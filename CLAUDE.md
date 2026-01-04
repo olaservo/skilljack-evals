@@ -50,3 +50,11 @@ Parser (YAML tasks) → Judge (LLM scoring) → Report (markdown/JSON)
 ## Environment
 
 Requires `.env` with `ANTHROPIC_API_KEY`.
+
+## Security
+
+This project has locked-down Claude Code permissions (`.claude/settings.json`):
+- **Write access**: Only `./results/` directory
+- **Read access**: `./evals/`, `./src/`, `./results/`
+- **Network**: Only `api.anthropic.com` (for judging)
+- **Blocked**: curl, wget, .env files, source code edits
