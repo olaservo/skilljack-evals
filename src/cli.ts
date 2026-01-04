@@ -31,7 +31,7 @@ program
     output?: string;
     numTasks: string;
   }) => {
-    const outputPath = options.output || path.join(process.cwd(), 'evals', skillName, 'tasks.xml');
+    const outputPath = options.output || path.join(process.cwd(), 'evals', skillName, 'tasks.yaml');
     const numTasks = parseInt(options.numTasks, 10);
 
     // Create directory if needed
@@ -54,16 +54,16 @@ program
 
 program
   .command('parse')
-  .description('Parse tasks.xml and output JSON (for Claude Code mode)')
+  .description('Parse tasks.yaml and output JSON (for Claude Code mode)')
   .argument('<skill_name>', 'Name of the skill')
-  .option('-f, --eval-file <path>', 'Path to evaluation XML file')
+  .option('-f, --eval-file <path>', 'Path to evaluation YAML file')
   .option('-o, --output <path>', 'Output JSON file (default: stdout)')
   .action(async (skillName: string, options: {
     evalFile?: string;
     output?: string;
   }) => {
     const baseDir = path.join(process.cwd(), 'evals', skillName);
-    const evalFile = options.evalFile || path.join(baseDir, 'tasks.xml');
+    const evalFile = options.evalFile || path.join(baseDir, 'tasks.yaml');
 
     try {
       await fs.access(evalFile);
