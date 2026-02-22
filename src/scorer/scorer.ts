@@ -51,7 +51,8 @@ export async function scoreTask(
     judgeResult = await judge.judgeResult(task, result);
   }
 
-  return mergeScores(task.id, deterministicResult, judgeResult, weights);
+  const isNegativeTest = task.expectedSkillLoad === 'none';
+  return mergeScores(task.id, deterministicResult, judgeResult, weights, isNegativeTest);
 }
 
 /**
@@ -87,11 +88,18 @@ function mergeScores(
   taskId: string,
   det: DeterministicResult | null,
   judge: JudgeScore | null,
-  weights: Map<string, number>
+  weights: Map<string, number>,
+  isNegativeTest = false
 ): CombinedScore {
+  // For negative tests (expectedSkillLoad === 'none'):
+  // discovery = 1 means correctly did NOT activate (good)
+  // discovery = 0 means incorrectly activated (false positive)
+  const computeDiscovery = (activated: boolean) =>
+    isNegativeTest ? (activated ? 0 : 1) : (activated ? 1 : 0);
+
   // Case 1: Both available — merge
   if (det && judge) {
-    const discovery = det.skillActivated ? 1 : 0;
+    const discovery = computeDiscovery(det.skillActivated);
     const adherence = judge.adherence;
     const outputQuality = judge.outputQuality;
 
@@ -131,7 +139,7 @@ function mergeScores(
 
   // Case 2: Deterministic only
   if (det) {
-    const discovery = det.skillActivated ? 1 : 0;
+    const discovery = computeDiscovery(det.skillActivated);
     const adherence = det.passed ? 5 : 1;
     const outputQuality = det.passed ? 5 : 1;
 
