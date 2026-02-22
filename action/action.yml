@@ -1,4 +1,4 @@
-name: 'Skill Evaluation'
+name: 'Agent Skill Evaluation'
 description: 'Run agent skill evaluations to test discoverability, adherence, and output quality'
 branding:
   icon: 'check-circle'
