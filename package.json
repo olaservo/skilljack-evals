@@ -1,23 +1,23 @@
 {
   "name": "@skill-evals/cli",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
-  "description": "CLI tools for skill evaluation framework - parse tasks, judge results, generate reports",
+  "description": "CLI for evaluating AI agent skill discoverability, adherence, and output quality. Runs as standalone CLI or GitHub Action.",
   "bin": {
-    "skill-evals": "./dist/cli.js"
+    "skill-eval": "./dist/src/cli.js"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
     }
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/cli.ts",
-    "start": "node dist/cli.js",
+    "start": "node dist/src/cli.js",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit"
   },
@@ -28,6 +28,7 @@
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
+    "@actions/core": "^1.10.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "tsx": "^4.0.0",
@@ -37,6 +38,7 @@
     "node": ">=20.0.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "action"
   ]
 }

@@ -1,8 +1,8 @@
 /**
- * Skill evaluation framework utilities.
+ * Skill evaluation framework.
  *
- * For automated evaluation using Claude Agent SDK, see the agent-sdk-runner.ts
- * template in the skill-eval-guide skill.
+ * Provides tools for evaluating AI agent skill discoverability,
+ * adherence, and output quality.
  *
  * @packageDocumentation
  */
@@ -11,23 +11,51 @@
 export type {
   EvalCriteria,
   EvalTask,
+  EvalDefaults,
   SkillEvaluation,
+  DeterministicCheck,
+  DeterministicResult,
+  FixtureConfig,
   ToolCallRecord,
   TaskResult,
   RunnerOptions,
   FailureCategory,
   JudgeScore,
   JudgeOptions,
+  CombinedScore,
+  SessionLogEntry,
+  MetricsData,
+  SessionLog,
   EvaluationSummary,
   FailureBreakdown,
+  ReportMetadata,
   EvaluationReport,
 } from './types.js';
 
-// Parser
-export { parseEvalFile, createEvalTemplate } from './parser.js';
+// Config
+export { loadConfig, loadConfigSync, getDefaultWeights, DEFAULT_CONFIG } from './config.js';
+export type { EvalConfig } from './config.js';
 
-// Judge
-export { SkillJudge } from './judge.js';
+// Parser
+export { parseEvalFile, createEvalTemplate, validateEvalFile } from './parser.js';
+
+// Runner
+export { SkillEvalRunner } from './runner/runner.js';
+export { setupLocalSkills, cleanupLocalSkills } from './runner/skill-setup.js';
+export { createToolPolicy } from './runner/security.js';
+
+// Scorer
+export { scoreTask, scoreAll } from './scorer/scorer.js';
+export { scoreDeterministic } from './scorer/deterministic.js';
+export { SkillJudge } from './scorer/judge.js';
+
+// Session
+export { SessionLogger } from './session/session-logger.js';
 
 // Report
-export { generateReport, generateJsonResults } from './report.js';
+export { generateReport, generateJsonResults, computeSummary, computeFailureBreakdown } from './report/report.js';
+export { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
+
+// Pipeline
+export { runPipeline, scorePipeline } from './pipeline.js';
+export type { PipelineOptions, PipelineResult } from './pipeline.js';

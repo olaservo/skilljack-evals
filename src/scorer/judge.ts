@@ -1,9 +1,26 @@
 /**
  * LLM-as-judge for scoring skill evaluation results.
+ *
+ * Uses Claude (via Agent SDK) to evaluate agent performance on three dimensions:
+ * - Discovery (0/1): Did agent load the expected skill?
+ * - Adherence (1-5): How well did agent follow skill instructions?
+ * - Output Quality (1-5): Does output meet task requirements?
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { EvalTask, TaskResult, JudgeScore, JudgeOptions, FailureCategory } from './types.js';
+import type {
+  EvalTask,
+  TaskResult,
+  JudgeScore,
+  JudgeOptions,
+  FailureCategory,
+} from '../types.js';
+import {
+  isAssistantMessage,
+  isResultMessage,
+  isTextBlock,
+} from '../types.js';
+import { loadConfigSync } from '../config.js';
 
 const JUDGE_PROMPT_TEMPLATE = `You are an expert evaluator for AI agent skills. Score this skill evaluation result.
 
@@ -31,6 +48,7 @@ Score the agent's performance on three dimensions:
 1. **Discovery (0 or 1)**: Did the agent load the expected skill "{expectedSkill}"?
    - Score 1 if the expected skill was loaded
    - Score 0 if it was not loaded
+   - If expected skill is "none", score 1 if NO skill was loaded, 0 if a skill was incorrectly loaded
 
 2. **Adherence (1-5)**: How well did the agent follow the skill's instructions?
    - 5 = Perfectly followed all instructions
@@ -48,6 +66,7 @@ Score the agent's performance on three dimensions:
 
 4. **Failure Category** (if score < 4 on any dimension):
    - "discovery_failure": Agent didn't load the skill when it should have
+   - "false_positive": Agent loaded a skill when it should NOT have
    - "instruction_ambiguity": Agent misinterpreted skill instructions
    - "missing_guidance": Skill didn't cover a needed case
    - "agent_error": Agent made a mistake despite clear guidance
@@ -72,8 +91,11 @@ export class SkillJudge {
   private options: Required<JudgeOptions>;
 
   constructor(options: JudgeOptions = {}) {
+    const config = loadConfigSync();
+
     this.options = {
-      model: options.model ?? 'haiku', // Haiku for faster/cheaper judging
+      model: options.model ?? config.defaultJudgeModel,
+      outputTruncation: options.outputTruncation ?? config.judgeOutputTruncation,
     };
   }
 
@@ -81,7 +103,6 @@ export class SkillJudge {
    * Build the prompt for the judge.
    */
   private buildJudgePrompt(task: EvalTask, result: TaskResult): string {
-    // Format criteria
     const criteriaLines = task.criteria.map(
       (c) => `- **${capitalize(c.dimension)}** (weight ${c.weight}): ${c.description}`
     );
@@ -89,12 +110,10 @@ export class SkillJudge {
       ? criteriaLines.join('\n')
       : '- No specific criteria defined';
 
-    // Format checklist
     const checklistText = task.goldenChecklist.length > 0
       ? task.goldenChecklist.map((item) => `- ${item}`).join('\n')
       : '- No checklist defined';
 
-    // Format skill loads
     const skillLoads = result.skillLoads.length > 0
       ? result.skillLoads.join(', ')
       : 'None';
@@ -105,7 +124,7 @@ export class SkillJudge {
       .replace('{criteriaText}', criteriaText)
       .replace('{checklistText}', checklistText)
       .replace('{skillLoads}', skillLoads)
-      .replace('{output}', result.output.slice(0, 5000) || '(no output)');
+      .replace('{output}', result.output.slice(0, this.options.outputTruncation) || '(no output)');
   }
 
   /**
@@ -116,7 +135,6 @@ export class SkillJudge {
     taskId: string,
     weights: Map<string, number>
   ): JudgeScore {
-    // Extract JSON from response (may be wrapped in markdown code blocks)
     const jsonMatch = response.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
       return this.createErrorScore(taskId, 'Failed to parse judge response');
@@ -129,7 +147,6 @@ export class SkillJudge {
       const adherence = Number(data.adherence) || 1;
       const outputQuality = Number(data.output_quality) || 1;
 
-      // Normalize to 0-1 scale for weighted calculation
       const adherenceNorm = (adherence - 1) / 4;
       const outputNorm = (outputQuality - 1) / 4;
 
@@ -152,9 +169,6 @@ export class SkillJudge {
     }
   }
 
-  /**
-   * Create an error score when parsing fails.
-   */
   private createErrorScore(taskId: string, reason: string): JudgeScore {
     return {
       taskId,
@@ -171,7 +185,6 @@ export class SkillJudge {
    * Score a single evaluation result.
    */
   async judgeResult(task: EvalTask, result: TaskResult): Promise<JudgeScore> {
-    // Handle error cases
     if (result.isError) {
       return {
         taskId: task.id,
@@ -184,7 +197,6 @@ export class SkillJudge {
       };
     }
 
-    // Build weights map from criteria
     const weights = new Map<string, number>();
     for (const c of task.criteria) {
       weights.set(c.dimension, c.weight);
@@ -199,34 +211,29 @@ export class SkillJudge {
         prompt,
         options: {
           model: this.options.model,
-          allowedTools: [], // No tools needed for judging
+          allowedTools: [],
           permissionMode: 'bypassPermissions',
         },
       })) {
-        // Capture text output
-        if (message.type === 'assistant' && message.message) {
-          const content = (message.message as any).content;
-          if (Array.isArray(content)) {
-            for (const block of content) {
-              if (block.type === 'text' && block.text) {
-                responseText += block.text;
-              }
+        if (isAssistantMessage(message)) {
+          const content = message.message.content;
+          for (const block of content) {
+            if (isTextBlock(block)) {
+              responseText += block.text;
             }
           }
         }
 
-        // Also check result message
-        if (message.type === 'result') {
-          const res = message as any;
-          if (res.result) {
-            responseText = res.result;
+        if (isResultMessage(message)) {
+          if (message.result) {
+            responseText = message.result;
           }
         }
       }
 
       return this.parseJudgeResponse(responseText, task.id, weights);
     } catch (error) {
-      // Fallback: simple heuristic scoring
+      // Fallback: heuristic scoring
       const discovery = result.skillLoads.includes(task.expectedSkillLoad) ? 1 : 0;
       return {
         taskId: task.id,

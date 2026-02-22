@@ -1,0 +1,72 @@
+name: 'Skill Evaluation'
+description: 'Run agent skill evaluations to test discoverability, adherence, and output quality'
+branding:
+  icon: 'check-circle'
+  color: 'blue'
+
+inputs:
+  tasks:
+    description: 'Path to tasks YAML file'
+    required: true
+  model:
+    description: 'Agent model for task execution'
+    required: false
+    default: 'sonnet'
+  judge-model:
+    description: 'Model for LLM-as-judge scoring'
+    required: false
+    default: 'haiku'
+  config:
+    description: 'Path to eval.config.yaml'
+    required: false
+  threshold-discovery:
+    description: 'Minimum discovery rate (0-1)'
+    required: false
+    default: '0.8'
+  threshold-score:
+    description: 'Minimum average score (1-5)'
+    required: false
+    default: '4.0'
+  timeout:
+    description: 'Per-task timeout in milliseconds'
+    required: false
+    default: '300000'
+  tasks-filter:
+    description: 'Comma-separated list of task IDs to run'
+    required: false
+  skills-dir:
+    description: 'Path to skills directory for local setup'
+    required: false
+  working-directory:
+    description: 'Working directory for agent execution'
+    required: false
+    default: '.'
+  no-judge:
+    description: 'Skip LLM judge scoring (deterministic only)'
+    required: false
+    default: 'false'
+  no-deterministic:
+    description: 'Skip deterministic scoring (LLM judge only)'
+    required: false
+    default: 'false'
+  anthropic-api-key:
+    description: 'Anthropic API key (or use ANTHROPIC_API_KEY env var)'
+    required: false
+
+outputs:
+  passed:
+    description: 'Whether all thresholds were met (true/false)'
+  discovery-rate:
+    description: 'Discovery rate achieved (0-1)'
+  avg-score:
+    description: 'Average weighted score achieved'
+  report-path:
+    description: 'Path to generated markdown report'
+  json-path:
+    description: 'Path to generated JSON report'
+
+runs:
+  using: 'node20'
+  main: '../dist/action/index.js'
+  # Note: For GitHub Actions marketplace, this path should be relative to repo root.
+  # If publishing as a GitHub Action, the main path is: dist/action/index.js

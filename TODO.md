@@ -1,0 +1,5 @@
+- Add Readme and setup instructions (API and Bedrock), can look at code execution example too
+- Where does it save results?  How to configure?
+- Make sure that bypassPermissions is actually what we want here and what precautions need to be put in place
+- Add example of using with eval skill in claude code (include here?)
+- Test again with real skills

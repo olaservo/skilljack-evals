@@ -1,0 +1,31 @@
+# Skill Evaluation Configuration
+# Override any of these with environment variables (EVAL_* prefix)
+
+models:
+  agent: sonnet        # EVAL_AGENT_MODEL
+  judge: haiku         # EVAL_JUDGE_MODEL
+
+scoring:
+  weights:
+    discovery: 0.3
+    adherence: 0.4
+    output: 0.3
+
+thresholds:
+  discovery_rate: 0.8  # EVAL_DISCOVERY_THRESHOLD (80%)
+  avg_score: 4.0       # EVAL_SCORE_THRESHOLD
+
+runner:
+  timeout_ms: 300000   # EVAL_TASK_TIMEOUT_MS (5 minutes)
+  allowed_write_dirs:
+    - ./results/
+    - ./fixtures/
+
+output:
+  dir: ./results       # EVAL_OUTPUT_DIR
+  judge_truncation: 5000
+  report_truncation: 2000
+
+ci:
+  exit_on_failure: true   # EVAL_EXIT_ON_FAILURE
+  github_summary: false   # EVAL_GITHUB_SUMMARY

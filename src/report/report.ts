@@ -1,5 +1,7 @@
 /**
  * Report generation for skill evaluation results.
+ *
+ * Generates markdown and JSON reports from combined evaluation scores.
  */
 
 import * as fs from 'fs/promises';
@@ -7,22 +9,14 @@ import * as path from 'path';
 import type {
   SkillEvaluation,
   TaskResult,
-  JudgeScore,
+  CombinedScore,
   EvaluationReport,
   EvaluationSummary,
   FailureBreakdown,
   FailureCategory,
-} from './types.js';
-
-export interface SkillMetadata {
-  skillName: string;
-  skillPath: string;
-  gitCommit?: string;
-  gitBranch?: string;
-  version?: string;
-  agentModel: string;
-  judgeModel: string;
-}
+  ReportMetadata,
+} from '../types.js';
+import { loadConfigSync } from '../config.js';
 
 /**
  * Generate a markdown report from evaluation results.
@@ -30,56 +24,28 @@ export interface SkillMetadata {
 export async function generateReport(
   evaluation: SkillEvaluation,
   results: TaskResult[],
-  scores: JudgeScore[],
+  scores: CombinedScore[],
   outputPath?: string,
-  metadata?: SkillMetadata
+  metadata?: ReportMetadata
 ): Promise<string> {
+  const config = loadConfigSync();
   const totalTasks = evaluation.tasks.length;
+  const summary = computeSummary(results, scores);
+  const failureBreakdown = computeFailureBreakdown(scores);
 
-  // Calculate summary metrics
-  const discoveryCorrect = scores.filter((s) => s.discovery >= 1).length;
-  const discoveryAccuracy = totalTasks > 0 ? (discoveryCorrect / totalTasks) * 100 : 0;
-
-  const avgAdherence = totalTasks > 0
-    ? scores.reduce((sum, s) => sum + s.adherence, 0) / totalTasks
-    : 0;
-  const avgOutput = totalTasks > 0
-    ? scores.reduce((sum, s) => sum + s.outputQuality, 0) / totalTasks
-    : 0;
-  const avgWeighted = totalTasks > 0
-    ? scores.reduce((sum, s) => sum + s.weightedScore, 0) / totalTasks
-    : 0;
-
-  const totalDuration = results.reduce((sum, r) => sum + r.durationMs, 0) / 1000;
-  const totalCost = results.reduce((sum, r) => sum + r.costUsd, 0);
-
-  // Failure category breakdown
-  const failureCounts = new Map<string, number>();
-  for (const s of scores) {
-    const cat = s.failureCategory || 'none';
-    failureCounts.set(cat, (failureCounts.get(cat) || 0) + 1);
-  }
-
-  const failureRows = Array.from(failureCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([cat, count]) => {
-      const pct = totalTasks > 0 ? (count / totalTasks) * 100 : 0;
-      const displayCat = cat === 'none' ? 'No Failure' : formatCategory(cat);
-      return `| ${displayCat} | ${count} | ${pct.toFixed(1)}% |`;
-    });
+  // Determine pass/fail
+  const discoveryPassed = summary.discoveryAccuracy >= config.discoveryThreshold;
+  const scorePassed = summary.avgAdherence >= config.scoreThreshold && summary.avgOutputQuality >= config.scoreThreshold;
+  const passed = discoveryPassed && scorePassed;
 
   // Build metadata section
   let metaSection = '';
   if (metadata) {
-    const metaLines = [
-      `**Skill Path:** \`${metadata.skillPath}\``,
-    ];
+    const metaLines = [`**Skill Path:** \`${metadata.skillPath}\``];
     if (metadata.gitCommit) {
       metaLines.push(`**Git:** ${metadata.gitBranch}@${metadata.gitCommit}`);
     }
-    if (metadata.version) {
-      metaLines.push(`**Version:** ${metadata.version}`);
-    }
+    if (metadata.version) metaLines.push(`**Version:** ${metadata.version}`);
     metaLines.push(`**Agent Model:** ${metadata.agentModel}`);
     metaLines.push(`**Judge Model:** ${metadata.judgeModel}`);
     metaSection = metaLines.join('\n') + '\n';
@@ -90,33 +56,34 @@ export async function generateReport(
 
 **Generated:** ${new Date().toISOString()}
 **Total Tasks:** ${totalTasks}
+**Result:** ${passed ? 'PASS' : 'FAIL'}
 ${metaSection}
 ---
 
 ## Summary
 
-| Metric | Value |
-|--------|-------|
-| **Discovery Accuracy** | ${discoveryAccuracy.toFixed(1)}% (${discoveryCorrect}/${totalTasks}) |
-| **Avg Adherence Score** | ${avgAdherence.toFixed(2)}/5.0 |
-| **Avg Output Quality** | ${avgOutput.toFixed(2)}/5.0 |
-| **Avg Weighted Score** | ${avgWeighted.toFixed(2)} |
-| **Total Duration** | ${totalDuration.toFixed(1)}s |
-| **Total Cost** | $${totalCost.toFixed(4)} |
+| Metric | Value | Threshold | Status |
+|--------|-------|-----------|--------|
+| **Discovery Accuracy** | ${(summary.discoveryAccuracy * 100).toFixed(1)}% | ${(config.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? 'PASS' : 'FAIL'} |
+| **Avg Adherence Score** | ${summary.avgAdherence.toFixed(2)}/5.0 | ${config.scoreThreshold.toFixed(1)} | ${summary.avgAdherence >= config.scoreThreshold ? 'PASS' : 'FAIL'} |
+| **Avg Output Quality** | ${summary.avgOutputQuality.toFixed(2)}/5.0 | ${config.scoreThreshold.toFixed(1)} | ${summary.avgOutputQuality >= config.scoreThreshold ? 'PASS' : 'FAIL'} |
+| **Avg Weighted Score** | ${summary.avgWeightedScore.toFixed(2)} | | |
+| **Total Duration** | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |
+| **Total Cost** | $${summary.totalCostUsd.toFixed(4)} | | |
 
 ## Failure Analysis
 
 | Category | Count | Percentage |
 |----------|-------|------------|
-${failureRows.join('\n')}
-
----
-
-## Task Details
-
 `;
 
-  // Add task details
+  for (const fb of failureBreakdown) {
+    const displayCat = fb.category === 'none' ? 'No Failure' : formatCategory(fb.category);
+    report += `| ${displayCat} | ${fb.count} | ${fb.percentage.toFixed(1)}% |\n`;
+  }
+
+  report += `\n---\n\n## Task Details\n\n`;
+
   for (let i = 0; i < evaluation.tasks.length; i++) {
     const task = evaluation.tasks[i];
     const result = results[i];
@@ -137,20 +104,29 @@ ${failureRows.join('\n')}
 
 | Dimension | Score | Status |
 |-----------|-------|--------|
-| Discovery | ${Math.round(score.discovery)} | ${statusIndicator(score.discovery, 1)} |
-| Adherence | ${score.adherence}/5 | ${statusIndicator(score.adherence, 4)} |
-| Output Quality | ${score.outputQuality}/5 | ${statusIndicator(score.outputQuality, 4)} |
+| Discovery | ${Math.round(score.discovery)} | ${score.discovery >= 1 ? 'PASS' : 'FAIL'} |
+| Adherence | ${score.adherence}/5 | ${score.adherence >= 4 ? 'PASS' : 'FAIL'} |
+| Output Quality | ${score.outputQuality}/5 | ${score.outputQuality >= 4 ? 'PASS' : 'FAIL'} |
 | **Weighted** | **${score.weightedScore.toFixed(2)}** | |
 
 **Failure Category:** ${formatCategory(score.failureCategory)}
+`;
 
-**Judge Reasoning:** ${score.reasoning || 'No reasoning provided'}
+    // Show deterministic results if available
+    if (score.deterministic) {
+      report += `\n**Deterministic Check:** ${score.deterministic.passed ? 'PASS' : 'FAIL'}\n`;
+      for (const detail of score.deterministic.details) {
+        report += `- ${detail}\n`;
+      }
+    }
+
+    report += `\n**Reasoning:** ${score.reasoning || 'No reasoning provided'}
 
 <details>
 <summary>Agent Output (click to expand)</summary>
 
 \`\`\`
-${result.output.slice(0, 2000) || '(no output)'}
+${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
 \`\`\`
 
 </details>
@@ -162,7 +138,6 @@ ${result.output.slice(0, 2000) || '(no output)'}
 `;
   }
 
-  // Write to file if path provided
   if (outputPath) {
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, report);
@@ -173,21 +148,45 @@ ${result.output.slice(0, 2000) || '(no output)'}
 }
 
 /**
- * Generate JSON results for programmatic analysis.
+ * Generate JSON report for programmatic analysis.
  */
 export async function generateJsonResults(
   evaluation: SkillEvaluation,
   results: TaskResult[],
-  scores: JudgeScore[],
+  scores: CombinedScore[],
   outputPath?: string,
-  metadata?: SkillMetadata
+  metadata?: ReportMetadata
 ): Promise<EvaluationReport> {
+  const config = loadConfigSync();
   const summary = computeSummary(results, scores);
   const failureBreakdown = computeFailureBreakdown(scores);
+
+  const discoveryPassed = summary.discoveryAccuracy >= config.discoveryThreshold;
+  const scorePassed = summary.avgAdherence >= config.scoreThreshold && summary.avgOutputQuality >= config.scoreThreshold;
+  const passed = discoveryPassed && scorePassed;
+
+  const failureReasons: string[] = [];
+  if (!discoveryPassed) {
+    failureReasons.push(
+      `Discovery rate ${(summary.discoveryAccuracy * 100).toFixed(1)}% below threshold ${(config.discoveryThreshold * 100).toFixed(0)}%`
+    );
+  }
+  if (summary.avgAdherence < config.scoreThreshold) {
+    failureReasons.push(
+      `Avg adherence ${summary.avgAdherence.toFixed(2)} below threshold ${config.scoreThreshold}`
+    );
+  }
+  if (summary.avgOutputQuality < config.scoreThreshold) {
+    failureReasons.push(
+      `Avg output quality ${summary.avgOutputQuality.toFixed(2)} below threshold ${config.scoreThreshold}`
+    );
+  }
 
   const report: EvaluationReport = {
     skillName: evaluation.skillName,
     timestamp: new Date().toISOString(),
+    passed,
+    failureReasons,
     metadata: metadata ? {
       skillPath: metadata.skillPath,
       gitCommit: metadata.gitCommit,
@@ -215,9 +214,12 @@ export async function generateJsonResults(
 }
 
 /**
- * Compute summary statistics.
+ * Compute summary statistics from combined scores.
  */
-function computeSummary(results: TaskResult[], scores: JudgeScore[]): EvaluationSummary {
+export function computeSummary(
+  results: TaskResult[],
+  scores: CombinedScore[]
+): EvaluationSummary {
   const totalTasks = scores.length;
   const discoveryCorrect = scores.filter((s) => s.discovery >= 1).length;
 
@@ -241,7 +243,7 @@ function computeSummary(results: TaskResult[], scores: JudgeScore[]): Evaluation
 /**
  * Compute failure category breakdown.
  */
-function computeFailureBreakdown(scores: JudgeScore[]): FailureBreakdown[] {
+export function computeFailureBreakdown(scores: CombinedScore[]): FailureBreakdown[] {
   const counts = new Map<string, number>();
   for (const score of scores) {
     const cat = score.failureCategory || 'none';
@@ -258,16 +260,6 @@ function computeFailureBreakdown(scores: JudgeScore[]): FailureBreakdown[] {
     .sort((a, b) => b.count - a.count);
 }
 
-/**
- * Return status indicator based on score vs threshold.
- */
-function statusIndicator(score: number, threshold: number): string {
-  return score >= threshold ? 'PASS' : 'FAIL';
-}
-
-/**
- * Format a failure category for display.
- */
 function formatCategory(cat: string): string {
   if (cat === 'none') return 'No Failure';
   return cat

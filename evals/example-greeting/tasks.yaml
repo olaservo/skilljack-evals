@@ -1,0 +1,51 @@
+skill: greeting
+version: "1.0"
+
+defaults:
+  expected_skill_load: greeting
+  criteria:
+    discovery: { weight: 0.3 }
+    adherence: { weight: 0.4 }
+    output: { weight: 0.3 }
+
+tasks:
+  - id: gr-001
+    prompt: "Hello! Please greet me using the greeting skill."
+    deterministic:
+      expect_skill_activation: true
+      expect_marker: "GREETING_SUCCESS"
+    criteria:
+      discovery: { weight: 0.3, description: "Should load the greeting skill" }
+      adherence: { weight: 0.4, description: "Should follow the greeting format specified in the skill" }
+      output: { weight: 0.3, description: "Greeting should be friendly and include the success marker" }
+    golden_checklist:
+      - "Loaded the greeting skill"
+      - "Included GREETING_SUCCESS marker in output"
+      - "Friendly and welcoming tone"
+
+  - id: gr-002
+    prompt: "Hi there! Can you say hello in a special way?"
+    deterministic:
+      expect_skill_activation: true
+      expect_marker: "GREETING_SUCCESS"
+    criteria:
+      discovery: { weight: 0.3, description: "Should load the greeting skill" }
+      adherence: { weight: 0.4, description: "Should recognize this as a greeting request and follow skill format" }
+      output: { weight: 0.3, description: "Should produce a formatted greeting with marker" }
+    golden_checklist:
+      - "Recognized the greeting intent"
+      - "Used the greeting skill"
+      - "Output includes the marker phrase"
+
+  - id: gr-fp-001
+    prompt: "What are some best practices for writing greeting messages in emails?"
+    expected_skill_load: none
+    deterministic:
+      expect_skill_activation: false
+    criteria:
+      discovery: { weight: 0.5, description: "Should NOT load the greeting skill - this is an educational question" }
+      adherence: { weight: 0.3, description: "Should answer the question about email greetings" }
+      output: { weight: 0.2, description: "Should provide helpful email greeting advice" }
+    golden_checklist:
+      - "Did not load the greeting skill"
+      - "Provided useful email greeting advice"
