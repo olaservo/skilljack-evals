@@ -1,6 +1,6 @@
 # skilljack-evals
 
-CLI for evaluating AI agent skills. Tests how well agents discover, load, and execute [Agent Skills](https://agentskills.io/home) — measuring discoverability, instruction adherence, and output quality.
+CLI for evaluating AI agent skills using the Claude Agent SDK. Tests how well agents discover, load, and execute [Agent Skills](https://agentskills.io/home) — measuring discoverability, instruction adherence, and output quality.
 
 Runs standalone or as a GitHub Action.
 
@@ -313,6 +313,10 @@ const score = await judge.judgeResult(task, result);
 const detScore = scoreDeterministic(task, result);
 const report = generateReport(evaluation, results, scores);
 ```
+
+## Roadmap
+
+The runner currently uses the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) to execute tasks. Support for other models and agent clients is planned for future releases.
 
 ## Development
 
