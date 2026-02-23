@@ -8,8 +8,8 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { parseEvalFile } from './parser.js';
-import { SkillEvalRunner } from './runner/runner.js';
 import { setupLocalSkills, cleanupLocalSkills } from './runner/skill-setup.js';
+import { createRunner } from './runner/runner-factory.js';
 import { scoreAll, type ScorerOptions } from './scorer/scorer.js';
 import { SessionLogger } from './session/session-logger.js';
 import { generateReport, generateJsonResults, computeSummary } from './report/report.js';
@@ -103,22 +103,26 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     }
   }
 
+  // 2b. Setup local skills (Claude SDK copies to .claude/skills/; others pass skillsDir to runner)
   let skillsSetup = false;
-  if (skillsDir) {
+  if (skillsDir && config.runnerType === 'claude-sdk') {
     console.log(`Setting up local skills from: ${skillsDir}`);
     const skillNames = await setupLocalSkills(skillsDir, cwd);
     skillsSetup = true;
     console.log(`Skills configured: ${skillNames.join(', ')}`);
+  } else if (skillsDir) {
+    console.log(`Skills directory: ${skillsDir} (${config.runnerType} handles discovery natively)`);
   }
 
   try {
     // 3. Run agent against tasks (N times)
     const numRuns = options.numRuns ?? 3;
-    const runner = new SkillEvalRunner({
+    const runner = await createRunner(config.runnerType, {
       cwd,
       model: config.defaultAgentModel,
       parallel: false,
       allowedWriteDirs: config.allowedWriteDirs,
+      skillsDir,
     });
 
     const logDir = path.join(config.outputDir, 'logs');
@@ -133,9 +137,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
     for (let run = 0; run < numRuns; run++) {
       if (numRuns > 1) {
-        console.log(`\n--- Run ${run + 1}/${numRuns} ---\n`);
+        console.log(`\n--- Run ${run + 1}/${numRuns} (${config.runnerType}) ---\n`);
       } else {
-        console.log('\n--- Running Tasks ---\n');
+        console.log(`\n--- Running Tasks (${config.runnerType}) ---\n`);
       }
 
       const runLogDir = numRuns > 1 ? path.join(logDir, `run-${run + 1}`) : logDir;
@@ -181,6 +185,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
     const metadata: ReportMetadata = {
       skillPath: options.tasksFile,
+      runnerType: config.runnerType,
       agentModel: config.defaultAgentModel,
       judgeModel: config.defaultJudgeModel,
     };

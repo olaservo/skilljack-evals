@@ -214,6 +214,7 @@ export async function generateJsonResults(
       gitCommit: metadata.gitCommit,
       gitBranch: metadata.gitBranch,
       version: metadata.version,
+      runnerType: metadata.runnerType,
       agentModel: metadata.agentModel,
       judgeModel: metadata.judgeModel,
     } : undefined,

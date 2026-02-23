@@ -213,6 +213,7 @@ export interface ReportMetadata {
   gitCommit?: string;
   gitBranch?: string;
   version?: string;
+  runnerType?: string;
   agentModel: string;
   judgeModel: string;
 }

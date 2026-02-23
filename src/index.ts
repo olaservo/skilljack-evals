@@ -34,13 +34,17 @@ export type {
 
 // Config
 export { loadConfig, loadConfigSync, getDefaultWeights, DEFAULT_CONFIG } from './config.js';
-export type { EvalConfig } from './config.js';
+export type { EvalConfig, RunnerType as ConfigRunnerType } from './config.js';
 
 // Parser
 export { parseEvalFile, createEvalTemplate, validateEvalFile } from './parser.js';
 
 // Runner
 export { SkillEvalRunner } from './runner/runner.js';
+export { ClaudeSdkRunner } from './runner/claude-sdk-runner.js';
+export type { AgentRunner, AgentRunnerOptions } from './runner/agent-runner.js';
+export { createRunner } from './runner/runner-factory.js';
+export type { RunnerType } from './runner/runner-factory.js';
 export { setupLocalSkills, cleanupLocalSkills } from './runner/skill-setup.js';
 export { createToolPolicy } from './runner/security.js';
 
