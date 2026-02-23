@@ -3,7 +3,7 @@
 /**
  * CLI for skill evaluation framework.
  *
- * Primary command: `skill-eval run` — runs the full evaluation pipeline.
+ * Primary command: `skilljack-evals run` — runs the full evaluation pipeline.
  * Also supports: score, report, create-eval, validate.
  */
 
@@ -21,7 +21,7 @@ import type { EvalConfig } from './config.js';
 const program = new Command();
 
 program
-  .name('skill-eval')
+  .name('skilljack-evals')
   .description('Skill evaluation CLI — run evaluations, score results, generate reports')
   .version('1.0.0');
 
@@ -207,7 +207,7 @@ program
     console.log();
     console.log('Next steps:');
     console.log(`1. Edit ${outputPath} to add real evaluation tasks`);
-    console.log(`2. Run: skill-eval run ${outputPath}`);
+    console.log(`2. Run: skilljack-evals run ${outputPath}`);
   });
 
 // ============================================

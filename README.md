@@ -1,4 +1,4 @@
-# skill-eval-cli
+# skilljack-evals
 
 CLI for evaluating AI agent skills. Tests how well agents discover, load, and execute [Agent Skills](https://agentskills.io/home) — measuring discoverability, instruction adherence, and output quality.
 
@@ -24,13 +24,13 @@ npm run build
 
 ```bash
 # Run the example greeting evaluation
-skill-eval run evals/example-greeting/tasks.yaml --verbose
+skilljack-evals run evals/example-greeting/tasks.yaml --verbose
 
 # Deterministic scoring only (no LLM judge, free)
-skill-eval run evals/example-greeting/tasks.yaml --no-judge
+skilljack-evals run evals/example-greeting/tasks.yaml --no-judge
 
 # Validate a task file without running
-skill-eval validate evals/example-greeting/tasks.yaml
+skilljack-evals validate evals/example-greeting/tasks.yaml
 ```
 
 ## Configuration
@@ -93,7 +93,7 @@ ci:
 Runs the agent against tasks, scores results, and generates reports.
 
 ```bash
-skill-eval run evals/greeting/tasks.yaml \
+skilljack-evals run evals/greeting/tasks.yaml \
   --model sonnet --judge-model haiku \
   --timeout 300000 \
   --tasks gr-001,gr-002 \
@@ -105,31 +105,31 @@ skill-eval run evals/greeting/tasks.yaml \
 ### `score` — Score existing results
 
 ```bash
-skill-eval score results.json --judge-model haiku
+skilljack-evals score results.json --judge-model haiku
 ```
 
 ### `report` — Generate reports from scored results
 
 ```bash
-skill-eval report results.json -o report.md --json report.json
+skilljack-evals report results.json -o report.md --json report.json
 ```
 
 ### `validate` — Check YAML syntax
 
 ```bash
-skill-eval validate evals/greeting/tasks.yaml
+skilljack-evals validate evals/greeting/tasks.yaml
 ```
 
 ### `create-eval` — Generate task template
 
 ```bash
-skill-eval create-eval greeting -o evals/greeting/tasks.yaml -n 10
+skilljack-evals create-eval greeting -o evals/greeting/tasks.yaml -n 10
 ```
 
 ### `parse` — Parse YAML to JSON
 
 ```bash
-skill-eval parse evals/greeting/tasks.yaml
+skilljack-evals parse evals/greeting/tasks.yaml
 ```
 
 ## Architecture
@@ -222,7 +222,7 @@ Both `deterministic` and `criteria` blocks are optional. If both are present, th
 ## GitHub Action
 
 ```yaml
-- uses: your-org/skill-eval@v1
+- uses: olaservo/skilljack-evals@v1
   with:
     tasks: evals/commit/tasks.yaml
     threshold-discovery: '0.8'
@@ -269,7 +269,7 @@ import {
   runPipeline,
   scoreDeterministic,
   loadConfig,
-} from '@skill-evals/cli';
+} from '@skilljack/evals';
 
 // Full pipeline
 const result = await runPipeline('evals/greeting/tasks.yaml', {
