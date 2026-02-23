@@ -84,11 +84,26 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
   console.log(`Running ${evaluation.tasks.length} task(s) for skill: ${evaluation.skillName}`);
 
-  // 2. Setup local skills if skills directory provided
+  // 2. Setup local skills
+  // Auto-detect skills/ directory relative to tasks file if not explicitly provided
+  let skillsDir = options.skillsDir;
+  if (!skillsDir) {
+    const tasksDir = path.dirname(path.resolve(options.tasksFile));
+    const autoSkillsDir = path.join(tasksDir, 'skills');
+    try {
+      const stat = await fs.stat(autoSkillsDir);
+      if (stat.isDirectory()) {
+        skillsDir = autoSkillsDir;
+      }
+    } catch {
+      // No skills/ directory found, that's fine
+    }
+  }
+
   let skillsSetup = false;
-  if (options.skillsDir) {
-    console.log(`Setting up local skills from: ${options.skillsDir}`);
-    const skillNames = await setupLocalSkills(options.skillsDir, cwd);
+  if (skillsDir) {
+    console.log(`Setting up local skills from: ${skillsDir}`);
+    const skillNames = await setupLocalSkills(skillsDir, cwd);
     skillsSetup = true;
     console.log(`Skills configured: ${skillNames.join(', ')}`);
   }
