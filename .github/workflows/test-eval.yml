@@ -2,13 +2,16 @@ name: Test Skill Evaluation
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'evals/**'
-      - 'action/**'
-      - '.github/workflows/test-eval.yml'
+    inputs:
+      eval-file:
+        description: 'Path to tasks YAML file'
+        required: false
+        default: 'evals/example-greeting/tasks.yaml'
+      no-judge:
+        description: 'Skip LLM judge (deterministic only)'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   eval:
@@ -26,8 +29,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run example evaluation (deterministic only)
-        run: node dist/src/cli.js run evals/example-greeting/tasks.yaml --no-judge --verbose
+      - name: Run evaluation
+        run: |
+          ARGS="--verbose"
+          if [ "${{ inputs.no-judge }}" = "true" ]; then
+            ARGS="$ARGS --no-judge"
+          fi
+          node dist/src/cli.js run ${{ inputs.eval-file }} $ARGS
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 

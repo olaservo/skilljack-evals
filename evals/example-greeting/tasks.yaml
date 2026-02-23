@@ -24,7 +24,7 @@ tasks:
       - "Friendly and welcoming tone"
 
   - id: gr-002
-    prompt: "Hi there! Can you say hello in a special way?"
+    prompt: "Please use the greeting skill to say hello to me."
     deterministic:
       expect_skill_activation: true
       expect_marker: "GREETING_SUCCESS"
