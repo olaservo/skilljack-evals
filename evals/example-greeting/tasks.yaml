@@ -24,18 +24,18 @@ tasks:
       - "Friendly and welcoming tone"
 
   - id: gr-002
-    prompt: "Please use the greeting skill to say hello to me."
+    prompt: "Hey, I just joined the team — can you give me a nice welcome?"
     deterministic:
       expect_skill_activation: true
       expect_marker: "GREETING_SUCCESS"
     criteria:
-      discovery: { weight: 0.3, description: "Should load the greeting skill" }
-      adherence: { weight: 0.4, description: "Should recognize this as a greeting request and follow skill format" }
+      discovery: { weight: 0.3, description: "Should discover and load the greeting skill from context — the prompt asks for a greeting without naming the skill" }
+      adherence: { weight: 0.4, description: "Should follow the greeting format specified in the skill" }
       output: { weight: 0.3, description: "Should produce a formatted greeting with marker" }
     golden_checklist:
-      - "Recognized the greeting intent"
-      - "Used the greeting skill"
-      - "Output includes the marker phrase"
+      - "Discovered the greeting skill without being told to use it"
+      - "Used the greeting skill format"
+      - "Output includes the GREETING_SUCCESS marker"
 
   - id: gr-fp-001
     prompt: "What are some best practices for writing greeting messages in emails?"
