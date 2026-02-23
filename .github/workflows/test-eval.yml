@@ -12,6 +12,11 @@ on:
         required: false
         type: boolean
         default: true
+      runs-number:
+        description: 'Number of times to run each task'
+        required: false
+        type: number
+        default: 3
 
 jobs:
   eval:
@@ -31,7 +36,7 @@ jobs:
 
       - name: Run evaluation
         run: |
-          ARGS="--verbose"
+          ARGS="--verbose --runs $RUNS_NUMBER"
           if [ "$NO_JUDGE" = "true" ]; then
             ARGS="$ARGS --no-judge"
           fi
@@ -40,6 +45,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           EVAL_FILE: ${{ inputs.eval-file }}
           NO_JUDGE: ${{ inputs.no-judge }}
+          RUNS_NUMBER: ${{ inputs.runs-number }}
 
       - name: Upload results
         if: always()

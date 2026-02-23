@@ -15,6 +15,7 @@ import { SessionLogger } from './session/session-logger.js';
 import { generateReport, generateJsonResults, computeSummary } from './report/report.js';
 import { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
 import { loadConfig, type EvalConfig } from './config.js';
+import { aggregateResults, aggregateScores } from './scorer/aggregator.js';
 import type {
   SkillEvaluation,
   TaskResult,
@@ -41,6 +42,8 @@ export interface PipelineOptions {
   noDeterministic?: boolean;
   /** Skip LLM judge scoring */
   noJudge?: boolean;
+  /** Number of times to run each task (default: 3) */
+  numRuns?: number;
   /** Enable verbose logging */
   verbose?: boolean;
 }
@@ -109,8 +112,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   }
 
   try {
-    // 3. Run agent against tasks
-    console.log('\n--- Running Tasks ---\n');
+    // 3. Run agent against tasks (N times)
+    const numRuns = options.numRuns ?? 3;
     const runner = new SkillEvalRunner({
       cwd,
       model: config.defaultAgentModel,
@@ -119,19 +122,55 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     });
 
     const logDir = path.join(config.outputDir, 'logs');
-    const results = await runner.runAll(
-      evaluation,
-      (task: EvalTask) => new SessionLogger(task.id, logDir)
-    );
-
-    // 4. Score results
-    console.log('\n--- Scoring ---\n');
     const scorerOptions: ScorerOptions = {
       noDeterministic: options.noDeterministic,
       noJudge: options.noJudge,
       judgeOptions: { model: config.defaultJudgeModel },
     };
-    const scores = await scoreAll(evaluation.tasks, results, scorerOptions);
+
+    const allResults: TaskResult[][] = [];
+    const allScores: CombinedScore[][] = [];
+
+    for (let run = 0; run < numRuns; run++) {
+      if (numRuns > 1) {
+        console.log(`\n--- Run ${run + 1}/${numRuns} ---\n`);
+      } else {
+        console.log('\n--- Running Tasks ---\n');
+      }
+
+      const runLogDir = numRuns > 1 ? path.join(logDir, `run-${run + 1}`) : logDir;
+      const results = await runner.runAll(
+        evaluation,
+        (task: EvalTask) => new SessionLogger(task.id, runLogDir)
+      );
+      allResults.push(results);
+
+      // Score this run
+      if (numRuns > 1) {
+        console.log(`\n--- Scoring Run ${run + 1}/${numRuns} ---\n`);
+      } else {
+        console.log('\n--- Scoring ---\n');
+      }
+      const scores = await scoreAll(evaluation.tasks, results, scorerOptions);
+      allScores.push(scores);
+    }
+
+    // Aggregate across runs
+    const results = aggregateResults(allResults, allScores);
+    const scores = aggregateScores(allScores);
+
+    // Build per-run details for the report
+    const runDetails: Array<{ result: TaskResult; score: CombinedScore }>[] = [];
+    if (numRuns > 1) {
+      for (let t = 0; t < evaluation.tasks.length; t++) {
+        runDetails.push(
+          allResults.map((r, run) => ({
+            result: r[t],
+            score: allScores[run][t],
+          }))
+        );
+      }
+    }
 
     // 5. Generate reports
     console.log('\n--- Generating Reports ---\n');
@@ -146,8 +185,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       judgeModel: config.defaultJudgeModel,
     };
 
-    await generateReport(evaluation, results, scores, reportPath, metadata);
-    const report = await generateJsonResults(evaluation, results, scores, jsonPath, metadata);
+    await generateReport(evaluation, results, scores, reportPath, metadata, numRuns, runDetails);
+    const report = await generateJsonResults(evaluation, results, scores, jsonPath, metadata, numRuns, runDetails);
 
     // 6. GitHub summary
     if (config.githubSummary) {
@@ -247,6 +286,9 @@ function printSummary(report: EvaluationReport): void {
   console.log(`  Skill Evaluation: ${report.skillName}`);
   console.log('='.repeat(50));
   console.log(`  Result: ${report.passed ? 'PASS' : 'FAIL'}`);
+  if (s.numRuns > 1) {
+    console.log(`  Runs: ${s.numRuns}`);
+  }
   console.log(`  Discovery: ${(s.discoveryAccuracy * 100).toFixed(0)}%`);
   console.log(`  Avg Adherence: ${s.avgAdherence.toFixed(2)}/5`);
   console.log(`  Avg Output Quality: ${s.avgOutputQuality.toFixed(2)}/5`);

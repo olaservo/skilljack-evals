@@ -48,6 +48,7 @@ export { createToolPolicy } from './runner/security.js';
 export { scoreTask, scoreAll } from './scorer/scorer.js';
 export { scoreDeterministic } from './scorer/deterministic.js';
 export { SkillJudge } from './scorer/judge.js';
+export { aggregateResults, aggregateScores } from './scorer/aggregator.js';
 
 // Session
 export { SessionLogger } from './session/session-logger.js';

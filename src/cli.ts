@@ -45,6 +45,7 @@ program
   .option('--threshold-score <score>', 'Min avg score (1-5)')
   .option('--no-judge', 'Skip LLM judge scoring (deterministic only)')
   .option('--no-deterministic', 'Skip deterministic scoring (LLM judge only)')
+  .option('--runs <number>', 'Number of times to run each task (default: 3)')
   .option('--github-summary', 'Write GitHub Actions step summary')
   .option('--verbose', 'Enable verbose output')
   .action(async (tasksFile: string, options: {
@@ -60,6 +61,7 @@ program
     thresholdScore?: string;
     judge?: boolean;
     deterministic?: boolean;
+    runs?: string;
     githubSummary?: boolean;
     verbose?: boolean;
   }) => {
@@ -82,6 +84,7 @@ program
         taskFilter: options.tasks,
         noJudge: options.judge === false,
         noDeterministic: options.deterministic === false,
+        numRuns: options.runs ? parseInt(options.runs, 10) : undefined,
         verbose: options.verbose,
       });
 

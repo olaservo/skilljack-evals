@@ -26,11 +26,13 @@ export async function generateReport(
   results: TaskResult[],
   scores: CombinedScore[],
   outputPath?: string,
-  metadata?: ReportMetadata
+  metadata?: ReportMetadata,
+  numRuns = 1,
+  runDetails?: Array<{ result: TaskResult; score: CombinedScore }>[]
 ): Promise<string> {
   const config = loadConfigSync();
   const totalTasks = evaluation.tasks.length;
-  const summary = computeSummary(results, scores);
+  const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
 
   // Determine pass/fail
@@ -52,11 +54,13 @@ export async function generateReport(
   }
 
   // Build report
+  const runsLine = numRuns > 1 ? `**Runs per Task:** ${numRuns}\n` : '';
+
   let report = `# Skill Evaluation Report: ${evaluation.skillName}
 
 **Generated:** ${new Date().toISOString()}
 **Total Tasks:** ${totalTasks}
-**Result:** ${passed ? 'PASS' : 'FAIL'}
+${runsLine}**Result:** ${passed ? 'PASS' : 'FAIL'}
 ${metaSection}
 ---
 
@@ -132,10 +136,26 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
 </details>
 
 **Metrics:** Duration: ${(result.durationMs / 1000).toFixed(1)}s | Turns: ${result.numTurns} | Cost: $${result.costUsd.toFixed(4)}
-
----
-
 `;
+
+    // Per-run breakdown
+    if (runDetails && runDetails[i] && runDetails[i].length > 1) {
+      report += `
+<details>
+<summary>Per-run breakdown (${runDetails[i].length} runs)</summary>
+
+| Run | Discovery | Adherence | Output | Weighted | Skills Loaded |
+|-----|-----------|-----------|--------|----------|---------------|
+`;
+      for (let r = 0; r < runDetails[i].length; r++) {
+        const rd = runDetails[i][r];
+        const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(', ') : 'none';
+        report += `| ${r + 1} | ${rd.score.discovery} | ${rd.score.adherence}/5 | ${rd.score.outputQuality}/5 | ${rd.score.weightedScore.toFixed(2)} | ${skills} |\n`;
+      }
+      report += `\n</details>\n`;
+    }
+
+    report += `\n---\n\n`;
   }
 
   if (outputPath) {
@@ -155,10 +175,12 @@ export async function generateJsonResults(
   results: TaskResult[],
   scores: CombinedScore[],
   outputPath?: string,
-  metadata?: ReportMetadata
+  metadata?: ReportMetadata,
+  numRuns = 1,
+  runDetails?: Array<{ result: TaskResult; score: CombinedScore }>[]
 ): Promise<EvaluationReport> {
   const config = loadConfigSync();
-  const summary = computeSummary(results, scores);
+  const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
 
   const discoveryPassed = summary.discoveryAccuracy >= config.discoveryThreshold;
@@ -201,6 +223,7 @@ export async function generateJsonResults(
       task,
       result: results[i],
       score: scores[i],
+      runDetails: runDetails?.[i],
     })),
   };
 
@@ -218,14 +241,21 @@ export async function generateJsonResults(
  */
 export function computeSummary(
   results: TaskResult[],
-  scores: CombinedScore[]
+  scores: CombinedScore[],
+  numRuns = 1
 ): EvaluationSummary {
   const totalTasks = scores.length;
-  const discoveryCorrect = scores.filter((s) => s.discovery >= 1).length;
+
+  // With multi-run, discovery is a float (0-1) per task representing the rate.
+  // Average across tasks to get overall discovery accuracy.
+  const avgDiscovery = totalTasks > 0
+    ? scores.reduce((sum, s) => sum + s.discovery, 0) / totalTasks
+    : 0;
 
   return {
     totalTasks,
-    discoveryAccuracy: totalTasks > 0 ? discoveryCorrect / totalTasks : 0,
+    numRuns,
+    discoveryAccuracy: avgDiscovery,
     avgAdherence: totalTasks > 0
       ? scores.reduce((sum, s) => sum + s.adherence, 0) / totalTasks
       : 0,

@@ -49,6 +49,10 @@ inputs:
     description: 'Skip deterministic scoring (LLM judge only)'
     required: false
     default: 'false'
+  runs:
+    description: 'Number of times to run each task (default: 3)'
+    required: false
+    default: '3'
   anthropic-api-key:
     description: 'Anthropic API key (or use ANTHROPIC_API_KEY env var)'
     required: false

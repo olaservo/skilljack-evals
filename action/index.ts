@@ -24,6 +24,7 @@ async function run(): Promise<void> {
     const cwd = core.getInput('working-directory') || process.cwd();
     const noJudge = core.getInput('no-judge') === 'true';
     const noDeterministic = core.getInput('no-deterministic') === 'true';
+    const numRuns = parseInt(core.getInput('runs') || '3', 10);
 
     // Handle API key
     const apiKey = core.getInput('anthropic-api-key') || process.env.ANTHROPIC_API_KEY;
@@ -52,6 +53,7 @@ async function run(): Promise<void> {
       taskFilter: tasksFilter,
       noJudge,
       noDeterministic,
+      numRuns,
     });
 
     // Set outputs

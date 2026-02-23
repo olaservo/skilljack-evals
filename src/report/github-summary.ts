@@ -20,7 +20,8 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   const lines: string[] = [];
 
   const icon = report.passed ? ':white_check_mark:' : ':x:';
-  lines.push(`## ${icon} Skill Evaluation: ${report.skillName}`);
+  const runsLabel = summary.numRuns > 1 ? ` (${summary.numRuns} runs)` : '';
+  lines.push(`## ${icon} Skill Evaluation: ${report.skillName}${runsLabel}`);
   lines.push('');
 
   // Summary table

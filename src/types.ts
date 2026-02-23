@@ -193,6 +193,7 @@ export interface SessionLog {
 
 export interface EvaluationSummary {
   totalTasks: number;
+  numRuns: number;
   discoveryAccuracy: number; // 0-1
   avgAdherence: number; // 1-5
   avgOutputQuality: number; // 1-5
@@ -229,6 +230,7 @@ export interface EvaluationReport {
     result: TaskResult;
     score: CombinedScore;
     sessionLogPath?: string;
+    runDetails?: Array<{ result: TaskResult; score: CombinedScore }>;
   }>;
 }
 
