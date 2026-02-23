@@ -32,12 +32,14 @@ jobs:
       - name: Run evaluation
         run: |
           ARGS="--verbose"
-          if [ "${{ inputs.no-judge }}" = "true" ]; then
+          if [ "$NO_JUDGE" = "true" ]; then
             ARGS="$ARGS --no-judge"
           fi
-          node dist/src/cli.js run ${{ inputs.eval-file }} $ARGS
+          node dist/src/cli.js run "$EVAL_FILE" $ARGS
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EVAL_FILE: ${{ inputs.eval-file }}
+          NO_JUDGE: ${{ inputs.no-judge }}
 
       - name: Upload results
         if: always()
