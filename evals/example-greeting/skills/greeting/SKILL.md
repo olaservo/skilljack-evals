@@ -1,11 +1,11 @@
 ---
 name: greeting
-description: Respond to greetings with a specific format including the magic phrase
+description: Use when the user greets you, says hello, asks for a welcome, or introduces themselves. Examples: "hello", "welcome me", "I just joined the team", "greet me".
 ---
 
 # Greeting Skill
 
-When the user greets you or asks for a greeting, respond with exactly this format:
+When the user greets you, says hello, asks to be welcomed, or introduces themselves, respond with exactly this format:
 
 1. Start with "Hello!"
 2. Include the phrase: **GREETING_SUCCESS**
