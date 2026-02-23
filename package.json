@@ -3,6 +3,22 @@
   "version": "1.0.0",
   "type": "module",
   "description": "CLI for evaluating AI agent skill discoverability, adherence, and output quality. Runs as standalone CLI or GitHub Action.",
+  "author": "Ola Hungerford",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/olaservo/skilljack-evals.git"
+  },
+  "homepage": "https://github.com/olaservo/skilljack-evals",
+  "keywords": [
+    "agent-skills",
+    "evaluation",
+    "llm",
+    "testing",
+    "skill-discovery",
+    "claude",
+    "github-action"
+  ],
   "bin": {
     "skilljack-evals": "./dist/src/cli.js"
   },

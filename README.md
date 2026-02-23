@@ -33,6 +33,35 @@ skilljack-evals run evals/example-greeting/tasks.yaml --no-judge
 skilljack-evals validate evals/example-greeting/tasks.yaml
 ```
 
+## Building Skills with Evals
+
+Start by writing eval tasks that describe the outcomes you want, then build your skill to pass them. This eval-first approach works like TDD for agent skills:
+
+1. **Decide if a skill is the right tool** — Skills are for capabilities that should only activate on demand. For instructions that always apply, use `CLAUDE.md` or `AGENTS.md`. For validation and formatting, consider static analysis, pre-commit hooks, or agent hooks instead.
+
+2. **Define desired outcomes** — Write eval tasks with the prompts users will say, the markers your skill should output, and a checklist of what "good" looks like.
+
+3. **Add false-positive tests** — Include prompts that are similar but should *not* trigger the skill. These catch over-eager activation and are just as important as positive tests.
+
+4. **Create a minimal SKILL.md** — Start with basic instructions and metadata.
+
+5. **Run evals and iterate** — Use `skilljack-evals run` to see where the skill falls short. Deterministic checks (`--no-judge`) are free and fast for rapid iteration. Add the LLM judge when you're ready to evaluate output quality.
+
+6. **Keep the eval suite** — As you update the skill, run evals as a regression check. Add them to CI with the GitHub Action to catch regressions automatically.
+
+```bash
+# Scaffold eval tasks for a new skill
+skilljack-evals create-eval my-skill -o evals/my-skill/tasks.yaml
+
+# Fast iteration loop (deterministic only, no API cost for judging)
+skilljack-evals run evals/my-skill/tasks.yaml --no-judge --verbose
+
+# Full evaluation with LLM judge
+skilljack-evals run evals/my-skill/tasks.yaml --verbose
+```
+
+This workflow ensures your skill is discoverable from the right prompts, doesn't activate when it shouldn't, and produces the output quality you expect.
+
 ## Configuration
 
 ### API Key
@@ -292,36 +321,4 @@ npm run dev        # Run CLI in dev mode (tsx)
 npm run build      # Compile TypeScript
 npm run typecheck  # Type check without emitting
 npm run start      # Run compiled CLI
-```
-
-## Project Structure
-
-```
-src/
-  cli.ts                    # CLI entry point (commander)
-  index.ts                  # Public API exports
-  types.ts                  # TypeScript interfaces
-  config.ts                 # Centralized config (file + env + CLI)
-  parser.ts                 # YAML parsing and validation
-  pipeline.ts               # Full eval pipeline orchestrator
-  runner/
-    runner.ts               # Agent SDK runner
-    skill-setup.ts          # Skill file management
-    security.ts             # Tool write restrictions
-  scorer/
-    scorer.ts               # Score orchestrator (deterministic + judge)
-    deterministic.ts        # Marker/tool-call checks
-    judge.ts                # LLM-as-judge scoring
-  session/
-    session-logger.ts       # Event capture and logging
-  report/
-    report.ts               # Markdown + JSON report generation
-    github-summary.ts       # GitHub Actions summary
-action/
-  action.yml                # GitHub Action metadata
-  index.ts                  # Action entry point
-evals/
-  example-greeting/         # Example evaluation
-    tasks.yaml
-    skills/greeting/SKILL.md
 ```

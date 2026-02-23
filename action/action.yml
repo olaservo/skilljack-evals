@@ -67,6 +67,4 @@ outputs:
 
 runs:
   using: 'node20'
-  main: '../dist/action/index.js'
-  # Note: For GitHub Actions marketplace, this path should be relative to repo root.
-  # If publishing as a GitHub Action, the main path is: dist/action/index.js
+  main: 'dist/action/index.js'
