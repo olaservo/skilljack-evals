@@ -171,7 +171,7 @@ export class VercelAiRunner extends BaseRunner {
   readonly providerName = 'vercel-ai';
 
   async runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult> {
-    const { generateText, tool: defineTool } = await dynamicImport('ai', 'ai');
+    const { generateText, tool: defineTool, stepCountIs } = await dynamicImport('ai', 'ai');
     const { z } = await dynamicImport('zod', 'zod');
 
     const skillLoads: string[] = [];
@@ -199,7 +199,7 @@ export class VercelAiRunner extends BaseRunner {
       const tools = {
         loadSkill: defineTool({
           description: 'Load a skill to get specialized instructions',
-          parameters: z.object({
+          inputSchema: z.object({
             name: z.string().describe('The skill name to load'),
           }),
           execute: async ({ name }: { name: string }) => {
@@ -220,7 +220,7 @@ export class VercelAiRunner extends BaseRunner {
         }),
         readFile: defineTool({
           description: 'Read the contents of a file',
-          parameters: z.object({
+          inputSchema: z.object({
             file_path: z.string().describe('Absolute or relative path to the file'),
           }),
           execute: async ({ file_path }: { file_path: string }) => {
@@ -236,7 +236,7 @@ export class VercelAiRunner extends BaseRunner {
         }),
         writeFile: defineTool({
           description: 'Write content to a file',
-          parameters: z.object({
+          inputSchema: z.object({
             file_path: z.string().describe('Absolute or relative path to the file'),
             content: z.string().describe('Content to write'),
           }),
@@ -255,7 +255,7 @@ export class VercelAiRunner extends BaseRunner {
         }),
         bash: defineTool({
           description: 'Execute a bash command',
-          parameters: z.object({
+          inputSchema: z.object({
             command: z.string().describe('The command to execute'),
           }),
           execute: async ({ command }: { command: string }) => {
@@ -283,7 +283,7 @@ export class VercelAiRunner extends BaseRunner {
         system: systemPrompt,
         prompt: task.prompt,
         tools,
-        maxSteps: 20,
+        stopWhen: stepCountIs(20),
         onStepFinish: (event: { toolCalls?: Array<{ toolName: string; args: unknown; toolCallId: string }> }) => {
           stepCount++;
           if (event.toolCalls) {

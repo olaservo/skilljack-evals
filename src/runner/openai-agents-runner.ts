@@ -90,35 +90,46 @@ function parseFrontmatter(content: string): { name?: string; description?: strin
 
 /**
  * Create a local shell implementation for the OpenAI Agents SDK shellTool.
- * Executes commands in the specified working directory.
+ * Implements the Shell interface: { run(action: ShellAction): Promise<ShellResult> }
+ * where ShellAction = { commands: string[], timeoutMs?: number, maxOutputLength?: number }
+ * and ShellResult = { output: Array<{ stdout, stderr, outcome: { type, exitCode? } }> }
  */
 function createLocalShell(cwd: string) {
-  return async (input: { command: string[] }) => {
-    const results = [];
-    for (const command of input.command) {
-      try {
-        const { stdout, stderr } = await execAsync(command, {
-          cwd,
-          timeout: 30000,
-          encoding: 'utf-8',
-        });
-        results.push({
-          command,
-          stdout: stdout ?? '',
-          stderr: stderr ?? '',
-          exitCode: 0,
-        });
-      } catch (err: unknown) {
-        const execErr = err as { stdout?: string; stderr?: string; code?: number };
-        results.push({
-          command,
-          stdout: execErr.stdout ?? '',
-          stderr: execErr.stderr ?? String(err),
-          exitCode: execErr.code ?? 1,
-        });
+  return {
+    async run(action: { commands: string[]; timeoutMs?: number; maxOutputLength?: number }) {
+      const output = [];
+      const timeout = action.timeoutMs ?? 30000;
+      for (const command of action.commands) {
+        try {
+          const { stdout, stderr } = await execAsync(command, {
+            cwd,
+            timeout,
+            encoding: 'utf-8',
+          });
+          output.push({
+            stdout: stdout ?? '',
+            stderr: stderr ?? '',
+            outcome: { type: 'exit' as const, exitCode: 0 },
+          });
+        } catch (err: unknown) {
+          const execErr = err as { stdout?: string; stderr?: string; code?: number; killed?: boolean };
+          if (execErr.killed) {
+            output.push({
+              stdout: execErr.stdout ?? '',
+              stderr: execErr.stderr ?? '',
+              outcome: { type: 'timeout' as const },
+            });
+          } else {
+            output.push({
+              stdout: execErr.stdout ?? '',
+              stderr: execErr.stderr ?? String(err),
+              outcome: { type: 'exit' as const, exitCode: execErr.code ?? 1 },
+            });
+          }
+        }
       }
-    }
-    return results;
+      return { output };
+    },
   };
 }
 
@@ -197,8 +208,8 @@ function detectSkillLoadsFromShellCommands(
           }
         }
       }
-      // Fallback: extract from path pattern
-      const match = cmd.match(/skills\/([^/\s]+)/);
+      // Fallback: extract from path pattern (strip trailing quotes/punctuation)
+      const match = cmd.match(/skills\/([^/\s"']+)/);
       if (match && !loads.includes(match[1])) {
         loads.push(match[1]);
       }

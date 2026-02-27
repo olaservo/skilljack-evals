@@ -51,22 +51,36 @@
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "ai": "^6.0.0",
-    "@ai-sdk/openai": "^3.0.0",
     "@ai-sdk/anthropic": "^3.0.0",
     "@ai-sdk/google": "^3.0.0",
-    "@openai/agents": "^0.4.0",
-    "openai": "^6.0.0",
+    "@ai-sdk/openai": "^3.0.33",
+    "@openai/agents": "^0.4.15",
+    "ai": "^6.0.99",
+    "openai": "^6.25.0",
     "zod": "^4.0.0"
   },
   "peerDependenciesMeta": {
-    "ai": { "optional": true },
-    "@ai-sdk/openai": { "optional": true },
-    "@ai-sdk/anthropic": { "optional": true },
-    "@ai-sdk/google": { "optional": true },
-    "@openai/agents": { "optional": true },
-    "openai": { "optional": true },
-    "zod": { "optional": true }
+    "ai": {
+      "optional": true
+    },
+    "@ai-sdk/openai": {
+      "optional": true
+    },
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google": {
+      "optional": true
+    },
+    "@openai/agents": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=20.0.0"
