@@ -186,7 +186,7 @@ Two scoring methods that can run independently or together:
 - Validates expected/forbidden tool usage
 - Binary pass/fail
 
-**LLM Judge** (richer, ~$0.001/task):
+**LLM Judge** (richer, ~$0.20/run with default settings):
 - Discovery (0 or 1) — Did the agent load the expected skill?
 - Adherence (1-5) — How well did the agent follow skill instructions?
 - Output Quality (1-5) — Does the output meet task requirements?
