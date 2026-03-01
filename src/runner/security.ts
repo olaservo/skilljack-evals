@@ -1,11 +1,27 @@
 /**
  * Security policies for the evaluation runner.
  *
- * Restricts file writes to allowed directories via the Agent SDK's
- * canUseTool callback.
+ * Restricts file writes to allowed directories. Provides both:
+ * - createToolPolicy(): Agent SDK canUseTool callback (Claude SDK runner)
+ * - isWriteAllowed(): Standalone path check (Vercel AI / OpenAI runners)
  */
 
 import * as path from 'path';
+
+/**
+ * Check whether a resolved file path falls within the allowed write directories.
+ * Used by non-Claude runners that don't have canUseTool callbacks.
+ */
+export function isWriteAllowed(
+  resolvedPath: string,
+  allowedWriteDirs: string[],
+  cwd: string,
+): boolean {
+  if (allowedWriteDirs.length === 0) return true;
+
+  const resolvedDirs = allowedWriteDirs.map((dir) => path.resolve(cwd, dir));
+  return resolvedDirs.some((dir) => resolvedPath.startsWith(dir));
+}
 
 /**
  * Create a canUseTool callback that restricts Write/Edit to allowed directories.
