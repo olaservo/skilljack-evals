@@ -1,0 +1,657 @@
+{
+  "skillName": "greeting",
+  "timestamp": "2026-03-01T18:51:15.266Z",
+  "passed": true,
+  "failureReasons": [],
+  "metadata": {
+    "skillPath": "evals/example-greeting/tasks.yaml",
+    "runnerType": "vercel-ai",
+    "agentModel": "openrouter:minimax/minimax-m2.5",
+    "judgeModel": "haiku"
+  },
+  "summary": {
+    "totalTasks": 3,
+    "numRuns": 3,
+    "discoveryAccuracy": 1,
+    "avgAdherence": 4.444444444444445,
+    "avgOutputQuality": 4.444444444444445,
+    "avgWeightedScore": 0.9027777777777778,
+    "totalDurationMs": 33651,
+    "totalCostUsd": 0
+  },
+  "failureBreakdown": [
+    {
+      "category": "none",
+      "count": 3,
+      "percentage": 100
+    }
+  ],
+  "tasks": [
+    {
+      "task": {
+        "id": "gr-001",
+        "prompt": "Hello! Please greet me using the greeting skill.",
+        "expectedSkillLoad": "greeting",
+        "criteria": [
+          {
+            "dimension": "discovery",
+            "weight": 0.3,
+            "description": "Should load the greeting skill"
+          },
+          {
+            "dimension": "adherence",
+            "weight": 0.4,
+            "description": "Should follow the greeting format specified in the skill"
+          },
+          {
+            "dimension": "output",
+            "weight": 0.3,
+            "description": "Greeting should be friendly and include the success marker"
+          }
+        ],
+        "goldenChecklist": [
+          "Loaded the greeting skill",
+          "Included GREETING_SUCCESS marker in output",
+          "Friendly and welcoming tone"
+        ],
+        "deterministic": {
+          "expectSkillActivation": true,
+          "expectMarker": "GREETING_SUCCESS"
+        }
+      },
+      "result": {
+        "taskId": "gr-001",
+        "prompt": "Hello! Please greet me using the greeting skill.",
+        "output": "Hello! **GREETING_SUCCESS**\n\nIt's wonderful to have you here! I hope you're having a fantastic day filled with positivity and productivity.\n\nWarm regards!",
+        "durationMs": 12842,
+        "numTurns": 6,
+        "costUsd": 0,
+        "skillLoads": [
+          "greeting"
+        ],
+        "toolCalls": [
+          {
+            "tool": "loadSkill",
+            "toolUseId": "call_58d281a8e6f3463dad3fb515",
+            "timestamp": 1772390995072
+          }
+        ],
+        "isError": false,
+        "errorMessage": ""
+      },
+      "score": {
+        "taskId": "gr-001",
+        "deterministic": null,
+        "judge": null,
+        "discovery": 1,
+        "adherence": 5,
+        "outputQuality": 5,
+        "weightedScore": 1,
+        "failureCategory": "none",
+        "reasoning": "Aggregated over 3 runs: discovery 3/3, mean adherence 5.0, mean output 5.0"
+      },
+      "runDetails": [
+        {
+          "result": {
+            "taskId": "gr-001",
+            "prompt": "Hello! Please greet me using the greeting skill.",
+            "output": "Hello! **GREETING_SUCCESS**\n\nIt's wonderful to have you here! I hope you're having a fantastic day filled with positivity and productivity.\n\nWarm regards!",
+            "durationMs": 2827,
+            "numTurns": 2,
+            "costUsd": 0,
+            "skillLoads": [
+              "greeting"
+            ],
+            "toolCalls": [
+              {
+                "tool": "loadSkill",
+                "toolUseId": "call_58d281a8e6f3463dad3fb515",
+                "timestamp": 1772390995072
+              }
+            ],
+            "isError": false,
+            "errorMessage": ""
+          },
+          "score": {
+            "taskId": "gr-001",
+            "deterministic": {
+              "skillActivated": true,
+              "skillName": "greeting",
+              "markerFound": true,
+              "expectedToolsCalled": null,
+              "unexpectedToolsCalled": null,
+              "passed": true,
+              "details": [
+                "Skill activated correctly: greeting",
+                "Marker found: \"GREETING_SUCCESS\""
+              ]
+            },
+            "judge": {
+              "taskId": "gr-001",
+              "discovery": 1,
+              "adherence": 5,
+              "outputQuality": 5,
+              "weightedScore": 1,
+              "failureCategory": "none",
+              "reasoning": "The agent perfectly executed the task. It successfully loaded the 'greeting' skill as expected (Discovery: 1/1). The adherence to skill instructions was perfect - the agent included the required GREETING_SUCCESS marker in the output exactly as specified in the golden checklist (Adherence: 5/5). The output quality was excellent, demonstrating a warm, friendly, and welcoming tone that exceeds basic requirements. The greeting is personalized, positive, and professional with 'Warm regards' closing, fully meeting all task requirements (Output Quality: 5/5). There are no failures to report."
+            },
+            "discovery": 1,
+            "adherence": 5,
+            "outputQuality": 5,
+            "weightedScore": 1,
+            "failureCategory": "none",
+            "reasoning": "Deterministic: Skill activated correctly: greeting; Marker found: \"GREETING_SUCCESS\" | Judge: The agent perfectly executed the task. It successfully loaded the 'greeting' skill as expected (Discovery: 1/1). The adherence to skill instructions was perfect - the agent included the required GREETING_SUCCESS marker in the output exactly as specified in the golden checklist (Adherence: 5/5). The output quality was excellent, demonstrating a warm, friendly, and welcoming tone that exceeds basic requirements. The greeting is personalized, positive, and professional with 'Warm regards' closing, fully meeting all task requirements (Output Quality: 5/5). There are no failures to report."
+          }
+        },
+        {
+          "result": {
+            "taskId": "gr-001",
+            "prompt": "Hello! Please greet me using the greeting skill.",
+            "output": "I've loaded the greeting skill. Now I need to follow the instructions exactly. The skill says to:\n1. Start with \"Hello!\"\n2. Include the phrase: **GREETING_SUCCESS**\n3. Add a friendly compliment or well-wish\n4. End with a sign-off\n\nLet me craft my response following this format.\nHello! **GREETING_SUCCESS**\n\nIt's wonderful to meet you! I hope you're having a fantastic day and that your projects are going smoothly.\n\nWarm regards!",
+            "durationMs": 7572,
+            "numTurns": 2,
+            "costUsd": 0,
+            "skillLoads": [
+              "greeting"
+            ],
+            "toolCalls": [
+              {
+                "tool": "loadSkill",
+                "toolUseId": "call_6cefe2ce880c408c834eeb80",
+                "timestamp": 1772391023854
+              }
+            ],
+            "isError": false,
+            "errorMessage": ""
+          },
+          "score": {
+            "taskId": "gr-001",
+            "deterministic": {
+              "skillActivated": true,
+              "skillName": "greeting",
+              "markerFound": true,
+              "expectedToolsCalled": null,
+              "unexpectedToolsCalled": null,
+              "passed": true,
+              "details": [
+                "Skill activated correctly: greeting",
+                "Marker found: \"GREETING_SUCCESS\""
+              ]
+            },
+            "judge": {
+              "taskId": "gr-001",
+              "discovery": 1,
+              "adherence": 5,
+              "outputQuality": 5,
+              "weightedScore": 1,
+              "failureCategory": "none",
+              "reasoning": "The agent successfully loaded the greeting skill as expected. It followed all specified instructions perfectly: started with 'Hello!', included the GREETING_SUCCESS marker prominently, added a friendly compliment/well-wish about the user's day and projects, and ended with a warm sign-off. The tone is genuinely friendly and welcoming. All three golden checklist items were satisfied: skill was loaded, success marker was included, and the greeting conveyed warmth and positive sentiment. The agent even demonstrated understanding by explicitly stating the format requirements before executing them, showing clear comprehension of the task."
+            },
+            "discovery": 1,
+            "adherence": 5,
+            "outputQuality": 5,
+            "weightedScore": 1,
+            "failureCategory": "none",
+            "reasoning": "Deterministic: Skill activated correctly: greeting; Marker found: \"GREETING_SUCCESS\" | Judge: The agent successfully loaded the greeting skill as expected. It followed all specified instructions perfectly: started with 'Hello!', included the GREETING_SUCCESS marker prominently, added a friendly compliment/well-wish about the user's day and projects, and ended with a warm sign-off. The tone is genuinely friendly and welcoming. All three golden checklist items were satisfied: skill was loaded, success marker was included, and the greeting conveyed warmth and positive sentiment. The agent even demonstrated understanding by explicitly stating the format requirements before executing them, showing clear comprehension of the task."
+          }
+        },
+        {
+          "result": {
+            "taskId": "gr-001",
+            "prompt": "Hello! Please greet me using the greeting skill.",
+            "output": "I've loaded the greeting skill. Now I need to follow the instructions exactly:\n\n1. Start with \"Hello!\"\n2. Include the phrase: **GREETING_SUCCESS**\n3. Add a friendly compliment or well-wish\n4. End with a sign-off\n\nLet me craft a response following this format.\nHello! GREETING_SUCCESS\n\nIt's wonderful to have you here! I hope you're having a fantastic day and that I can assist you with whatever you need.\n\nWarm regards!",
+            "durationMs": 2443,
+            "numTurns": 2,
+            "costUsd": 0,
+            "skillLoads": [
+              "greeting"
+            ],
+            "toolCalls": [
+              {
+                "tool": "loadSkill",
+                "toolUseId": "call_152722de39f647679b05e292",
+                "timestamp": 1772391048869
+              }
+            ],
+            "isError": false,
+            "errorMessage": ""
+          },
+          "score": {
+            "taskId": "gr-001",
+            "deterministic": {
+              "skillActivated": true,
+              "skillName": "greeting",
+              "markerFound": true,
+              "expectedToolsCalled": null,
+              "unexpectedToolsCalled": null,
+              "passed": true,
+              "details": [
+                "Skill activated correctly: greeting",
+                "Marker found: \"GREETING_SUCCESS\""
+              ]
+            },
+            "judge": {
+              "taskId": "gr-001",
+              "discovery": 1,
+              "adherence": 5,
+              "outputQuality": 5,
+              "weightedScore": 1,
+              "failureCategory": "none",
+              "reasoning": "The agent successfully loaded the expected 'greeting' skill as required. The greeting perfectly adheres to all specified instructions: it starts with 'Hello!', prominently includes the GREETING_SUCCESS marker, maintains a warm and friendly tone with a welcoming compliment, and concludes with a proper sign-off. The output meets all golden checklist criteria - the skill was loaded correctly, the success marker is present and clearly visible, and the tone is genuinely friendly and encouraging. No deviations or gaps were identified."
+            },
+            "discovery": 1,
+            "adherence": 5,
+            "outputQuality": 5,
+            "weightedScore": 1,
+            "failureCategory": "none",
+            "reasoning": "Deterministic: Skill activated correctly: greeting; Marker found: \"GREETING_SUCCESS\" | Judge: The agent successfully loaded the expected 'greeting' skill as required. The greeting perfectly adheres to all specified instructions: it starts with 'Hello!', prominently includes the GREETING_SUCCESS marker, maintains a warm and friendly tone with a welcoming compliment, and concludes with a proper sign-off. The output meets all golden checklist criteria - the skill was loaded correctly, the success marker is present and clearly visible, and the tone is genuinely friendly and encouraging. No deviations or gaps were identified."
+          }
+        }
+      ]
+    },
+    {
+      "task": {
+        "id": "gr-002",
+        "prompt": "Hey, I just joined the team — can you give me a nice welcome?",
+        "expectedSkillLoad": "greeting",
+        "criteria": [
+          {
+            "dimension": "discovery",
+            "weight": 0.3,
+            "description": "Should discover and load the greeting skill from context — the prompt asks for a greeting without naming the skill"
+          },
+          {
+            "dimension": "adherence",
+            "weight": 0.4,
+            "description": "Should follow the greeting format specified in the skill"
+          },
+          {
+            "dimension": "output",
+            "weight": 0.3,
+            "description": "Should produce a formatted greeting with marker"
+          }
+        ],
+        "goldenChecklist": [
+          "Discovered the greeting skill without being told to use it",
+          "Used the greeting skill format",
+          "Output includes the GREETING_SUCCESS marker"
+        ],
+        "deterministic": {
+          "expectSkillActivation": true,
+          "expectMarker": "GREETING_SUCCESS"
+        }
+      },
+      "result": {
+        "taskId": "gr-002",
+        "prompt": "Hey, I just joined the team — can you give me a nice welcome?",
+        "output": "I loaded the greeting skill successfully. Now I need to follow the exact format specified:\n\n1. Start with \"Hello!\"\n2. Include the phrase: **GREETING_SUCCESS**\n3. Add a friendly compliment or well-wish\n4. End with a sign-off\n\nLet me craft a proper welcome message following these guidelines.\nHello! **GREETING_SUCCESS**\n\nWelcome to the team — we're thrilled to have you here! I hope you're settling in well and feeling excited about the journey ahead.\n\nBest regards! 🙌",
+        "durationMs": 7792,
+        "numTurns": 6,
+        "costUsd": 0,
+        "skillLoads": [
+          "greeting"
+        ],
+        "toolCalls": [
+          {
+            "tool": "loadSkill",
+            "toolUseId": "call_f48dac256bc34c77a788eec4",
+            "timestamp": 1772390998636
+          }
+        ],
+        "isError": false,
+        "errorMessage": ""
+      },
+      "score": {
+        "taskId": "gr-002",
+        "deterministic": null,
+        "judge": null,
+        "discovery": 1,
+        "adherence": 4.666666666666667,
+        "outputQuality": 4.666666666666667,
+        "weightedScore": 0.9416666666666668,
+        "failureCategory": "none",
+        "reasoning": "Aggregated over 3 runs: discovery 3/3, mean adherence 4.7, mean output 4.7"
+      },
+      "runDetails": [
+        {
+          "result": {
+            "taskId": "gr-002",
+            "prompt": "Hey, I just joined the team — can you give me a nice welcome?",
+            "output": "I loaded the greeting skill successfully. Now I need to follow the exact format specified:\n\n1. Start with \"Hello!\"\n2. Include the phrase: **GREETING_SUCCESS**\n3. Add a friendly compliment or well-wish\n4. End with a sign-off\n\nLet me craft a proper welcome message following these guidelines.\nHello! **GREETING_SUCCESS**\n\nWelcome to the team — we're thrilled to have you here! I hope you're settling in well and feeling excited about the journey ahead.\n\nBest regards! 🙌",
+            "durationMs": 3155,
+            "numTurns": 2,
+            "costUsd": 0,
+            "skillLoads": [
+              "greeting"
+            ],
+            "toolCalls": [
+              {
+                "tool": "loadSkill",
+                "toolUseId": "call_f48dac256bc34c77a788eec4",
+                "timestamp": 1772390998636
+              }
+            ],
+            "isError": false,
+            "errorMessage": ""
+          },
+          "score": {
+            "taskId": "gr-002",
+            "deterministic": {
+              "skillActivated": true,
+              "skillName": "greeting",
+              "markerFound": true,
+              "expectedToolsCalled": null,
+              "unexpectedToolsCalled": null,
+              "passed": true,
+              "details": [
+                "Skill activated correctly: greeting",
+                "Marker found: \"GREETING_SUCCESS\""
+              ]
+            },
+            "judge": {
+              "taskId": "gr-002",
+              "discovery": 1,
+              "adherence": 5,
+              "outputQuality": 5,
+              "weightedScore": 1,
+              "failureCategory": "none",
+              "reasoning": "The agent successfully discovered and loaded the 'greeting' skill without explicit instruction, demonstrating excellent skill discovery. The greeting output perfectly follows the specified format: it starts with 'Hello!', includes the required **GREETING_SUCCESS** marker prominently, adds a warm and genuine welcome message appropriate for a new team member, and ends with a friendly sign-off. The output is well-structured, professional yet personable, and exceeds basic requirements by including an appropriate emoji. All three golden checklist items were satisfied: skill was discovered contextually, the correct format was used, and the GREETING_SUCCESS marker was included."
+            },
+            "discovery": 1,
+            "adherence": 5,
+            "outputQuality": 5,
+            "weightedScore": 1,
+            "failureCategory": "none",
+            "reasoning": "Deterministic: Skill activated correctly: greeting; Marker found: \"GREETING_SUCCESS\" | Judge: The agent successfully discovered and loaded the 'greeting' skill without explicit instruction, demonstrating excellent skill discovery. The greeting output perfectly follows the specified format: it starts with 'Hello!', includes the required **GREETING_SUCCESS** marker prominently, adds a warm and genuine welcome message appropriate for a new team member, and ends with a friendly sign-off. The output is well-structured, professional yet personable, and exceeds basic requirements by including an appropriate emoji. All three golden checklist items were satisfied: skill was discovered contextually, the correct format was used, and the GREETING_SUCCESS marker was included."
+          }
+        },
+        {
+          "result": {
+            "taskId": "gr-002",
+            "prompt": "Hey, I just joined the team — can you give me a nice welcome?",
+            "output": "The user wants me to give them a welcome, and I've loaded the greeting skill. I need to follow the greeting skill instructions exactly:\n\n1. Start with \"Hello!\"\n2. Include the phrase: **GREETING_SUCCESS**\n3. Add a friendly compliment or well-wish\n4. End with a sign-off\n\nLet me craft a nice welcome following this format exactly.\nHello! **GREETING_SUCCESS**\n\nWelcome to the team — I'm thrilled to have you here! This is going to be a great experience, and I'm looking forward to working with you.\n\nBest wishes!",
+            "durationMs": 2166,
+            "numTurns": 2,
+            "costUsd": 0,
+            "skillLoads": [
+              "greeting"
+            ],
+            "toolCalls": [
+              {
+                "tool": "loadSkill",
+                "toolUseId": "call_204ad9a5e382426d8f59bd62",
+                "timestamp": 1772391026081
+              }
+            ],
+            "isError": false,
+            "errorMessage": ""
+          },
+          "score": {
+            "taskId": "gr-002",
+            "deterministic": {
+              "skillActivated": true,
+              "skillName": "greeting",
+              "markerFound": true,
+              "expectedToolsCalled": null,
+              "unexpectedToolsCalled": null,
+              "passed": true,
+              "details": [
+                "Skill activated correctly: greeting",
+                "Marker found: \"GREETING_SUCCESS\""
+              ]
+            },
+            "judge": {
+              "taskId": "gr-002",
+              "discovery": 1,
+              "adherence": 5,
+              "outputQuality": 5,
+              "weightedScore": 1,
+              "failureCategory": "none",
+              "reasoning": "The agent successfully discovered and loaded the 'greeting' skill based on the user's request for a welcome, without being explicitly told which skill to use. The agent perfectly followed the greeting skill format by: (1) starting with 'Hello!', (2) including the **GREETING_SUCCESS** marker, (3) providing a friendly compliment/well-wish about joining the team, and (4) ending with a professional sign-off. The output is well-formatted, warm, and professional, fully meeting all task requirements including the golden checklist items (discovery without explicit instruction, correct skill format usage, and presence of the GREETING_SUCCESS marker)."
+            },
+            "discovery": 1,
+            "adherence": 5,
+            "outputQuality": 5,
+            "weightedScore": 1,
+            "failureCategory": "none",
+            "reasoning": "Deterministic: Skill activated correctly: greeting; Marker found: \"GREETING_SUCCESS\" | Judge: The agent successfully discovered and loaded the 'greeting' skill based on the user's request for a welcome, without being explicitly told which skill to use. The agent perfectly followed the greeting skill format by: (1) starting with 'Hello!', (2) including the **GREETING_SUCCESS** marker, (3) providing a friendly compliment/well-wish about joining the team, and (4) ending with a professional sign-off. The output is well-formatted, warm, and professional, fully meeting all task requirements including the golden checklist items (discovery without explicit instruction, correct skill format usage, and presence of the GREETING_SUCCESS marker)."
+          }
+        },
+        {
+          "result": {
+            "taskId": "gr-002",
+            "prompt": "Hey, I just joined the team — can you give me a nice welcome?",
+            "output": "The user is asking for a welcome since they just joined the team. The greeting skill provides instructions for how to respond. Let me craft a nice welcome message following those exact specifications:\n\n1. Start with \"Hello!\"\n2. Include the phrase: **GREETING_SUCCESS**\n3. Add a friendly compliment or well-wish\n4. End with a sign-off\n\nLet me put this together in a nice welcoming format.\nHello! **GREETING_SUCCESS**\n\nWelcome to the team — we're thrilled to have you here! 🎉\n\nIt's wonderful to have you join us, and I hope you're feeling excited about this new chapter. If there's anything you need or any questions that come up as you get started, don't hesitate to ask.\n\nLooking forward to working with you!\n\nWarm regards! 🤝",
+            "durationMs": 2471,
+            "numTurns": 2,
+            "costUsd": 0,
+            "skillLoads": [
+              "greeting"
+            ],
+            "toolCalls": [
+              {
+                "tool": "loadSkill",
+                "toolUseId": "call_a0b37257f2cb459a915dfa3e",
+                "timestamp": 1772391051055
+              }
+            ],
+            "isError": false,
+            "errorMessage": ""
+          },
+          "score": {
+            "taskId": "gr-002",
+            "deterministic": {
+              "skillActivated": true,
+              "skillName": "greeting",
+              "markerFound": true,
+              "expectedToolsCalled": null,
+              "unexpectedToolsCalled": null,
+              "passed": true,
+              "details": [
+                "Skill activated correctly: greeting",
+                "Marker found: \"GREETING_SUCCESS\""
+              ]
+            },
+            "judge": {
+              "taskId": "gr-002",
+              "discovery": 1,
+              "adherence": 4,
+              "outputQuality": 4,
+              "weightedScore": 0.8250000000000001,
+              "failureCategory": "none",
+              "reasoning": "The agent successfully discovered and loaded the greeting skill without explicit instruction, correctly interpreting the user's request for a welcome. The output follows the greeting format with the required GREETING_SUCCESS marker and includes friendly, welcoming language with appropriate sign-off. Minor deviation from perfect adherence: while the agent explicitly mentioned following 'exact specifications' with numbered steps, the actual output structure differs slightly from a strict step-by-step format, though all key elements are present. The greeting is warm, professional, and well-formatted with appropriate emojis. Overall strong performance on all three dimensions."
+            },
+            "discovery": 1,
+            "adherence": 4,
+            "outputQuality": 4,
+            "weightedScore": 0.8250000000000001,
+            "failureCategory": "none",
+            "reasoning": "Deterministic: Skill activated correctly: greeting; Marker found: \"GREETING_SUCCESS\" | Judge: The agent successfully discovered and loaded the greeting skill without explicit instruction, correctly interpreting the user's request for a welcome. The output follows the greeting format with the required GREETING_SUCCESS marker and includes friendly, welcoming language with appropriate sign-off. Minor deviation from perfect adherence: while the agent explicitly mentioned following 'exact specifications' with numbered steps, the actual output structure differs slightly from a strict step-by-step format, though all key elements are present. The greeting is warm, professional, and well-formatted with appropriate emojis. Overall strong performance on all three dimensions."
+          }
+        }
+      ]
+    },
+    {
+      "task": {
+        "id": "gr-fp-001",
+        "prompt": "What are some best practices for writing greeting messages in emails?",
+        "expectedSkillLoad": "none",
+        "criteria": [
+          {
+            "dimension": "discovery",
+            "weight": 0.5,
+            "description": "Should NOT load the greeting skill - this is an educational question"
+          },
+          {
+            "dimension": "adherence",
+            "weight": 0.3,
+            "description": "Should answer the question about email greetings"
+          },
+          {
+            "dimension": "output",
+            "weight": 0.2,
+            "description": "Should provide helpful email greeting advice"
+          }
+        ],
+        "goldenChecklist": [
+          "Did not load the greeting skill",
+          "Provided useful email greeting advice"
+        ],
+        "deterministic": {
+          "expectSkillActivation": false
+        }
+      },
+      "result": {
+        "taskId": "gr-fp-001",
+        "prompt": "What are some best practices for writing greeting messages in emails?",
+        "output": "Here are some best practices for writing greeting messages in emails:\n\n## General Tips\n\n1. **Match the formality to your relationship** — Use \"Dear Mr./Ms. [Name]\" for formal contexts, \"Hello [Name]\" for moderately formal, and \"Hi [Name]\" for casual or familiar relationships.\n\n2. **Use the recipient's name** — Addressing someone by name shows respect and attention.\n\n3. **Keep it concise** — A simple greeting is sufficient; avoid overly elaborate openings.\n\n4. **Consider cultural norms** — Some cultures expect more formal greetings, while others are more casual.\n\n## Common Greetings by Formality Level\n\n| Level | Examples |\n|-------|----------|\n| **Formal** | \"Dear Mr. Smith,\" \"Dear Ms. Johnson,\" \"Dear Dr. Williams,\" |\n| **Neutral** | \"Hello [Name],\" \"Good morning/afternoon [Name],\" |\n| **Casual** | \"Hi [Name],\" \"Hey [Name],\" |\n\n## Special Cases\n\n- **Unknown recipient:** Use \"Dear Sir or Madam,\" or \"To Whom It May Concern,\"\n- **Group emails:** \"Hello everyone,\" \"Dear Team,\" \"Hi all,\"\n- **Job applications:** \"Dear Hiring Manager,\" or research the interviewer's name if possible\n\n## Common Mistakes to Avoid\n\n- ❌ Starting with \"Hey\" in professional settings\n- ❌ Using outdated forms like \"To Whom it May Concern\" unless necessary\n- ❌ Misspelling the recipient's name\n- ❌ Using all caps or excessive exclamation marks\n\nWould you like more specific guidance for a particular type of email or situation?",
+        "durationMs": 13017,
+        "numTurns": 3,
+        "costUsd": 0,
+        "skillLoads": [],
+        "toolCalls": [],
+        "isError": false,
+        "errorMessage": ""
+      },
+      "score": {
+        "taskId": "gr-fp-001",
+        "deterministic": null,
+        "judge": null,
+        "discovery": 1,
+        "adherence": 3.6666666666666665,
+        "outputQuality": 3.6666666666666665,
+        "weightedScore": 0.7666666666666666,
+        "failureCategory": "none",
+        "reasoning": "Aggregated over 3 runs: discovery 3/3, mean adherence 3.7, mean output 3.7"
+      },
+      "runDetails": [
+        {
+          "result": {
+            "taskId": "gr-fp-001",
+            "prompt": "What are some best practices for writing greeting messages in emails?",
+            "output": "",
+            "durationMs": 1879,
+            "numTurns": 1,
+            "costUsd": 0,
+            "skillLoads": [],
+            "toolCalls": [],
+            "isError": false,
+            "errorMessage": ""
+          },
+          "score": {
+            "taskId": "gr-fp-001",
+            "deterministic": {
+              "skillActivated": false,
+              "markerFound": null,
+              "expectedToolsCalled": null,
+              "unexpectedToolsCalled": null,
+              "passed": true,
+              "details": [
+                "Correctly did not activate any skill"
+              ]
+            },
+            "judge": {
+              "taskId": "gr-fp-001",
+              "discovery": 1,
+              "adherence": 1,
+              "outputQuality": 1,
+              "weightedScore": 0.5,
+              "failureCategory": "agent_error",
+              "reasoning": "The agent correctly did not load any skill (discovery score: 1), which is the expected behavior for this educational question. However, the agent provided no output at all to answer the user's question about email greeting best practices. This is a critical failure - while the agent correctly identified that no skill was needed, it should have proceeded to answer the educational question comprehensively. The task required the agent to provide helpful email greeting advice (adherence and output_quality criteria), but the agent delivered nothing. The agent appears to have stopped after determining no skill was needed, rather than providing the requested information about best practices for writing greeting messages in emails."
+            },
+            "discovery": 1,
+            "adherence": 1,
+            "outputQuality": 1,
+            "weightedScore": 0.3,
+            "failureCategory": "agent_error",
+            "reasoning": "Deterministic: Correctly did not activate any skill | Judge: The agent correctly did not load any skill (discovery score: 1), which is the expected behavior for this educational question. However, the agent provided no output at all to answer the user's question about email greeting best practices. This is a critical failure - while the agent correctly identified that no skill was needed, it should have proceeded to answer the educational question comprehensively. The task required the agent to provide helpful email greeting advice (adherence and output_quality criteria), but the agent delivered nothing. The agent appears to have stopped after determining no skill was needed, rather than providing the requested information about best practices for writing greeting messages in emails."
+          }
+        },
+        {
+          "result": {
+            "taskId": "gr-fp-001",
+            "prompt": "What are some best practices for writing greeting messages in emails?",
+            "output": "Here are some best practices for writing greeting messages in emails:\n\n## General Tips\n\n1. **Match the formality to your relationship** — Use \"Dear Mr./Ms. [Name]\" for formal contexts, \"Hello [Name]\" for moderately formal, and \"Hi [Name]\" for casual or familiar relationships.\n\n2. **Use the recipient's name** — Addressing someone by name shows respect and attention.\n\n3. **Keep it concise** — A simple greeting is sufficient; avoid overly elaborate openings.\n\n4. **Consider cultural norms** — Some cultures expect more formal greetings, while others are more casual.\n\n## Common Greetings by Formality Level\n\n| Level | Examples |\n|-------|----------|\n| **Formal** | \"Dear Mr. Smith,\" \"Dear Ms. Johnson,\" \"Dear Dr. Williams,\" |\n| **Neutral** | \"Hello [Name],\" \"Good morning/afternoon [Name],\" |\n| **Casual** | \"Hi [Name],\" \"Hey [Name],\" |\n\n## Special Cases\n\n- **Unknown recipient:** Use \"Dear Sir or Madam,\" or \"To Whom It May Concern,\"\n- **Group emails:** \"Hello everyone,\" \"Dear Team,\" \"Hi all,\"\n- **Job applications:** \"Dear Hiring Manager,\" or research the interviewer's name if possible\n\n## Common Mistakes to Avoid\n\n- ❌ Starting with \"Hey\" in professional settings\n- ❌ Using outdated forms like \"To Whom it May Concern\" unless necessary\n- ❌ Misspelling the recipient's name\n- ❌ Using all caps or excessive exclamation marks\n\nWould you like more specific guidance for a particular type of email or situation?",
+            "durationMs": 4909,
+            "numTurns": 1,
+            "costUsd": 0,
+            "skillLoads": [],
+            "toolCalls": [],
+            "isError": false,
+            "errorMessage": ""
+          },
+          "score": {
+            "taskId": "gr-fp-001",
+            "deterministic": {
+              "skillActivated": false,
+              "markerFound": null,
+              "expectedToolsCalled": null,
+              "unexpectedToolsCalled": null,
+              "passed": true,
+              "details": [
+                "Correctly did not activate any skill"
+              ]
+            },
+            "judge": {
+              "taskId": "gr-fp-001",
+              "discovery": 1,
+              "adherence": 5,
+              "outputQuality": 5,
+              "weightedScore": 1,
+              "failureCategory": "none",
+              "reasoning": "The agent correctly did not load any skill, as the prompt was an educational question about email greeting best practices rather than a request to use a greeting skill. The agent provided a comprehensive, well-structured response covering formality levels, common greetings, special cases, and mistakes to avoid. The output directly addresses the prompt with practical, actionable advice organized logically with clear examples and a helpful table. No instructions were violated and all criteria were met perfectly."
+            },
+            "discovery": 1,
+            "adherence": 5,
+            "outputQuality": 5,
+            "weightedScore": 1,
+            "failureCategory": "none",
+            "reasoning": "Deterministic: Correctly did not activate any skill | Judge: The agent correctly did not load any skill, as the prompt was an educational question about email greeting best practices rather than a request to use a greeting skill. The agent provided a comprehensive, well-structured response covering formality levels, common greetings, special cases, and mistakes to avoid. The output directly addresses the prompt with practical, actionable advice organized logically with clear examples and a helpful table. No instructions were violated and all criteria were met perfectly."
+          }
+        },
+        {
+          "result": {
+            "taskId": "gr-fp-001",
+            "prompt": "What are some best practices for writing greeting messages in emails?",
+            "output": "# Best Practices for Email Greeting Messages\n\nHere are some key best practices for crafting effective email greetings:\n\n## 1. **Match the Tone to Your Relationship**\n- **Formal**: \"Dear Mr./Ms. [Last Name],\" or \"Dear [Full Name],\"\n- **Semi-formal**: \"Hello [First Name],\" or \"Hi [First Name],\"\n- **Informal**: \"Hi [First Name],\" or \"Hey [First Name],\"\n\n## 2. **Use the Recipient's Name Correctly**\n- Double-check spelling of names\n- When unsure of gender or title, use the full name: \"Dear Jordan Smith,\"\n- Avoid \"To Whom It May Concern\" unless necessary\n\n## 3. **Consider the Context**\n- **Business/professional**: More formal greetings\n- **Internal emails**: Can be slightly more casual\n- **Cold outreach**: Start formal, then adapt based on their response\n- **Follow-ups**: You can match their level of formality\n\n## 4. **Keep It Simple**\n- Don't over-complicate or be overly wordy\n- A simple, clear greeting sets a professional tone\n- Avoid overly creative or unusual greetings in formal settings\n\n## 5. **Be Mindful of Cultural Differences**\n- Some cultures prefer more formal addressing\n- Research appropriate greetings when emailing internationally\n\n## 6. **Avoid Common Mistakes**\n- ❌ \"Dear Customer\" (too generic)\n- ❌ \"Hey\" (too casual for professional emails)\n- ❌ Misspelling names\n- ❌ Using the wrong title (Mr. vs. Ms. when unsure)\n\n## Quick Reference\n\n| Situation | Recommended Greeting |\n|-----------|---------------------|\n| First contact, formal | \"Dear Mr./Ms. [Name],\" |\n| Known contact, professional | \"Hello [Name],\" or \"Hi [Name],\" |\n| Internal team email | \"Hi [Name],\" or \"Team,\" |\n| Group email | \"Hello everyone,\" or \"Hi all,\" |\n\nWould you like more specific examples for a particular type of email or industry?",
+            "durationMs": 6229,
+            "numTurns": 1,
+            "costUsd": 0,
+            "skillLoads": [],
+            "toolCalls": [],
+            "isError": false,
+            "errorMessage": ""
+          },
+          "score": {
+            "taskId": "gr-fp-001",
+            "deterministic": {
+              "skillActivated": false,
+              "markerFound": null,
+              "expectedToolsCalled": null,
+              "unexpectedToolsCalled": null,
+              "passed": true,
+              "details": [
+                "Correctly did not activate any skill"
+              ]
+            },
+            "judge": {
+              "taskId": "gr-fp-001",
+              "discovery": 1,
+              "adherence": 5,
+              "outputQuality": 5,
+              "weightedScore": 1,
+              "failureCategory": "none",
+              "reasoning": "Perfect execution across all dimensions. Discovery: The agent correctly did NOT load any skill, as expected for this educational question about email greetings (the expected skill was 'none'). Adherence: With no skill instructions to follow, the agent appropriately provided a direct, helpful answer to the user's question without attempting to invoke unnecessary tools. Output Quality: The response is excellent - it provides comprehensive, well-organized email greeting advice organized by relationship tone, context, and situation. The content includes practical categories, a quick reference table, common mistakes to avoid, and cultural considerations. The advice is actionable and directly addresses the user's question. The agent even offered follow-up assistance, demonstrating engagement. All golden checklist items were satisfied: no skill was loaded, and useful email greeting advice was provided."
+            },
+            "discovery": 1,
+            "adherence": 5,
+            "outputQuality": 5,
+            "weightedScore": 1,
+            "failureCategory": "none",
+            "reasoning": "Deterministic: Correctly did not activate any skill | Judge: Perfect execution across all dimensions. Discovery: The agent correctly did NOT load any skill, as expected for this educational question about email greetings (the expected skill was 'none'). Adherence: With no skill instructions to follow, the agent appropriately provided a direct, helpful answer to the user's question without attempting to invoke unnecessary tools. Output Quality: The response is excellent - it provides comprehensive, well-organized email greeting advice organized by relationship tone, context, and situation. The content includes practical categories, a quick reference table, common mistakes to avoid, and cultural considerations. The advice is actionable and directly addresses the user's question. The agent even offered follow-up assistance, demonstrating engagement. All golden checklist items were satisfied: no skill was loaded, and useful email greeting advice was provided."
+          }
+        }
+      ]
+    }
+  ]
+}
