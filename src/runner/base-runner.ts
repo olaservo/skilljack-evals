@@ -50,21 +50,21 @@ export abstract class BaseRunner implements AgentRunner {
     logger?: SessionLogger,
   ): Promise<TaskResult> {
     const timeout = timeoutMs ?? this.options.taskTimeoutMs ?? 300000;
-    let timer: ReturnType<typeof setTimeout>;
 
-    const timeoutPromise = new Promise<TaskResult>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`Task ${task.id} timed out after ${timeout}ms`)),
-        timeout,
-      );
-    });
+    const controller = new AbortController();
+    const abortTimer = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const result = await Promise.race([this.runTask(task, logger), timeoutPromise]);
-      clearTimeout(timer!);
+      const result = await Promise.race([
+        this.runTask(task, logger),
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () =>
+            reject(new Error(`Task ${task.id} timed out after ${timeout}ms`)),
+          );
+        }),
+      ]);
       return result;
     } catch (error) {
-      clearTimeout(timer!);
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger?.markAsError(errorMessage);
 
@@ -80,6 +80,8 @@ export abstract class BaseRunner implements AgentRunner {
         isError: true,
         errorMessage,
       };
+    } finally {
+      clearTimeout(abortTimer);
     }
   }
 

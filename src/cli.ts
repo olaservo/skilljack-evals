@@ -16,6 +16,7 @@ import { runPipeline, scorePipeline } from './pipeline.js';
 import { generateReport, generateJsonResults } from './report/report.js';
 import { SkillJudge } from './scorer/judge.js';
 import type { EvalTask, TaskResult, JudgeScore, SkillEvaluation, CombinedScore } from './types.js';
+import { VALID_RUNNER_TYPES } from './config.js';
 import type { EvalConfig, RunnerType } from './config.js';
 
 const program = new Command();
@@ -68,9 +69,8 @@ program
     verbose?: boolean;
   }) => {
     try {
-      const validRunners: RunnerType[] = ['claude-sdk', 'vercel-ai', 'openai-agents'];
-      if (options.runner && !validRunners.includes(options.runner as RunnerType)) {
-        console.error(`Error: Invalid runner "${options.runner}". Valid options: ${validRunners.join(', ')}`);
+      if (options.runner && !VALID_RUNNER_TYPES.includes(options.runner as RunnerType)) {
+        console.error(`Error: Invalid runner "${options.runner}". Valid options: ${VALID_RUNNER_TYPES.join(', ')}`);
         process.exit(1);
       }
 

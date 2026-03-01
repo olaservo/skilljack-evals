@@ -18,6 +18,8 @@ import * as path from 'path';
 
 export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents';
 
+export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'vercel-ai', 'openai-agents'];
+
 export interface EvalConfig {
   // Runner
   runnerType: RunnerType;
@@ -124,7 +126,12 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
 
     const config: Partial<EvalConfig> = {};
 
-    if (raw.runner?.type) config.runnerType = raw.runner.type as RunnerType;
+    if (raw.runner?.type) {
+      if (!VALID_RUNNER_TYPES.includes(raw.runner.type as RunnerType)) {
+        throw new Error(`Invalid runner type "${raw.runner.type}" in config file. Valid: ${VALID_RUNNER_TYPES.join(', ')}`);
+      }
+      config.runnerType = raw.runner.type as RunnerType;
+    }
     if (raw.models?.agent) config.defaultAgentModel = raw.models.agent;
     if (raw.models?.judge) config.defaultJudgeModel = raw.models.judge;
 
@@ -174,7 +181,12 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
 function loadEnvConfig(): Partial<EvalConfig> {
   const config: Partial<EvalConfig> = {};
 
-  if (process.env.EVAL_RUNNER_TYPE) config.runnerType = process.env.EVAL_RUNNER_TYPE as RunnerType;
+  if (process.env.EVAL_RUNNER_TYPE) {
+    if (!VALID_RUNNER_TYPES.includes(process.env.EVAL_RUNNER_TYPE as RunnerType)) {
+      throw new Error(`Invalid EVAL_RUNNER_TYPE "${process.env.EVAL_RUNNER_TYPE}". Valid: ${VALID_RUNNER_TYPES.join(', ')}`);
+    }
+    config.runnerType = process.env.EVAL_RUNNER_TYPE as RunnerType;
+  }
   if (process.env.EVAL_AGENT_MODEL) config.defaultAgentModel = process.env.EVAL_AGENT_MODEL;
   if (process.env.EVAL_JUDGE_MODEL) config.defaultJudgeModel = process.env.EVAL_JUDGE_MODEL;
 

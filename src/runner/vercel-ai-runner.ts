@@ -167,7 +167,19 @@ export class VercelAiRunner extends BaseRunner {
             const resolved = path.isAbsolute(file_path)
               ? file_path
               : path.join(cwd, file_path);
+
+            // Restrict reads to within the working directory
+            const normalizedPath = path.resolve(resolved);
+            const normalizedCwd = path.resolve(cwd);
+            if (!normalizedPath.startsWith(normalizedCwd + path.sep) && normalizedPath !== normalizedCwd) {
+              return `Error: Read denied — ${file_path} is outside the working directory`;
+            }
+
             try {
+              const stats = await fs.stat(resolved);
+              if (stats.size > 10 * 1024 * 1024) {
+                return `Error: File too large (${stats.size} bytes). Maximum is 10MB.`;
+              }
               return await fs.readFile(resolved, 'utf-8');
             } catch (err) {
               return `Error reading file: ${err instanceof Error ? err.message : String(err)}`;
