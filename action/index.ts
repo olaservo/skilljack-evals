@@ -52,6 +52,12 @@ async function run(): Promise<void> {
       core.setSecret(googleKey);
     }
 
+    const openrouterKey = core.getInput('openrouter-api-key') || process.env.OPENROUTER_API_KEY;
+    if (openrouterKey) {
+      process.env.OPENROUTER_API_KEY = openrouterKey;
+      core.setSecret(openrouterKey);
+    }
+
     // Build config overrides
     const configOverrides: Partial<EvalConfig> = {
       runnerType: runner,

@@ -66,6 +66,9 @@ inputs:
   google-api-key:
     description: 'Google AI API key for vercel-ai (google:) runner (or use GOOGLE_GENERATIVE_AI_API_KEY env var)'
     required: false
+  openrouter-api-key:
+    description: 'OpenRouter API key for vercel-ai (openrouter:) runner (or use OPENROUTER_API_KEY env var)'
+    required: false
 
 outputs:
   passed:
