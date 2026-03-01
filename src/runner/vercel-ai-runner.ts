@@ -7,7 +7,8 @@
  * https://sdk.vercel.ai/docs/guides/agent-skills
  *
  * Supports any model provider via the Vercel AI SDK registry pattern:
- *   "openai:gpt-5.2", "anthropic:claude-sonnet-4-6", "google:gemini-2.0-flash"
+ *   "openai:gpt-5.2", "anthropic:claude-sonnet-4-6", "google:gemini-2.0-flash",
+ *   "openrouter:deepseek/deepseek-v3.2"
  */
 
 import type { EvalTask, ToolCallRecord, TaskResult } from '../types.js';
@@ -62,9 +63,17 @@ async function resolveModel(modelString: string, importFn: ImportFn): Promise<an
       const google = createGoogleGenerativeAI();
       return google(model);
     }
+    case 'openrouter': {
+      const { createOpenRouter } = await importFn(
+        '@openrouter/ai-sdk-provider',
+        '@openrouter/ai-sdk-provider',
+      );
+      const openrouter = createOpenRouter();
+      return openrouter(model);
+    }
     default:
       throw new Error(
-        `Unknown provider "${provider}". Supported: openai, anthropic, google. ` +
+        `Unknown provider "${provider}". Supported: openai, anthropic, google, openrouter. ` +
         `Use format "provider:model" (e.g. "openai:gpt-5.2").`,
       );
   }

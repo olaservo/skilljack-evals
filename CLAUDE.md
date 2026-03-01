@@ -44,7 +44,7 @@ YAML tasks → Config → Runner (Claude SDK | Vercel AI | OpenAI Agents) → Sc
 
 Three runners selected via `--runner` flag:
 - `claude-sdk` (default) — uses Claude Agent SDK, model aliases like `sonnet`, `haiku`
-- `vercel-ai` — uses Vercel AI SDK, model format `"provider:model"` (e.g., `anthropic:claude-sonnet-4-6`, `google:gemini-2.5-pro`, `openai:gpt-5.2`)
+- `vercel-ai` — uses Vercel AI SDK, model format `"provider:model"` (e.g., `anthropic:claude-sonnet-4-6`, `google:gemini-2.5-pro`, `openai:gpt-5.2`, `openrouter:deepseek/deepseek-v3.2`)
 - `openai-agents` — uses OpenAI Agents SDK, plain model names (e.g., `gpt-5.2`)
 
 ## Scoring
@@ -71,7 +71,7 @@ Two methods, run independently or together:
 - `@actions/core` (dev) - GitHub Action support
 
 Peer dependencies (install as needed for non-Claude runners):
-- `ai`, `zod`, `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google` - Vercel AI SDK
+- `ai`, `zod`, `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`, `@openrouter/ai-sdk-provider` - Vercel AI SDK
 - `@openai/agents`, `openai` - OpenAI Agents SDK
 
 ## Environment
@@ -80,6 +80,7 @@ Requires API key for selected runner in environment or `.env` file:
 - Claude SDK / Vercel AI (anthropic:): `ANTHROPIC_API_KEY`
 - Vercel AI (openai:) / OpenAI Agents: `OPENAI_API_KEY`
 - Vercel AI (google:): `GOOGLE_GENERATIVE_AI_API_KEY`
+- Vercel AI (openrouter:): `OPENROUTER_API_KEY`
 
 For Bedrock: set `CLAUDE_CODE_USE_BEDROCK=1` + AWS env vars.
 
