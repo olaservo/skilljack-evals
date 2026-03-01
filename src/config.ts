@@ -51,7 +51,7 @@ export interface EvalConfig {
   discoveryThreshold: number; // 0-1, default 0.8 (80%)
   scoreThreshold: number; // 1-5, default 4.0
 
-  // Runner
+  // Security
   allowedWriteDirs: string[];
 }
 

@@ -24,7 +24,11 @@ export interface AgentRunnerOptions {
   model?: string;
   /** Per-task timeout in ms */
   taskTimeoutMs?: number;
-  /** Directories the agent is allowed to write to */
+  /**
+   * Directories the agent is allowed to write to.
+   * NOTE: Only enforced for structured file-write tools (writeFile, Write/Edit).
+   * Bash/shell tools can bypass these restrictions.
+   */
   allowedWriteDirs?: string[];
   /** Path to skills directory (for non-Claude runners that handle discovery natively) */
   skillsDir?: string;

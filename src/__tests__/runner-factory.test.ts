@@ -9,9 +9,31 @@ describe('createRunner', () => {
     expect(runner.providerName).toBe('claude-sdk');
   });
 
+  it('creates a vercel-ai runner', async () => {
+    const runner = await createRunner('vercel-ai', {});
+    expect(runner).toBeDefined();
+    expect(runner.providerName).toBe('vercel-ai');
+  });
+
+  it('creates an openai-agents runner', async () => {
+    const runner = await createRunner('openai-agents', {});
+    expect(runner).toBeDefined();
+    expect(runner.providerName).toBe('openai-agents');
+  });
+
   it('throws for unknown runner type', async () => {
     await expect(
       createRunner('invalid-runner' as RunnerType, {}),
     ).rejects.toThrow('Unknown runner type: invalid-runner');
+  });
+
+  it('passes options through to runner', async () => {
+    const runner = await createRunner('claude-sdk', {
+      model: 'haiku',
+      cwd: '/tmp/test',
+      taskTimeoutMs: 60000,
+    });
+    expect(runner).toBeDefined();
+    expect(runner.providerName).toBe('claude-sdk');
   });
 });

@@ -70,6 +70,10 @@ export async function discoverSkills(skillsDir: string): Promise<SkillMetadata[]
           description: frontmatter.description,
           path: path.resolve(skillDir),
         });
+      } else if (frontmatter.name || frontmatter.description) {
+        console.warn(
+          `Skipping skill in ${entry.name}: SKILL.md frontmatter missing ${!frontmatter.name ? 'name' : 'description'}`,
+        );
       }
     } catch {
       continue;
