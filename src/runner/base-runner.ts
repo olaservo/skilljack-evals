@@ -12,21 +12,29 @@ import type {
   TaskResult,
 } from '../types.js';
 import { loadConfigSync } from '../config.js';
+import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
 
 export abstract class BaseRunner implements AgentRunner {
   abstract readonly providerName: string;
   protected options: AgentRunnerOptions;
 
-  constructor(options: AgentRunnerOptions = {}) {
-    const config = loadConfigSync();
+  /**
+   * @param options - Runner options (cwd, model, timeout, etc.)
+   * @param config - Pre-loaded EvalConfig. If omitted, falls back to
+   *   loadConfigSync() which only reads env vars + defaults (no YAML file).
+   *   The pipeline always passes a fully-loaded config, but direct API users
+   *   should call loadConfig() first and pass the result here.
+   */
+  constructor(options: AgentRunnerOptions = {}, config?: EvalConfig) {
+    const resolvedConfig = config ?? loadConfigSync();
 
     this.options = {
       cwd: options.cwd ?? process.cwd(),
       parallel: options.parallel ?? false,
-      model: options.model ?? config.defaultAgentModel,
-      taskTimeoutMs: options.taskTimeoutMs ?? config.taskTimeoutMs,
-      allowedWriteDirs: options.allowedWriteDirs ?? config.allowedWriteDirs,
+      model: options.model ?? resolvedConfig.defaultAgentModel,
+      taskTimeoutMs: options.taskTimeoutMs ?? resolvedConfig.taskTimeoutMs,
+      allowedWriteDirs: options.allowedWriteDirs ?? resolvedConfig.allowedWriteDirs,
       skillsDir: options.skillsDir,
     };
   }

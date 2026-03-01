@@ -198,6 +198,10 @@ export class VercelAiRunner extends BaseRunner {
             }
           },
         }),
+        // NOTE: The bash tool can perform arbitrary writes and network access.
+        // The writeFile tool's allowedWriteDirs restriction does not apply here.
+        // This is acceptable in the eval context since the agent runs in a
+        // controlled working directory with timeout protection.
         bash: defineTool({
           description: 'Execute a bash command',
           inputSchema: z.object({

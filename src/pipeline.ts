@@ -123,7 +123,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       parallel: false,
       allowedWriteDirs: config.allowedWriteDirs,
       skillsDir,
-    });
+    }, config);
 
     const logDir = path.join(config.outputDir, 'logs');
     const scorerOptions: ScorerOptions = {

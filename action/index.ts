@@ -27,11 +27,23 @@ async function run(): Promise<void> {
     const noDeterministic = core.getInput('no-deterministic') === 'true';
     const numRuns = parseInt(core.getInput('runs') || '3', 10);
 
-    // Handle API key
-    const apiKey = core.getInput('anthropic-api-key') || process.env.ANTHROPIC_API_KEY;
-    if (apiKey) {
-      process.env.ANTHROPIC_API_KEY = apiKey;
-      core.setSecret(apiKey);
+    // Handle API keys
+    const anthropicKey = core.getInput('anthropic-api-key') || process.env.ANTHROPIC_API_KEY;
+    if (anthropicKey) {
+      process.env.ANTHROPIC_API_KEY = anthropicKey;
+      core.setSecret(anthropicKey);
+    }
+
+    const openaiKey = core.getInput('openai-api-key') || process.env.OPENAI_API_KEY;
+    if (openaiKey) {
+      process.env.OPENAI_API_KEY = openaiKey;
+      core.setSecret(openaiKey);
+    }
+
+    const googleKey = core.getInput('google-api-key') || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (googleKey) {
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = googleKey;
+      core.setSecret(googleKey);
     }
 
     // Build config overrides

@@ -24,6 +24,7 @@ import {
 import { createToolPolicy } from './security.js';
 import { BaseRunner } from './base-runner.js';
 import type { AgentRunnerOptions } from './agent-runner.js';
+import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
 
 /**
@@ -39,8 +40,8 @@ export class ClaudeSdkRunner extends BaseRunner {
   readonly providerName = 'claude-sdk';
   private sdkOptions: ClaudeSdkRunnerOptions;
 
-  constructor(options: ClaudeSdkRunnerOptions = {}) {
-    super(options);
+  constructor(options: ClaudeSdkRunnerOptions = {}, config?: EvalConfig) {
+    super(options, config);
     this.sdkOptions = {
       ...this.options,
       settingSources: options.settingSources ?? ['project'],

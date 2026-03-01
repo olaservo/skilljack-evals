@@ -8,15 +8,25 @@
 import type { AgentRunner, AgentRunnerOptions } from './agent-runner.js';
 import { ClaudeSdkRunner } from './claude-sdk-runner.js';
 import type { ClaudeSdkRunnerOptions } from './claude-sdk-runner.js';
-import type { RunnerType } from '../config.js';
+import type { RunnerType, EvalConfig } from '../config.js';
 
+/**
+ * Create the appropriate AgentRunner based on runner type.
+ *
+ * @param type - Runner type ('claude-sdk', 'vercel-ai', or 'openai-agents')
+ * @param options - Runner options (cwd, model, timeout, etc.)
+ * @param config - Optional pre-loaded EvalConfig. Passed through to BaseRunner
+ *   so YAML file config values are respected. When omitted, BaseRunner falls
+ *   back to loadConfigSync() (env vars + defaults only).
+ */
 export async function createRunner(
   type: RunnerType,
   options: AgentRunnerOptions,
+  config?: EvalConfig,
 ): Promise<AgentRunner> {
   switch (type) {
     case 'claude-sdk':
-      return new ClaudeSdkRunner(options as ClaudeSdkRunnerOptions);
+      return new ClaudeSdkRunner(options as ClaudeSdkRunnerOptions, config);
 
     case 'vercel-ai': {
       const { VercelAiRunner } = await import('./vercel-ai-runner.js').catch(() => {
@@ -25,7 +35,7 @@ export async function createRunner(
           'Install them with: npm install ai @ai-sdk/openai zod',
         );
       });
-      return new VercelAiRunner(options);
+      return new VercelAiRunner(options, config);
     }
 
     case 'openai-agents': {
@@ -35,7 +45,7 @@ export async function createRunner(
           'Install it with: npm install @openai/agents',
         );
       });
-      return new OpenAiAgentsRunner(options);
+      return new OpenAiAgentsRunner(options, config);
     }
 
     default:

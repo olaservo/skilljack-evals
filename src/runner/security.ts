@@ -19,8 +19,14 @@ export function isWriteAllowed(
 ): boolean {
   if (allowedWriteDirs.length === 0) return true;
 
-  const resolvedDirs = allowedWriteDirs.map((dir) => path.resolve(cwd, dir));
-  return resolvedDirs.some((dir) => resolvedPath.startsWith(dir));
+  const resolvedDirs = allowedWriteDirs.map((dir) => {
+    const resolved = path.resolve(cwd, dir);
+    // Ensure trailing separator so "/app/results" won't match "/app/results-evil"
+    return resolved.endsWith(path.sep) ? resolved : resolved + path.sep;
+  });
+  return resolvedDirs.some(
+    (dir) => resolvedPath.startsWith(dir) || resolvedPath === dir.slice(0, -1),
+  );
 }
 
 /**
@@ -33,9 +39,10 @@ export function createToolPolicy(
   allowedWriteDirs: string[],
   cwd: string
 ) {
-  const resolvedDirs = allowedWriteDirs.map((dir) =>
-    path.resolve(cwd, dir)
-  );
+  const resolvedDirs = allowedWriteDirs.map((dir) => {
+    const resolved = path.resolve(cwd, dir);
+    return resolved.endsWith(path.sep) ? resolved : resolved + path.sep;
+  });
 
   return async (
     toolName: string,
@@ -52,7 +59,7 @@ export function createToolPolicy(
     const resolvedPath = path.resolve(cwd, filePath);
 
     const isAllowed = resolvedDirs.some((dir) =>
-      resolvedPath.startsWith(dir)
+      resolvedPath.startsWith(dir) || resolvedPath === dir.slice(0, -1)
     );
 
     if (isAllowed) {

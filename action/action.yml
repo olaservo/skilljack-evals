@@ -60,6 +60,12 @@ inputs:
   anthropic-api-key:
     description: 'Anthropic API key (or use ANTHROPIC_API_KEY env var)'
     required: false
+  openai-api-key:
+    description: 'OpenAI API key for vercel-ai (openai:) or openai-agents runner (or use OPENAI_API_KEY env var)'
+    required: false
+  google-api-key:
+    description: 'Google AI API key for vercel-ai (google:) runner (or use GOOGLE_GENERATIVE_AI_API_KEY env var)'
+    required: false
 
 outputs:
   passed:
