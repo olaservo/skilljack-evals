@@ -19,6 +19,11 @@ export abstract class BaseRunner implements AgentRunner {
   abstract readonly providerName: string;
   protected options: AgentRunnerOptions;
 
+  /** Read-only access to resolved runner options (for testing and introspection). */
+  get runnerOptions(): Readonly<AgentRunnerOptions> {
+    return this.options;
+  }
+
   /**
    * @param options - Runner options (cwd, model, timeout, etc.)
    * @param config - Pre-loaded EvalConfig. If omitted, falls back to
@@ -36,6 +41,29 @@ export abstract class BaseRunner implements AgentRunner {
       taskTimeoutMs: options.taskTimeoutMs ?? resolvedConfig.taskTimeoutMs,
       allowedWriteDirs: options.allowedWriteDirs ?? resolvedConfig.allowedWriteDirs,
       skillsDir: options.skillsDir,
+      countReadAsFallback: options.countReadAsFallback ?? false,
+    };
+  }
+
+  /**
+   * Create a standardized error TaskResult.
+   */
+  protected createErrorResult(
+    task: EvalTask,
+    errorMessage: string,
+    durationMs: number,
+  ): TaskResult {
+    return {
+      taskId: task.id,
+      prompt: task.prompt,
+      output: '',
+      durationMs,
+      numTurns: 0,
+      costUsd: 0,
+      skillLoads: [],
+      toolCalls: [],
+      isError: true,
+      errorMessage,
     };
   }
 
@@ -68,18 +96,7 @@ export abstract class BaseRunner implements AgentRunner {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger?.markAsError(errorMessage);
 
-      return {
-        taskId: task.id,
-        prompt: task.prompt,
-        output: '',
-        durationMs: timeout,
-        numTurns: 0,
-        costUsd: 0,
-        skillLoads: [],
-        toolCalls: [],
-        isError: true,
-        errorMessage,
-      };
+      return this.createErrorResult(task, errorMessage, timeout);
     } finally {
       clearTimeout(abortTimer);
     }
@@ -105,18 +122,9 @@ export abstract class BaseRunner implements AgentRunner {
           return result.value;
         }
         const task = evaluation.tasks[i];
-        return {
-          taskId: task.id,
-          prompt: task.prompt,
-          output: '',
-          durationMs: 0,
-          numTurns: 0,
-          costUsd: 0,
-          skillLoads: [],
-          toolCalls: [],
-          isError: true,
-          errorMessage: result.reason?.message || 'Unknown error',
-        };
+        const errMsg = result.reason?.message || 'Unknown error';
+        console.error(`  Task ${task.id} ERROR: ${errMsg}`);
+        return this.createErrorResult(task, errMsg, 0);
       });
     }
 

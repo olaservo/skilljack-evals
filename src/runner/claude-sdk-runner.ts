@@ -32,8 +32,6 @@ import type { SessionLogger } from '../session/session-logger.js';
  */
 export interface ClaudeSdkRunnerOptions extends AgentRunnerOptions {
   settingSources?: Array<'user' | 'project' | 'local'>;
-  /** Count Read calls to SKILL.md as skill discovery (default: false) */
-  countReadAsFallback?: boolean;
 }
 
 export class ClaudeSdkRunner extends BaseRunner {
@@ -45,7 +43,6 @@ export class ClaudeSdkRunner extends BaseRunner {
     this.sdkOptions = {
       ...this.options,
       settingSources: options.settingSources ?? ['project'],
-      countReadAsFallback: options.countReadAsFallback ?? false,
     };
   }
 
@@ -120,7 +117,7 @@ export class ClaudeSdkRunner extends BaseRunner {
               }
 
               // Optionally detect via Read calls to SKILL.md
-              if (this.sdkOptions.countReadAsFallback && toolName === 'Read') {
+              if (this.options.countReadAsFallback && toolName === 'Read') {
                 const filePath = (toolInput.file_path as string) || '';
                 if (filePath.includes('SKILL.md') || filePath.includes('/skills/')) {
                   const match = filePath.match(/skills\/([^/]+)/);
@@ -161,18 +158,7 @@ export class ClaudeSdkRunner extends BaseRunner {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger?.markAsError(errorMessage);
 
-      return {
-        taskId: task.id,
-        prompt: task.prompt,
-        output: '',
-        durationMs: Date.now() - startTime,
-        numTurns: 0,
-        costUsd: 0,
-        skillLoads: [],
-        toolCalls: [],
-        isError: true,
-        errorMessage,
-      };
+      return this.createErrorResult(task, errorMessage, Date.now() - startTime);
     }
   }
 }

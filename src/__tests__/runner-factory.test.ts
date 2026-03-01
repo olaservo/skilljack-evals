@@ -35,5 +35,10 @@ describe('createRunner', () => {
     });
     expect(runner).toBeDefined();
     expect(runner.providerName).toBe('claude-sdk');
+
+    const opts = (runner as any).runnerOptions;
+    expect(opts.model).toBe('haiku');
+    expect(opts.cwd).toBe('/tmp/test');
+    expect(opts.taskTimeoutMs).toBe(60000);
   });
 });

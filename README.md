@@ -95,6 +95,14 @@ npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google
 npm install @openai/agents openai
 ```
 
+### Skill Support by SDK
+
+Each runner uses the SDK's native mechanism for skill discovery and loading:
+
+- **Claude Agent SDK** — Skills via `.claude/skills/` and the `Skill` tool. See [Claude Code Skills](https://docs.anthropic.com/en/docs/claude-code/skills) and [Agent Skills format](https://agentskills.io/home).
+- **Vercel AI SDK** — Skills via a `loadSkill` tool defined in the runner, following the [Agent Skills cookbook guide](https://ai-sdk.dev/cookbook/guides/agent-skills).
+- **OpenAI Agents SDK** — Skills via `shellTool()` with local skill bundles. See [Skills in OpenAI API](https://developers.openai.com/api/docs/guides/tools-skills/) and the [Skills cookbook](https://developers.openai.com/cookbook/examples/skills_in_api/).
+
 ### Baseline Results
 
 Baselines for the `example-greeting` evaluation (9 runs each, stored in `evals/example-greeting/baselines/`):

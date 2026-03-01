@@ -1,0 +1,2 @@
+# Baseline JSON files are generated — collapse in diffs, exclude from language stats
+evals/example-greeting/baselines/*.json linguist-generated=true

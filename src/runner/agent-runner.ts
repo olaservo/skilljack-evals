@@ -32,6 +32,14 @@ export interface AgentRunnerOptions {
   allowedWriteDirs?: string[];
   /** Path to skills directory (for non-Claude runners that handle discovery natively) */
   skillsDir?: string;
+  /**
+   * Count indirect reads of SKILL.md (via Read/readFile tools) as skill
+   * discovery. When false (default), only explicit loadSkill/Skill tool
+   * calls are counted. Set true for models that bypass the loadSkill tool.
+   * Note: Does not apply to the OpenAI Agents runner, which uses shell-based
+   * skill detection as its native mechanism.
+   */
+  countReadAsFallback?: boolean;
 }
 
 /**

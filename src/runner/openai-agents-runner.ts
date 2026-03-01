@@ -141,8 +141,9 @@ function extractFromRawResponses(
 
 /**
  * Detect skill loads from shell commands (e.g., cat SKILL.md).
+ * Exported for direct unit testing.
  */
-function detectSkillLoadsFromShellCommands(
+export function detectSkillLoadsFromShellCommands(
   shellCommands: string[],
   localSkills: SkillMetadata[],
 ): string[] {
@@ -176,15 +177,14 @@ function detectSkillLoadsFromShellCommands(
 export class OpenAiAgentsRunner extends BaseRunner {
   readonly providerName = 'openai-agents';
 
-  async runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult> {
-    let Agent: any, run: any, shellTool: any;
+  /**
+   * Dynamically import the OpenAI Agents SDK.
+   * Protected to allow test subclasses to inject mocks.
+   */
+  protected async importAgentsSdk(): Promise<{ Agent: any; run: any; shellTool: any }> {
     try {
-      // Uses Function() constructor to prevent bundlers from statically
-      // analyzing the import and failing at build time for optional deps.
       const mod = await (Function('pkg', 'return import(pkg)')('@openai/agents'));
-      Agent = mod.Agent;
-      run = mod.run;
-      shellTool = mod.shellTool;
+      return { Agent: mod.Agent, run: mod.run, shellTool: mod.shellTool };
     } catch (err) {
       const detail = err instanceof Error ? `: ${err.message}` : '';
       throw new Error(
@@ -192,6 +192,10 @@ export class OpenAiAgentsRunner extends BaseRunner {
         'Install it with: npm install @openai/agents',
       );
     }
+  }
+
+  async runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult> {
+    const { Agent, run, shellTool } = await this.importAgentsSdk();
 
     const startTime = Date.now();
 
@@ -259,18 +263,7 @@ export class OpenAiAgentsRunner extends BaseRunner {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger?.markAsError(errorMessage);
 
-      return {
-        taskId: task.id,
-        prompt: task.prompt,
-        output: '',
-        durationMs: Date.now() - startTime,
-        numTurns: 0,
-        costUsd: 0,
-        skillLoads: [],
-        toolCalls: [],
-        isError: true,
-        errorMessage,
-      };
+      return this.createErrorResult(task, errorMessage, Date.now() - startTime);
     }
   }
 }

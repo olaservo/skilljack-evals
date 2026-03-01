@@ -27,31 +27,18 @@ const execAsync = promisify(exec);
 // Model Resolution
 // ============================================
 
-/**
- * Dynamically import a module, throwing a helpful error if missing.
- *
- * Uses Function() constructor to prevent bundlers from statically
- * analyzing the import and failing at build time for optional deps.
- */
-async function dynamicImport(pkg: string, installHint: string): Promise<any> {
-  try {
-    return await (Function('pkg', 'return import(pkg)')(pkg));
-  } catch (err) {
-    const detail = err instanceof Error ? `: ${err.message}` : '';
-    throw new Error(`${pkg} is required${detail}. Install with: npm install ${installHint}`);
-  }
-}
+type ImportFn = (pkg: string, installHint: string) => Promise<any>;
 
 /**
  * Resolve a model string like "openai:gpt-5.2" into a Vercel AI SDK
  * LanguageModel instance via dynamic provider import.
  */
-async function resolveModel(modelString: string): Promise<any> {
+async function resolveModel(modelString: string, importFn: ImportFn): Promise<any> {
   // Parse "provider:model" format
   const colonIdx = modelString.indexOf(':');
   if (colonIdx === -1) {
     // Default to OpenAI if no provider prefix
-    const { createOpenAI } = await dynamicImport('@ai-sdk/openai', '@ai-sdk/openai');
+    const { createOpenAI } = await importFn('@ai-sdk/openai', '@ai-sdk/openai');
     const openai = createOpenAI();
     return openai(modelString);
   }
@@ -61,17 +48,17 @@ async function resolveModel(modelString: string): Promise<any> {
 
   switch (provider) {
     case 'openai': {
-      const { createOpenAI } = await dynamicImport('@ai-sdk/openai', '@ai-sdk/openai');
+      const { createOpenAI } = await importFn('@ai-sdk/openai', '@ai-sdk/openai');
       const openai = createOpenAI();
       return openai(model);
     }
     case 'anthropic': {
-      const { createAnthropic } = await dynamicImport('@ai-sdk/anthropic', '@ai-sdk/anthropic');
+      const { createAnthropic } = await importFn('@ai-sdk/anthropic', '@ai-sdk/anthropic');
       const anthropic = createAnthropic();
       return anthropic(model);
     }
     case 'google': {
-      const { createGoogleGenerativeAI } = await dynamicImport('@ai-sdk/google', '@ai-sdk/google');
+      const { createGoogleGenerativeAI } = await importFn('@ai-sdk/google', '@ai-sdk/google');
       const google = createGoogleGenerativeAI();
       return google(model);
     }
@@ -110,9 +97,23 @@ ${skillsList}
 export class VercelAiRunner extends BaseRunner {
   readonly providerName = 'vercel-ai';
 
+  /**
+   * Dynamically import a module, throwing a helpful error if missing.
+   * Protected to allow test subclasses to inject mocks.
+   */
+  protected async dynamicImport(pkg: string, installHint: string): Promise<any> {
+    try {
+      return await (Function('pkg', 'return import(pkg)')(pkg));
+    } catch (err) {
+      const detail = err instanceof Error ? `: ${err.message}` : '';
+      throw new Error(`${pkg} is required${detail}. Install with: npm install ${installHint}`);
+    }
+  }
+
   async runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult> {
-    const { generateText, tool: defineTool, stepCountIs } = await dynamicImport('ai', 'ai');
-    const { z } = await dynamicImport('zod', 'zod');
+    const importFn = this.dynamicImport.bind(this);
+    const { generateText, tool: defineTool, stepCountIs } = await importFn('ai', 'ai');
+    const { z } = await importFn('zod', 'zod');
 
     const skillLoads: string[] = [];
     const toolCalls: ToolCallRecord[] = [];
@@ -131,7 +132,7 @@ export class VercelAiRunner extends BaseRunner {
         : 'You are a helpful AI assistant.';
 
       // 3. Resolve model
-      const model = await resolveModel(this.options.model ?? 'openai:gpt-5.2');
+      const model = await resolveModel(this.options.model ?? 'openai:gpt-5.2', importFn);
 
       const cwd = this.options.cwd ?? process.cwd();
       const allowedWriteDirs = this.options.allowedWriteDirs ?? [];
@@ -257,8 +258,8 @@ export class VercelAiRunner extends BaseRunner {
               });
               logger?.addToolUse(tc.toolName, tc.args);
 
-              // Detect skill loads from readFile calls to SKILL.md
-              if (tc.toolName === 'readFile') {
+              // Optionally detect skill loads from readFile calls to SKILL.md
+              if (this.options.countReadAsFallback && tc.toolName === 'readFile') {
                 const filePath = (tc.args as { file_path?: string })?.file_path ?? '';
                 if (filePath.includes('SKILL.md') || filePath.includes('/skills/')) {
                   const match = filePath.match(/skills\/([^/]+)/);
@@ -297,18 +298,7 @@ export class VercelAiRunner extends BaseRunner {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger?.markAsError(errorMessage);
 
-      return {
-        taskId: task.id,
-        prompt: task.prompt,
-        output: '',
-        durationMs: Date.now() - startTime,
-        numTurns: 0,
-        costUsd: 0,
-        skillLoads: [],
-        toolCalls: [],
-        isError: true,
-        errorMessage,
-      };
+      return this.createErrorResult(task, errorMessage, Date.now() - startTime);
     }
   }
 }
