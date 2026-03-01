@@ -7,12 +7,13 @@
 
 import * as core from '@actions/core';
 import { runPipeline } from '../src/pipeline.js';
-import type { EvalConfig } from '../src/config.js';
+import type { EvalConfig, RunnerType } from '../src/config.js';
 
 async function run(): Promise<void> {
   try {
     // Read inputs
     const tasks = core.getInput('tasks', { required: true });
+    const runner = (core.getInput('runner') || 'claude-sdk') as RunnerType;
     const model = core.getInput('model') || 'sonnet';
     const judgeModel = core.getInput('judge-model') || 'haiku';
     const configPath = core.getInput('config') || undefined;
@@ -35,6 +36,7 @@ async function run(): Promise<void> {
 
     // Build config overrides
     const configOverrides: Partial<EvalConfig> = {
+      runnerType: runner,
       defaultAgentModel: model,
       defaultJudgeModel: judgeModel,
       discoveryThreshold: thresholdDiscovery,

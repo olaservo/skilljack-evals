@@ -51,8 +51,8 @@
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "@ai-sdk/anthropic": "^3.0.0",
-    "@ai-sdk/google": "^3.0.0",
+    "@ai-sdk/anthropic": "^3.0.50",
+    "@ai-sdk/google": "^3.0.34",
     "@ai-sdk/openai": "^3.0.33",
     "@openai/agents": "^0.4.15",
     "ai": "^6.0.99",

@@ -8,6 +8,10 @@ inputs:
   tasks:
     description: 'Path to tasks YAML file'
     required: true
+  runner:
+    description: 'Runner type: claude-sdk, vercel-ai, or openai-agents'
+    required: false
+    default: 'claude-sdk'
   model:
     description: 'Agent model for task execution'
     required: false
