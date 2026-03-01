@@ -72,6 +72,12 @@ describe('detectSkillLoadsFromShellCommands', () => {
     const loads = detectSkillLoadsFromShellCommands(cmds, skills);
     expect(loads).toContain('greeting');
   });
+
+  it('does not detect unregistered skills from path fallback', () => {
+    const cmds = ['ls /home/user/.claude/skills/unknown-skill/'];
+    const loads = detectSkillLoadsFromShellCommands(cmds, skills);
+    expect(loads).toEqual([]);
+  });
 });
 
 // ============================================

@@ -159,10 +159,13 @@ export function detectSkillLoadsFromShellCommands(
           }
         }
       }
-      // Fallback: extract from path pattern (strip trailing quotes/punctuation)
+      // Fallback: extract from path pattern, but only match registered skills
       const match = cmd.match(/skills\/([^/\s"']+)/);
-      if (match && !loads.includes(match[1])) {
-        loads.push(match[1]);
+      if (match) {
+        const candidate = match[1];
+        if (localSkills.some(s => s.name === candidate) && !loads.includes(candidate)) {
+          loads.push(candidate);
+        }
       }
     }
   }
