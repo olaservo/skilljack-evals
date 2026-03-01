@@ -190,7 +190,7 @@ skilljack-evals score results.json --judge-model haiku
 ### `report` — Generate reports from scored results
 
 ```bash
-skilljack-evals report results.json -o report.md --json report.json
+skilljack-evals report -r results.json -o report.md --json report.json
 ```
 
 ### `validate` — Check YAML syntax
@@ -343,7 +343,7 @@ The action writes a condensed summary to `$GITHUB_STEP_SUMMARY` and exits with c
 
 ```typescript
 import {
-  parseSkillEvaluation,
+  parseEvalFile,
   SkillJudge,
   generateReport,
   runPipeline,
@@ -352,13 +352,14 @@ import {
 } from '@skilljack/evals';
 
 // Full pipeline
-const result = await runPipeline('evals/greeting/tasks.yaml', {
-  model: 'sonnet',
+const result = await runPipeline({
+  tasksFile: 'evals/greeting/tasks.yaml',
+  configOverrides: { defaultAgentModel: 'sonnet' },
   verbose: true,
 });
 
 // Or individual steps
-const evaluation = await parseSkillEvaluation('path/to/tasks.yaml');
+const evaluation = await parseEvalFile('path/to/tasks.yaml');
 const judge = new SkillJudge({ model: 'haiku' });
 const score = await judge.judgeResult(task, result);
 const detScore = scoreDeterministic(task, result);
