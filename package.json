@@ -1,6 +1,6 @@
 {
   "name": "@skilljack/evals",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "CLI for evaluating AI agent skill discoverability, adherence, and output quality. Runs as standalone CLI or GitHub Action.",
   "author": "Ola Hungerford",
