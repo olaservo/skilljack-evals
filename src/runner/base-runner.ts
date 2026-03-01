@@ -130,7 +130,7 @@ export abstract class BaseRunner implements AgentRunner {
 
     const results: TaskResult[] = [];
     for (const task of evaluation.tasks) {
-      console.log(`Running task ${task.id}: ${task.prompt.slice(0, 60)}...`);
+      console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
       const logger = createLogger?.(task);
       const result = await this.runTaskWithTimeout(task, undefined, logger);
       results.push(result);
