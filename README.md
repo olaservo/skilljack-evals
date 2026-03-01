@@ -82,6 +82,13 @@ skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model
 skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "openai:gpt-5.2"
 skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "openrouter:deepseek/deepseek-v3.2"
 
+# OpenRouter — tested models
+# openrouter:deepseek/deepseek-v3.2
+# openrouter:minimax/minimax-m2.5
+# openrouter:moonshotai/kimi-k2.5
+# openrouter:z-ai/glm-5
+# openrouter:openai/gpt-oss-120b
+
 # OpenAI Agents SDK
 skilljack-evals run evals/example-greeting/tasks.yaml --runner openai-agents --model "gpt-5.2"
 ```
