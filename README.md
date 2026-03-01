@@ -1,8 +1,8 @@
 # skilljack-evals
 
-CLI for evaluating AI agent skills using the Claude Agent SDK. Tests how well agents discover, load, and execute [Agent Skills](https://agentskills.io/home) — measuring discoverability, instruction adherence, and output quality.
+CLI for evaluating AI agent skills across multiple agent frameworks. Tests how well agents discover, load, and execute [Agent Skills](https://agentskills.io/home) — measuring discoverability, instruction adherence, and output quality.
 
-Runs standalone or as a GitHub Action.
+Supports the Claude Agent SDK, Vercel AI SDK, and OpenAI Agents SDK. Runs standalone or as a GitHub Action.
 
 ## What are Agent Skills?
 
@@ -11,7 +11,7 @@ Agent Skills are a lightweight, open-source format for extending AI agent capabi
 ## Requirements
 
 - Node.js >= 20.0.0
-- Anthropic API key (or AWS credentials for Bedrock)
+- API key for your chosen runner (see [API Keys](#api-keys) below)
 
 ## Installation
 
@@ -62,11 +62,77 @@ skilljack-evals run evals/my-skill/tasks.yaml --verbose
 
 This workflow ensures your skill is discoverable from the right prompts, doesn't activate when it shouldn't, and produces the output quality you expect.
 
+## Multi-Runner Support
+
+Three runners are available, selected via the `--runner` CLI flag:
+
+| Runner | Flag | Model Format | Example |
+|--------|------|-------------|---------|
+| Claude Agent SDK (default) | `--runner claude-sdk` | Model aliases | `sonnet`, `haiku` |
+| Vercel AI SDK | `--runner vercel-ai` | `provider:model` | `anthropic:claude-sonnet-4-6`, `google:gemini-2.5-pro`, `openai:gpt-5.2` |
+| OpenAI Agents SDK | `--runner openai-agents` | Plain model name | `gpt-5.2` |
+
+```bash
+# Claude SDK (default)
+skilljack-evals run evals/example-greeting/tasks.yaml --model sonnet
+
+# Vercel AI SDK with different providers
+skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "anthropic:claude-sonnet-4-6"
+skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "google:gemini-2.5-pro"
+skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "openai:gpt-5.2"
+
+# OpenAI Agents SDK
+skilljack-evals run evals/example-greeting/tasks.yaml --runner openai-agents --model "gpt-5.2"
+```
+
+The Vercel AI SDK and OpenAI Agents SDK runners require their respective peer dependencies:
+
+```bash
+# Vercel AI SDK
+npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google
+
+# OpenAI Agents SDK
+npm install @openai/agents openai
+```
+
+### Skill Support by SDK
+
+Each runner uses the SDK's native mechanism for skill discovery and loading:
+
+- **Claude Agent SDK** — Skills via `.claude/skills/` and the `Skill` tool. See [Claude Code Skills](https://docs.anthropic.com/en/docs/claude-code/skills) and [Agent Skills format](https://agentskills.io/home).
+- **Vercel AI SDK** — Skills via a `loadSkill` tool defined in the runner, following the [Agent Skills cookbook guide](https://ai-sdk.dev/cookbook/guides/agent-skills).
+- **OpenAI Agents SDK** — Skills via `shellTool()` with local skill bundles. See [Skills in OpenAI API](https://developers.openai.com/api/docs/guides/tools-skills/) and the [Skills cookbook](https://developers.openai.com/cookbook/examples/skills_in_api/).
+
+### Baseline Results
+
+Baselines for the `example-greeting` evaluation (9 runs each, stored in `evals/example-greeting/baselines/`):
+
+| Runner | Model | Discovery | Adherence | Output | Weighted | Result |
+|--------|-------|-----------|-----------|--------|----------|--------|
+| claude-sdk | sonnet | 100% | 5.00/5 | 5.00/5 | 1.00 | PASS |
+| vercel-ai | claude-sonnet-4-6 | 100% | 5.00/5 | 5.00/5 | 1.00 | PASS |
+| vercel-ai | gemini-2.5-pro | 100% | 4.11/5 | 4.11/5 | 0.84 | PASS |
+| vercel-ai | gpt-5.2 | 67% | 3.67/5 | 4.37/5 | 0.72 | FAIL |
+| openai-agents | gpt-5.2 | 67% | 3.70/5 | 4.52/5 | 0.73 | FAIL |
+
+**Key findings:**
+- **Sonnet** achieves perfect scores regardless of runner harness (claude-sdk vs vercel-ai)
+- **Gemini 2.5 Pro** passes all thresholds and correctly handles false-positive tests
+- **gpt-5.2** consistently loads the greeting skill on the false-positive test (an educational question about email greetings that should not trigger the skill), causing discovery failure across both runners
+
 ## Configuration
 
-### API Key
+### API Keys
 
-Set `ANTHROPIC_API_KEY` in your environment or a `.env` file (see `.env.example`).
+Set the appropriate API key in your environment or a `.env` file (see `.env.example`):
+
+| Runner | Required Key |
+|--------|-------------|
+| Claude SDK | `ANTHROPIC_API_KEY` |
+| Vercel AI (`anthropic:`) | `ANTHROPIC_API_KEY` |
+| Vercel AI (`openai:`) | `OPENAI_API_KEY` |
+| Vercel AI (`google:`) | `GOOGLE_GENERATIVE_AI_API_KEY` |
+| OpenAI Agents | `OPENAI_API_KEY` |
 
 ### Bedrock
 
@@ -123,7 +189,8 @@ Runs the agent against tasks, scores results, and generates reports.
 
 ```bash
 skilljack-evals run evals/greeting/tasks.yaml \
-  --model sonnet --judge-model haiku \
+  --runner vercel-ai --model "google:gemini-2.5-pro" \
+  --judge-model haiku \
   --timeout 300000 \
   --tasks gr-001,gr-002 \
   --threshold-discovery 0.8 --threshold-score 4.0 \
@@ -164,14 +231,14 @@ skilljack-evals parse evals/greeting/tasks.yaml
 ## Architecture
 
 ```
-YAML tasks → Config → Runner (Agent SDK) → Scorer (deterministic + LLM judge) → Report
+YAML tasks → Config → Runner (Claude SDK / Vercel AI / OpenAI Agents) → Scorer (deterministic + LLM judge) → Report
 ```
 
 ### Pipeline
 
 1. **Parse** — Load and validate task definitions from YAML
 2. **Setup** — Copy skills to `.claude/skills/` in the working directory
-3. **Run** — Execute agent against each task via the Claude Agent SDK
+3. **Run** — Execute agent against each task via the selected runner
 4. **Score** — Deterministic checks (free, fast) then optional LLM judge
 5. **Report** — Generate markdown + JSON reports, check pass/fail thresholds
 6. **Cleanup** — Remove copied skills
@@ -265,6 +332,7 @@ Both `deterministic` and `criteria` blocks are optional. If both are present, th
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `tasks` | Yes | — | Path to tasks YAML file |
+| `runner` | No | `claude-sdk` | Runner type: `claude-sdk`, `vercel-ai`, `openai-agents` |
 | `model` | No | `sonnet` | Agent model |
 | `judge-model` | No | `haiku` | LLM judge model |
 | `config` | No | — | Path to eval.config.yaml |
@@ -313,10 +381,6 @@ const score = await judge.judgeResult(task, result);
 const detScore = scoreDeterministic(task, result);
 const report = generateReport(evaluation, results, scores);
 ```
-
-## Roadmap
-
-The runner currently uses the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) to execute tasks. Support for other models and agent clients is planned for future releases.
 
 ## Development
 

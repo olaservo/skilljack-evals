@@ -35,7 +35,8 @@
     "dev": "tsx src/cli.ts",
     "start": "node dist/src/cli.js",
     "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "~0.1.76",
@@ -48,7 +49,40 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
+  },
+  "peerDependencies": {
+    "@ai-sdk/anthropic": "^3.0.50",
+    "@ai-sdk/google": "^3.0.34",
+    "@ai-sdk/openai": "^3.0.33",
+    "@openai/agents": "^0.4.15",
+    "ai": "^6.0.99",
+    "openai": "^6.25.0",
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    },
+    "@ai-sdk/openai": {
+      "optional": true
+    },
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google": {
+      "optional": true
+    },
+    "@openai/agents": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=20.0.0"

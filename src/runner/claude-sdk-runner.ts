@@ -1,5 +1,5 @@
 /**
- * Skill Evaluation Runner - Claude Agent SDK
+ * Claude Agent SDK Runner
  *
  * Runs evaluation tasks against an agent using the Claude Agent SDK.
  * Supports local skill delivery (.claude/skills/) with both Anthropic API
@@ -12,10 +12,8 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type {
   EvalTask,
-  SkillEvaluation,
   ToolCallRecord,
   TaskResult,
-  RunnerOptions,
 } from '../types.js';
 import {
   isAssistantMessage,
@@ -24,22 +22,27 @@ import {
   isToolUseBlock,
 } from '../types.js';
 import { createToolPolicy } from './security.js';
-import { loadConfigSync } from '../config.js';
+import { BaseRunner } from './base-runner.js';
+import type { AgentRunnerOptions } from './agent-runner.js';
+import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
 
-export class SkillEvalRunner {
-  private options: Required<RunnerOptions>;
+/**
+ * Claude SDK-specific options (extends shared options).
+ */
+export interface ClaudeSdkRunnerOptions extends AgentRunnerOptions {
+  settingSources?: Array<'user' | 'project' | 'local'>;
+}
 
-  constructor(options: RunnerOptions = {}) {
-    const config = loadConfigSync();
+export class ClaudeSdkRunner extends BaseRunner {
+  readonly providerName = 'claude-sdk';
+  private sdkOptions: ClaudeSdkRunnerOptions;
 
-    this.options = {
-      cwd: options.cwd ?? process.cwd(),
-      parallel: options.parallel ?? false,
-      model: options.model ?? config.defaultAgentModel,
+  constructor(options: ClaudeSdkRunnerOptions = {}, config?: EvalConfig) {
+    super(options, config);
+    this.sdkOptions = {
+      ...this.options,
       settingSources: options.settingSources ?? ['project'],
-      countReadAsFallback: options.countReadAsFallback ?? false,
-      allowedWriteDirs: options.allowedWriteDirs ?? config.allowedWriteDirs,
     };
   }
 
@@ -58,8 +61,8 @@ export class SkillEvalRunner {
       let resultCostUsd = 0;
 
       const toolPolicy = createToolPolicy(
-        this.options.allowedWriteDirs,
-        this.options.cwd
+        this.options.allowedWriteDirs ?? [],
+        this.options.cwd ?? process.cwd(),
       );
 
       const q = query({
@@ -68,7 +71,7 @@ export class SkillEvalRunner {
           cwd: this.options.cwd,
           model: this.options.model,
           systemPrompt: { type: 'preset', preset: 'claude_code' },
-          settingSources: this.options.settingSources,
+          settingSources: this.sdkOptions.settingSources,
           allowedTools: [
             'Read', 'Write', 'Edit',
             'Glob', 'Grep', 'Bash',
@@ -155,109 +158,7 @@ export class SkillEvalRunner {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger?.markAsError(errorMessage);
 
-      return {
-        taskId: task.id,
-        prompt: task.prompt,
-        output: '',
-        durationMs: Date.now() - startTime,
-        numTurns: 0,
-        costUsd: 0,
-        skillLoads: [],
-        toolCalls: [],
-        isError: true,
-        errorMessage,
-      };
+      return this.createErrorResult(task, errorMessage, Date.now() - startTime);
     }
-  }
-
-  /**
-   * Execute a task with timeout protection.
-   */
-  async runTaskWithTimeout(
-    task: EvalTask,
-    timeoutMs?: number,
-    logger?: SessionLogger
-  ): Promise<TaskResult> {
-    const config = loadConfigSync();
-    const timeout = timeoutMs ?? config.taskTimeoutMs;
-
-    const timeoutPromise = new Promise<TaskResult>((_, reject) => {
-      setTimeout(
-        () => reject(new Error(`Task ${task.id} timed out after ${timeout}ms`)),
-        timeout
-      );
-    });
-
-    try {
-      return await Promise.race([this.runTask(task, logger), timeoutPromise]);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger?.markAsError(errorMessage);
-
-      return {
-        taskId: task.id,
-        prompt: task.prompt,
-        output: '',
-        durationMs: timeout,
-        numTurns: 0,
-        costUsd: 0,
-        skillLoads: [],
-        toolCalls: [],
-        isError: true,
-        errorMessage,
-      };
-    }
-  }
-
-  /**
-   * Run all tasks in an evaluation suite.
-   */
-  async runAll(
-    evaluation: SkillEvaluation,
-    createLogger?: (task: EvalTask) => SessionLogger
-  ): Promise<TaskResult[]> {
-    if (this.options.parallel) {
-      const results = await Promise.allSettled(
-        evaluation.tasks.map((task) => {
-          const logger = createLogger?.(task);
-          return this.runTaskWithTimeout(task, undefined, logger);
-        })
-      );
-
-      return results.map((result, i) => {
-        if (result.status === 'fulfilled') {
-          return result.value;
-        }
-        const task = evaluation.tasks[i];
-        return {
-          taskId: task.id,
-          prompt: task.prompt,
-          output: '',
-          durationMs: 0,
-          numTurns: 0,
-          costUsd: 0,
-          skillLoads: [],
-          toolCalls: [],
-          isError: true,
-          errorMessage: result.reason?.message || 'Unknown error',
-        };
-      });
-    }
-
-    const results: TaskResult[] = [];
-    for (const task of evaluation.tasks) {
-      console.log(`Running task ${task.id}: ${task.prompt.slice(0, 60)}...`);
-      const logger = createLogger?.(task);
-      const result = await this.runTaskWithTimeout(task, undefined, logger);
-      results.push(result);
-
-      if (result.isError) {
-        console.error(`  ERROR: ${result.errorMessage}`);
-      } else {
-        console.log(`  Skills loaded: ${result.skillLoads.join(', ') || 'none'}`);
-        console.log(`  Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
-      }
-    }
-    return results;
   }
 }

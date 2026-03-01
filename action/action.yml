@@ -8,6 +8,10 @@ inputs:
   tasks:
     description: 'Path to tasks YAML file'
     required: true
+  runner:
+    description: 'Runner type: claude-sdk, vercel-ai, or openai-agents'
+    required: false
+    default: 'claude-sdk'
   model:
     description: 'Agent model for task execution'
     required: false
@@ -55,6 +59,12 @@ inputs:
     default: '3'
   anthropic-api-key:
     description: 'Anthropic API key (or use ANTHROPIC_API_KEY env var)'
+    required: false
+  openai-api-key:
+    description: 'OpenAI API key for vercel-ai (openai:) or openai-agents runner (or use OPENAI_API_KEY env var)'
+    required: false
+  google-api-key:
+    description: 'Google AI API key for vercel-ai (google:) runner (or use GOOGLE_GENERATIVE_AI_API_KEY env var)'
     required: false
 
 outputs:

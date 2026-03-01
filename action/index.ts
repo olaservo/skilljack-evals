@@ -7,12 +7,19 @@
 
 import * as core from '@actions/core';
 import { runPipeline } from '../src/pipeline.js';
-import type { EvalConfig } from '../src/config.js';
+import { VALID_RUNNER_TYPES } from '../src/config.js';
+import type { EvalConfig, RunnerType } from '../src/config.js';
 
 async function run(): Promise<void> {
   try {
     // Read inputs
     const tasks = core.getInput('tasks', { required: true });
+    const runnerInput = core.getInput('runner') || 'claude-sdk';
+    if (!VALID_RUNNER_TYPES.includes(runnerInput as RunnerType)) {
+      core.setFailed(`Invalid runner "${runnerInput}". Valid options: ${VALID_RUNNER_TYPES.join(', ')}`);
+      return;
+    }
+    const runner = runnerInput as RunnerType;
     const model = core.getInput('model') || 'sonnet';
     const judgeModel = core.getInput('judge-model') || 'haiku';
     const configPath = core.getInput('config') || undefined;
@@ -26,15 +33,28 @@ async function run(): Promise<void> {
     const noDeterministic = core.getInput('no-deterministic') === 'true';
     const numRuns = parseInt(core.getInput('runs') || '3', 10);
 
-    // Handle API key
-    const apiKey = core.getInput('anthropic-api-key') || process.env.ANTHROPIC_API_KEY;
-    if (apiKey) {
-      process.env.ANTHROPIC_API_KEY = apiKey;
-      core.setSecret(apiKey);
+    // Handle API keys
+    const anthropicKey = core.getInput('anthropic-api-key') || process.env.ANTHROPIC_API_KEY;
+    if (anthropicKey) {
+      process.env.ANTHROPIC_API_KEY = anthropicKey;
+      core.setSecret(anthropicKey);
+    }
+
+    const openaiKey = core.getInput('openai-api-key') || process.env.OPENAI_API_KEY;
+    if (openaiKey) {
+      process.env.OPENAI_API_KEY = openaiKey;
+      core.setSecret(openaiKey);
+    }
+
+    const googleKey = core.getInput('google-api-key') || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (googleKey) {
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = googleKey;
+      core.setSecret(googleKey);
     }
 
     // Build config overrides
     const configOverrides: Partial<EvalConfig> = {
+      runnerType: runner,
       defaultAgentModel: model,
       defaultJudgeModel: judgeModel,
       discoveryThreshold: thresholdDiscovery,

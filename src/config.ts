@@ -16,7 +16,14 @@ import yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents';
+
+export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'vercel-ai', 'openai-agents'];
+
 export interface EvalConfig {
+  // Runner
+  runnerType: RunnerType;
+
   // Models
   defaultAgentModel: string;
   defaultJudgeModel: string;
@@ -44,7 +51,7 @@ export interface EvalConfig {
   discoveryThreshold: number; // 0-1, default 0.8 (80%)
   scoreThreshold: number; // 1-5, default 4.0
 
-  // Runner
+  // Security
   allowedWriteDirs: string[];
 }
 
@@ -52,6 +59,7 @@ export interface EvalConfig {
  * Default configuration values.
  */
 export const DEFAULT_CONFIG: EvalConfig = {
+  runnerType: 'claude-sdk',
   defaultAgentModel: 'sonnet',
   defaultJudgeModel: 'haiku',
   defaultWeights: {
@@ -90,6 +98,7 @@ interface RawConfigFile {
     avg_score?: number;
   };
   runner?: {
+    type?: string;
     timeout_ms?: number;
     allowed_write_dirs?: string[];
   };
@@ -117,6 +126,12 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
 
     const config: Partial<EvalConfig> = {};
 
+    if (raw.runner?.type) {
+      if (!VALID_RUNNER_TYPES.includes(raw.runner.type as RunnerType)) {
+        throw new Error(`Invalid runner type "${raw.runner.type}" in config file. Valid: ${VALID_RUNNER_TYPES.join(', ')}`);
+      }
+      config.runnerType = raw.runner.type as RunnerType;
+    }
     if (raw.models?.agent) config.defaultAgentModel = raw.models.agent;
     if (raw.models?.judge) config.defaultJudgeModel = raw.models.judge;
 
@@ -142,9 +157,13 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
     if (raw.ci?.github_summary !== undefined) config.githubSummary = raw.ci.github_summary;
 
     return config;
-  } catch {
-    // Config file not found or invalid — that's fine
-    return {};
+  } catch (err: unknown) {
+    // File not found is fine — use defaults
+    if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'ENOENT') {
+      return {};
+    }
+    // Re-throw parse/validation errors
+    throw err;
   }
 }
 
@@ -166,6 +185,12 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
 function loadEnvConfig(): Partial<EvalConfig> {
   const config: Partial<EvalConfig> = {};
 
+  if (process.env.EVAL_RUNNER_TYPE) {
+    if (!VALID_RUNNER_TYPES.includes(process.env.EVAL_RUNNER_TYPE as RunnerType)) {
+      throw new Error(`Invalid EVAL_RUNNER_TYPE "${process.env.EVAL_RUNNER_TYPE}". Valid: ${VALID_RUNNER_TYPES.join(', ')}`);
+    }
+    config.runnerType = process.env.EVAL_RUNNER_TYPE as RunnerType;
+  }
   if (process.env.EVAL_AGENT_MODEL) config.defaultAgentModel = process.env.EVAL_AGENT_MODEL;
   if (process.env.EVAL_JUDGE_MODEL) config.defaultJudgeModel = process.env.EVAL_JUDGE_MODEL;
 
@@ -204,6 +229,7 @@ function mergeConfigs(...configs: Partial<EvalConfig>[]): EvalConfig {
   const result = { ...DEFAULT_CONFIG };
 
   for (const config of configs) {
+    if (config.runnerType !== undefined) result.runnerType = config.runnerType;
     if (config.defaultAgentModel !== undefined) result.defaultAgentModel = config.defaultAgentModel;
     if (config.defaultJudgeModel !== undefined) result.defaultJudgeModel = config.defaultJudgeModel;
     if (config.defaultWeights !== undefined) result.defaultWeights = { ...result.defaultWeights, ...config.defaultWeights };

@@ -16,7 +16,8 @@ import { runPipeline, scorePipeline } from './pipeline.js';
 import { generateReport, generateJsonResults } from './report/report.js';
 import { SkillJudge } from './scorer/judge.js';
 import type { EvalTask, TaskResult, JudgeScore, SkillEvaluation, CombinedScore } from './types.js';
-import type { EvalConfig } from './config.js';
+import { VALID_RUNNER_TYPES } from './config.js';
+import type { EvalConfig, RunnerType } from './config.js';
 
 const program = new Command();
 
@@ -33,6 +34,7 @@ program
   .command('run')
   .description('Run the full evaluation pipeline: execute tasks → score → report')
   .argument('<tasks>', 'Path to tasks YAML file')
+  .option('--runner <type>', 'Runner type: claude-sdk, vercel-ai, openai-agents (default: claude-sdk)')
   .option('--model <model>', 'Agent model (default: sonnet)')
   .option('--judge-model <model>', 'Judge model (default: haiku)')
   .option('--config <path>', 'Path to eval.config.yaml')
@@ -49,6 +51,7 @@ program
   .option('--github-summary', 'Write GitHub Actions step summary')
   .option('--verbose', 'Enable verbose output')
   .action(async (tasksFile: string, options: {
+    runner?: string;
     model?: string;
     judgeModel?: string;
     config?: string;
@@ -66,7 +69,13 @@ program
     verbose?: boolean;
   }) => {
     try {
+      if (options.runner && !VALID_RUNNER_TYPES.includes(options.runner as RunnerType)) {
+        console.error(`Error: Invalid runner "${options.runner}". Valid options: ${VALID_RUNNER_TYPES.join(', ')}`);
+        process.exit(1);
+      }
+
       const configOverrides: Partial<EvalConfig> = {};
+      if (options.runner) configOverrides.runnerType = options.runner as RunnerType;
       if (options.model) configOverrides.defaultAgentModel = options.model;
       if (options.judgeModel) configOverrides.defaultJudgeModel = options.judgeModel;
       if (options.outputDir) configOverrides.outputDir = options.outputDir;

@@ -71,17 +71,6 @@ export interface TaskResult {
   errorMessage: string;
 }
 
-export interface RunnerOptions {
-  cwd?: string;
-  parallel?: boolean;
-  model?: string;
-  settingSources?: Array<'user' | 'project' | 'local'>;
-  /** Count Read calls to SKILL.md as skill discovery (default: false) */
-  countReadAsFallback?: boolean;
-  /** Directories the agent is allowed to write to */
-  allowedWriteDirs?: string[];
-}
-
 // ============================================
 // Deterministic Scoring Types
 // ============================================
@@ -213,6 +202,7 @@ export interface ReportMetadata {
   gitCommit?: string;
   gitBranch?: string;
   version?: string;
+  runnerType?: string;
   agentModel: string;
   judgeModel: string;
 }
