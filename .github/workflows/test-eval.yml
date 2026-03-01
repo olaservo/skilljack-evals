@@ -21,6 +21,26 @@ on:
 jobs:
   eval:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: claude-sdk
+            model: sonnet
+            name: claude-sdk-sonnet
+          - runner: vercel-ai
+            model: 'anthropic:claude-sonnet-4-6'
+            name: vercel-ai-sonnet
+          - runner: vercel-ai
+            model: 'google:gemini-2.5-pro'
+            name: vercel-ai-gemini
+          - runner: vercel-ai
+            model: 'openai:gpt-5.2'
+            name: vercel-ai-gpt
+          - runner: openai-agents
+            model: gpt-5.2
+            name: openai-agents-gpt
+    name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,25 +51,32 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Install peer dependencies
+        run: npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @openai/agents openai
+
       - name: Build
         run: npm run build
 
       - name: Run evaluation
         run: |
-          ARGS="--verbose --runs $RUNS_NUMBER"
+          ARGS="--verbose --runs $RUNS_NUMBER --runner $RUNNER --model $MODEL"
           if [ "$NO_JUDGE" = "true" ]; then
             ARGS="$ARGS --no-judge"
           fi
           node dist/src/cli.js run "$EVAL_FILE" $ARGS
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
           EVAL_FILE: ${{ inputs.eval-file }}
           NO_JUDGE: ${{ inputs.no-judge }}
           RUNS_NUMBER: ${{ inputs.runs-number }}
+          RUNNER: ${{ matrix.runner }}
+          MODEL: ${{ matrix.model }}
 
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eval-results
+          name: eval-results-${{ matrix.name }}
           path: results/
