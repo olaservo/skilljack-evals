@@ -35,7 +35,8 @@
     "dev": "tsx src/cli.ts",
     "start": "node dist/src/cli.js",
     "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "~0.1.76",
@@ -48,7 +49,8 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
   },
   "peerDependencies": {
     "@ai-sdk/anthropic": "^3.0.50",

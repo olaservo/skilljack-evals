@@ -52,7 +52,13 @@ jobs:
         run: npm install
 
       - name: Install peer dependencies
-        run: npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @openai/agents openai
+        if: matrix.runner != 'claude-sdk'
+        run: |
+          if [ "${{ matrix.runner }}" = "vercel-ai" ]; then
+            npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google
+          elif [ "${{ matrix.runner }}" = "openai-agents" ]; then
+            npm install @openai/agents openai
+          fi
 
       - name: Build
         run: npm run build

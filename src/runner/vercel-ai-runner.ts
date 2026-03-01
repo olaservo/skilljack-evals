@@ -36,8 +36,9 @@ const execAsync = promisify(exec);
 async function dynamicImport(pkg: string, installHint: string): Promise<any> {
   try {
     return await (Function('pkg', 'return import(pkg)')(pkg));
-  } catch {
-    throw new Error(`${pkg} is required. Install with: npm install ${installHint}`);
+  } catch (err) {
+    const detail = err instanceof Error ? `: ${err.message}` : '';
+    throw new Error(`${pkg} is required${detail}. Install with: npm install ${installHint}`);
   }
 }
 
@@ -176,11 +177,11 @@ export class VercelAiRunner extends BaseRunner {
             }
 
             try {
-              const stats = await fs.stat(resolved);
+              const stats = await fs.stat(normalizedPath);
               if (stats.size > 10 * 1024 * 1024) {
                 return `Error: File too large (${stats.size} bytes). Maximum is 10MB.`;
               }
-              return await fs.readFile(resolved, 'utf-8');
+              return await fs.readFile(normalizedPath, 'utf-8');
             } catch (err) {
               return `Error reading file: ${err instanceof Error ? err.message : String(err)}`;
             }

@@ -157,9 +157,13 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
     if (raw.ci?.github_summary !== undefined) config.githubSummary = raw.ci.github_summary;
 
     return config;
-  } catch {
-    // Config file not found or invalid — that's fine
-    return {};
+  } catch (err: unknown) {
+    // File not found is fine — use defaults
+    if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'ENOENT') {
+      return {};
+    }
+    // Re-throw parse/validation errors
+    throw err;
   }
 }
 

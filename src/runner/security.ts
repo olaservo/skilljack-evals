@@ -17,6 +17,9 @@ export function isWriteAllowed(
   allowedWriteDirs: string[],
   cwd: string,
 ): boolean {
+  // No restrictions configured — allow all writes.
+  // Default config provides ['./results/', './fixtures/'].
+  // Direct API users should set allowedWriteDirs explicitly.
   if (allowedWriteDirs.length === 0) return true;
 
   const resolvedDirs = allowedWriteDirs.map((dir) => {

@@ -185,9 +185,10 @@ export class OpenAiAgentsRunner extends BaseRunner {
       Agent = mod.Agent;
       run = mod.run;
       shellTool = mod.shellTool;
-    } catch {
+    } catch (err) {
+      const detail = err instanceof Error ? `: ${err.message}` : '';
       throw new Error(
-        'OpenAI Agents SDK runner requires "@openai/agents". ' +
+        `OpenAI Agents SDK runner requires "@openai/agents"${detail}. ` +
         'Install it with: npm install @openai/agents',
       );
     }

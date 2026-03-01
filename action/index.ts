@@ -7,13 +7,19 @@
 
 import * as core from '@actions/core';
 import { runPipeline } from '../src/pipeline.js';
+import { VALID_RUNNER_TYPES } from '../src/config.js';
 import type { EvalConfig, RunnerType } from '../src/config.js';
 
 async function run(): Promise<void> {
   try {
     // Read inputs
     const tasks = core.getInput('tasks', { required: true });
-    const runner = (core.getInput('runner') || 'claude-sdk') as RunnerType;
+    const runnerInput = core.getInput('runner') || 'claude-sdk';
+    if (!VALID_RUNNER_TYPES.includes(runnerInput as RunnerType)) {
+      core.setFailed(`Invalid runner "${runnerInput}". Valid options: ${VALID_RUNNER_TYPES.join(', ')}`);
+      return;
+    }
+    const runner = runnerInput as RunnerType;
     const model = core.getInput('model') || 'sonnet';
     const judgeModel = core.getInput('judge-model') || 'haiku';
     const configPath = core.getInput('config') || undefined;
