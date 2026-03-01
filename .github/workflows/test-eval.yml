@@ -43,6 +43,18 @@ jobs:
           - runner: vercel-ai
             model: 'openrouter:deepseek/deepseek-v3.2'
             name: vercel-ai-openrouter-deepseek
+          - runner: vercel-ai
+            model: 'openrouter:minimax/minimax-m2.5'
+            name: vercel-ai-openrouter-minimax
+          - runner: vercel-ai
+            model: 'openrouter:moonshotai/kimi-k2.5'
+            name: vercel-ai-openrouter-kimi
+          - runner: vercel-ai
+            model: 'openrouter:z-ai/glm-5'
+            name: vercel-ai-openrouter-glm
+          - runner: vercel-ai
+            model: 'openrouter:openai/gpt-oss-120b'
+            name: vercel-ai-openrouter-gpt-oss
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
