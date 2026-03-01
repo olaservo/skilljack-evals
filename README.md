@@ -69,7 +69,7 @@ Three runners are available, selected via the `--runner` CLI flag:
 | Runner | Flag | Model Format | Example |
 |--------|------|-------------|---------|
 | Claude Agent SDK (default) | `--runner claude-sdk` | Model aliases | `sonnet`, `haiku` |
-| Vercel AI SDK | `--runner vercel-ai` | `provider:model` | `anthropic:claude-sonnet-4-6`, `google:gemini-2.5-pro`, `openai:gpt-5.2` |
+| Vercel AI SDK | `--runner vercel-ai` | `provider:model` | `anthropic:claude-sonnet-4-6`, `google:gemini-2.5-pro`, `openai:gpt-5.2`, `openrouter:deepseek/deepseek-v3.2` |
 | OpenAI Agents SDK | `--runner openai-agents` | Plain model name | `gpt-5.2` |
 
 ```bash
@@ -80,6 +80,7 @@ skilljack-evals run evals/example-greeting/tasks.yaml --model sonnet
 skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "anthropic:claude-sonnet-4-6"
 skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "google:gemini-2.5-pro"
 skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "openai:gpt-5.2"
+skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "openrouter:deepseek/deepseek-v3.2"
 
 # OpenAI Agents SDK
 skilljack-evals run evals/example-greeting/tasks.yaml --runner openai-agents --model "gpt-5.2"
@@ -89,7 +90,7 @@ The Vercel AI SDK and OpenAI Agents SDK runners require their respective peer de
 
 ```bash
 # Vercel AI SDK
-npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google
+npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @openrouter/ai-sdk-provider
 
 # OpenAI Agents SDK
 npm install @openai/agents openai
@@ -115,6 +116,7 @@ Set the appropriate API key in your environment or a `.env` file (see `.env.exam
 | Vercel AI (`anthropic:`) | `ANTHROPIC_API_KEY` |
 | Vercel AI (`openai:`) | `OPENAI_API_KEY` |
 | Vercel AI (`google:`) | `GOOGLE_GENERATIVE_AI_API_KEY` |
+| Vercel AI (`openrouter:`) | `OPENROUTER_API_KEY` |
 | OpenAI Agents | `OPENAI_API_KEY` |
 
 ### Bedrock

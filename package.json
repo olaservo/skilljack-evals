@@ -57,6 +57,7 @@
     "@ai-sdk/google": "^3.0.34",
     "@ai-sdk/openai": "^3.0.33",
     "@openai/agents": "^0.4.15",
+    "@openrouter/ai-sdk-provider": "^2.2.3",
     "ai": "^6.0.99",
     "openai": "^6.25.0",
     "zod": "^4.0.0"
@@ -75,6 +76,9 @@
       "optional": true
     },
     "@openai/agents": {
+      "optional": true
+    },
+    "@openrouter/ai-sdk-provider": {
       "optional": true
     },
     "openai": {
