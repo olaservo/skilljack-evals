@@ -103,23 +103,6 @@ Each runner uses the SDK's native mechanism for skill discovery and loading:
 - **Vercel AI SDK** — Skills via a `loadSkill` tool defined in the runner, following the [Agent Skills cookbook guide](https://ai-sdk.dev/cookbook/guides/agent-skills).
 - **OpenAI Agents SDK** — Skills via `shellTool()` with local skill bundles. See [Skills in OpenAI API](https://developers.openai.com/api/docs/guides/tools-skills/) and the [Skills cookbook](https://developers.openai.com/cookbook/examples/skills_in_api/).
 
-### Baseline Results
-
-Baselines for the `example-greeting` evaluation (9 runs each, stored in `evals/example-greeting/baselines/`):
-
-| Runner | Model | Discovery | Adherence | Output | Weighted | Result |
-|--------|-------|-----------|-----------|--------|----------|--------|
-| claude-sdk | sonnet | 100% | 5.00/5 | 5.00/5 | 1.00 | PASS |
-| vercel-ai | claude-sonnet-4-6 | 100% | 5.00/5 | 5.00/5 | 1.00 | PASS |
-| vercel-ai | gemini-2.5-pro | 100% | 4.11/5 | 4.11/5 | 0.84 | PASS |
-| vercel-ai | gpt-5.2 | 67% | 3.67/5 | 4.37/5 | 0.72 | FAIL |
-| openai-agents | gpt-5.2 | 67% | 3.70/5 | 4.52/5 | 0.73 | FAIL |
-
-**Key findings:**
-- **Sonnet** achieves perfect scores regardless of runner harness (claude-sdk vs vercel-ai)
-- **Gemini 2.5 Pro** passes all thresholds and correctly handles false-positive tests
-- **gpt-5.2** consistently loads the greeting skill on the false-positive test (an educational question about email greetings that should not trigger the skill), causing discovery failure across both runners
-
 ## Configuration
 
 ### API Keys
