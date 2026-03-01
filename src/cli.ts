@@ -16,7 +16,7 @@ import { runPipeline, scorePipeline } from './pipeline.js';
 import { generateReport, generateJsonResults } from './report/report.js';
 import { SkillJudge } from './scorer/judge.js';
 import type { EvalTask, TaskResult, JudgeScore, SkillEvaluation, CombinedScore } from './types.js';
-import type { EvalConfig } from './config.js';
+import type { EvalConfig, RunnerType } from './config.js';
 
 const program = new Command();
 
@@ -68,8 +68,14 @@ program
     verbose?: boolean;
   }) => {
     try {
+      const validRunners: RunnerType[] = ['claude-sdk', 'vercel-ai', 'openai-agents'];
+      if (options.runner && !validRunners.includes(options.runner as RunnerType)) {
+        console.error(`Error: Invalid runner "${options.runner}". Valid options: ${validRunners.join(', ')}`);
+        process.exit(1);
+      }
+
       const configOverrides: Partial<EvalConfig> = {};
-      if (options.runner) configOverrides.runnerType = options.runner as EvalConfig['runnerType'];
+      if (options.runner) configOverrides.runnerType = options.runner as RunnerType;
       if (options.model) configOverrides.defaultAgentModel = options.model;
       if (options.judgeModel) configOverrides.defaultJudgeModel = options.judgeModel;
       if (options.outputDir) configOverrides.outputDir = options.outputDir;

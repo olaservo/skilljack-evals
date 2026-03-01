@@ -262,6 +262,7 @@ export async function scorePipeline(
 
   const metadata: ReportMetadata = {
     skillPath: resultsPath,
+    runnerType: data.metadata?.runnerType || config.runnerType,
     agentModel: data.metadata?.agentModel || config.defaultAgentModel,
     judgeModel: config.defaultJudgeModel,
   };

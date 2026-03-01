@@ -8,8 +8,7 @@
 import type { AgentRunner, AgentRunnerOptions } from './agent-runner.js';
 import { ClaudeSdkRunner } from './claude-sdk-runner.js';
 import type { ClaudeSdkRunnerOptions } from './claude-sdk-runner.js';
-
-export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents';
+import type { RunnerType } from '../config.js';
 
 export async function createRunner(
   type: RunnerType,

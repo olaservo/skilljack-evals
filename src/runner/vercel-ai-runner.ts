@@ -13,99 +13,15 @@
 import type { EvalTask, ToolCallRecord, TaskResult } from '../types.js';
 import { BaseRunner } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
+import { discoverSkills, stripFrontmatter, type SkillMetadata } from './skill-discovery.js';
+import { isWriteAllowed } from './security.js';
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-// ============================================
-// Skill Discovery (per Agent Skills spec)
-// ============================================
-
-interface SkillMetadata {
-  name: string;
-  description: string;
-  path: string;
-}
-
-/**
- * Discover skills in a directory by scanning for SKILL.md files
- * and parsing their YAML frontmatter.
- */
-async function discoverSkills(skillsDir: string): Promise<SkillMetadata[]> {
-  const skills: SkillMetadata[] = [];
-
-  let entries;
-  try {
-    entries = await fs.readdir(skillsDir, { withFileTypes: true });
-  } catch {
-    return skills;
-  }
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-
-    const skillDir = path.join(skillsDir, entry.name);
-    const skillFile = path.join(skillDir, 'SKILL.md');
-
-    try {
-      const content = await fs.readFile(skillFile, 'utf-8');
-      const frontmatter = parseFrontmatter(content);
-      if (frontmatter.name && frontmatter.description) {
-        skills.push({
-          name: frontmatter.name,
-          description: frontmatter.description,
-          path: path.resolve(skillDir),
-        });
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return skills;
-}
-
-function parseFrontmatter(content: string): { name?: string; description?: string } {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match?.[1]) return {};
-
-  const result: Record<string, string> = {};
-  for (const line of match[1].split('\n')) {
-    const colonIdx = line.indexOf(':');
-    if (colonIdx > 0) {
-      const key = line.slice(0, colonIdx).trim();
-      const value = line.slice(colonIdx + 1).trim().replace(/^['"]|['"]$/g, '');
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
-function stripFrontmatter(content: string): string {
-  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
-  return match ? content.slice(match[0].length).trim() : content.trim();
-}
-
-/**
- * Build the system prompt section listing available skills.
- */
-function buildSkillsPrompt(skills: SkillMetadata[]): string {
-  if (skills.length === 0) return '';
-
-  const skillsList = skills
-    .map(s => `- ${s.name}: ${s.description}`)
-    .join('\n');
-
-  return `## Skills
-
-Use the \`loadSkill\` tool to load a skill when the user's request
-would benefit from specialized instructions.
-
-Available skills:
-${skillsList}
-`;
-}
+const execAsync = promisify(exec);
 
 // ============================================
 // Model Resolution
@@ -113,6 +29,9 @@ ${skillsList}
 
 /**
  * Dynamically import a module, throwing a helpful error if missing.
+ *
+ * Uses Function() constructor to prevent bundlers from statically
+ * analyzing the import and failing at build time for optional deps.
  */
 async function dynamicImport(pkg: string, installHint: string): Promise<any> {
   try {
@@ -163,6 +82,26 @@ async function resolveModel(modelString: string): Promise<any> {
   }
 }
 
+/**
+ * Build the system prompt section listing available skills.
+ */
+function buildSkillsPrompt(skills: SkillMetadata[]): string {
+  if (skills.length === 0) return '';
+
+  const skillsList = skills
+    .map(s => `- ${s.name}: ${s.description}`)
+    .join('\n');
+
+  return `## Skills
+
+Use the \`loadSkill\` tool to load a skill when the user's request
+would benefit from specialized instructions.
+
+Available skills:
+${skillsList}
+`;
+}
+
 // ============================================
 // Runner
 // ============================================
@@ -194,6 +133,7 @@ export class VercelAiRunner extends BaseRunner {
       const model = await resolveModel(this.options.model ?? 'openai:gpt-5.2');
 
       const cwd = this.options.cwd ?? process.cwd();
+      const allowedWriteDirs = this.options.allowedWriteDirs ?? [];
 
       // 4. Define tools (per Vercel AI SDK cookbook pattern)
       const tools = {
@@ -244,6 +184,11 @@ export class VercelAiRunner extends BaseRunner {
             const resolved = path.isAbsolute(file_path)
               ? file_path
               : path.join(cwd, file_path);
+
+            if (!isWriteAllowed(resolved, allowedWriteDirs, cwd)) {
+              return `Write denied: ${file_path} is outside allowed directories: ${allowedWriteDirs.join(', ')}`;
+            }
+
             try {
               await fs.mkdir(path.dirname(resolved), { recursive: true });
               await fs.writeFile(resolved, content);
@@ -260,13 +205,12 @@ export class VercelAiRunner extends BaseRunner {
           }),
           execute: async ({ command }: { command: string }) => {
             try {
-              const output = execSync(command, {
+              const { stdout } = await execAsync(command, {
                 cwd,
                 encoding: 'utf-8',
                 timeout: 30000,
-                stdio: ['pipe', 'pipe', 'pipe'],
               });
-              return output;
+              return stdout;
             } catch (err: unknown) {
               const execErr = err as { stderr?: string; message?: string };
               return `Error: ${execErr.stderr || execErr.message || String(err)}`;
@@ -317,7 +261,7 @@ export class VercelAiRunner extends BaseRunner {
       // Extract usage info
       const usage = result.usage ?? { promptTokens: 0, completionTokens: 0 };
       const totalTokens = (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0);
-      // Rough cost estimate (varies by model)
+      // Rough cost estimate — actual pricing varies by model and provider
       const costUsd = totalTokens * 0.000003;
 
       return {

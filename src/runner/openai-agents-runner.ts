@@ -13,76 +13,13 @@
 import type { EvalTask, ToolCallRecord, TaskResult } from '../types.js';
 import { BaseRunner } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
+import { discoverSkills, type SkillMetadata } from './skill-discovery.js';
 
-import * as fs from 'fs/promises';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
-
-// ============================================
-// Skill Discovery
-// ============================================
-
-interface LocalSkill {
-  name: string;
-  description: string;
-  path: string;
-}
-
-/**
- * Build ShellToolLocalSkill entries from a skills directory.
- */
-async function buildLocalSkills(skillsDir: string): Promise<LocalSkill[]> {
-  const skills: LocalSkill[] = [];
-
-  let entries;
-  try {
-    entries = await fs.readdir(skillsDir, { withFileTypes: true });
-  } catch {
-    return skills;
-  }
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-
-    const skillDir = path.join(skillsDir, entry.name);
-    const skillFile = path.join(skillDir, 'SKILL.md');
-
-    try {
-      const content = await fs.readFile(skillFile, 'utf-8');
-      const frontmatter = parseFrontmatter(content);
-      if (frontmatter.name && frontmatter.description) {
-        skills.push({
-          name: frontmatter.name,
-          description: frontmatter.description,
-          path: path.resolve(skillDir),
-        });
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return skills;
-}
-
-function parseFrontmatter(content: string): { name?: string; description?: string } {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match?.[1]) return {};
-
-  const result: Record<string, string> = {};
-  for (const line of match[1].split('\n')) {
-    const colonIdx = line.indexOf(':');
-    if (colonIdx > 0) {
-      const key = line.slice(0, colonIdx).trim();
-      const value = line.slice(colonIdx + 1).trim().replace(/^['"]|['"]$/g, '');
-      result[key] = value;
-    }
-  }
-  return result;
-}
 
 // ============================================
 // Local Shell Implementation
@@ -99,13 +36,19 @@ function createLocalShell(cwd: string) {
     async run(action: { commands: string[]; timeoutMs?: number; maxOutputLength?: number }) {
       const output = [];
       const timeout = action.timeoutMs ?? 30000;
+      const maxLen = action.maxOutputLength ?? 0;
+
       for (const command of action.commands) {
         try {
-          const { stdout, stderr } = await execAsync(command, {
+          let { stdout, stderr } = await execAsync(command, {
             cwd,
             timeout,
             encoding: 'utf-8',
           });
+          if (maxLen > 0) {
+            stdout = (stdout ?? '').slice(0, maxLen);
+            stderr = (stderr ?? '').slice(0, maxLen);
+          }
           output.push({
             stdout: stdout ?? '',
             stderr: stderr ?? '',
@@ -113,16 +56,22 @@ function createLocalShell(cwd: string) {
           });
         } catch (err: unknown) {
           const execErr = err as { stdout?: string; stderr?: string; code?: number; killed?: boolean };
+          let stdout = execErr.stdout ?? '';
+          let stderr = execErr.stderr ?? String(err);
+          if (maxLen > 0) {
+            stdout = stdout.slice(0, maxLen);
+            stderr = stderr.slice(0, maxLen);
+          }
           if (execErr.killed) {
             output.push({
-              stdout: execErr.stdout ?? '',
-              stderr: execErr.stderr ?? '',
+              stdout,
+              stderr,
               outcome: { type: 'timeout' as const },
             });
           } else {
             output.push({
-              stdout: execErr.stdout ?? '',
-              stderr: execErr.stderr ?? String(err),
+              stdout,
+              stderr,
               outcome: { type: 'exit' as const, exitCode: execErr.code ?? 1 },
             });
           }
@@ -148,7 +97,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
  */
 function extractFromRawResponses(
   rawResponses: Array<{ output: unknown[] }>,
-): { toolCalls: ToolCallRecord[]; shellCommands: string[] } {
+): { toolCalls: ToolCallRecord[]; shellCommands: string[]; numTurns: number } {
   const toolCalls: ToolCallRecord[] = [];
   const shellCommands: string[] = [];
 
@@ -186,7 +135,8 @@ function extractFromRawResponses(
     }
   }
 
-  return { toolCalls, shellCommands };
+  // numTurns = number of raw responses (conversation turns), not tool calls
+  return { toolCalls, shellCommands, numTurns: rawResponses.length };
 }
 
 /**
@@ -194,7 +144,7 @@ function extractFromRawResponses(
  */
 function detectSkillLoadsFromShellCommands(
   shellCommands: string[],
-  localSkills: LocalSkill[],
+  localSkills: SkillMetadata[],
 ): string[] {
   const loads: string[] = [];
 
@@ -229,6 +179,8 @@ export class OpenAiAgentsRunner extends BaseRunner {
   async runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult> {
     let Agent: any, run: any, shellTool: any;
     try {
+      // Uses Function() constructor to prevent bundlers from statically
+      // analyzing the import and failing at build time for optional deps.
       const mod = await (Function('pkg', 'return import(pkg)')('@openai/agents'));
       Agent = mod.Agent;
       run = mod.run;
@@ -245,7 +197,7 @@ export class OpenAiAgentsRunner extends BaseRunner {
     try {
       // 1. Build local skill entries from skills directory
       const localSkills = this.options.skillsDir
-        ? await buildLocalSkills(this.options.skillsDir)
+        ? await discoverSkills(this.options.skillsDir)
         : [];
 
       const cwd = this.options.cwd ?? process.cwd();
@@ -274,7 +226,7 @@ export class OpenAiAgentsRunner extends BaseRunner {
       const output = result.finalOutput ?? '';
       logger?.addTextMessage(typeof output === 'string' ? output : JSON.stringify(output));
 
-      const { toolCalls, shellCommands } = extractFromRawResponses(
+      const { toolCalls, shellCommands, numTurns } = extractFromRawResponses(
         result.rawResponses as Array<{ output: unknown[] }>,
       );
       for (const tc of toolCalls) {
@@ -287,6 +239,7 @@ export class OpenAiAgentsRunner extends BaseRunner {
       // 6. Extract usage
       const usage = (result as unknown as { usage?: { inputTokens?: number; outputTokens?: number } }).usage;
       const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
+      // Rough cost estimate — actual pricing varies by model and provider
       const costUsd = totalTokens * 0.000003;
 
       return {
@@ -294,7 +247,7 @@ export class OpenAiAgentsRunner extends BaseRunner {
         prompt: task.prompt,
         output: typeof output === 'string' ? output : JSON.stringify(output),
         durationMs: Date.now() - startTime,
-        numTurns: toolCalls.length,
+        numTurns,
         costUsd,
         skillLoads: [...new Set(skillLoads)],
         toolCalls,
