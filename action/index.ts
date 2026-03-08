@@ -34,6 +34,8 @@ async function run(): Promise<void> {
     const numRuns = parseInt(core.getInput('runs') || '3', 10);
     const generateFeedbackPath = core.getInput('generate-feedback') || undefined;
     const feedbackPath = core.getInput('feedback') || undefined;
+    const compare = core.getInput('compare') === 'true';
+    const compareSkillPath = core.getInput('compare-skill') || undefined;
 
     // Handle API keys
     const anthropicKey = core.getInput('anthropic-api-key') || process.env.ANTHROPIC_API_KEY;
@@ -84,6 +86,8 @@ async function run(): Promise<void> {
       numRuns,
       generateFeedbackPath,
       feedbackPath,
+      compare: compare || !!compareSkillPath,
+      compareSkillPath,
     });
 
     // Set outputs
@@ -93,6 +97,13 @@ async function run(): Promise<void> {
     core.setOutput('report-path', result.reportPath || '');
     core.setOutput('json-path', result.jsonPath || '');
     core.setOutput('feedback-template-path', result.feedbackTemplatePath || '');
+
+    // Set comparison outputs
+    if (result.comparison) {
+      core.setOutput('adherence-delta', String(result.comparison.summary.delta.avgAdherenceDelta));
+      core.setOutput('output-delta', String(result.comparison.summary.delta.avgOutputQualityDelta));
+      core.setOutput('score-delta', String(result.comparison.summary.delta.avgWeightedScoreDelta));
+    }
 
     // Write job summary
     await core.summary.addRaw(result.markdownSummary).write();

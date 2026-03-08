@@ -3,6 +3,9 @@
  *
  * Coordinates the full evaluation flow:
  * parse tasks → setup skills → run agent → score → report → check thresholds
+ *
+ * In comparison mode (--compare), runs each task with AND without the skill,
+ * then computes delta metrics showing the skill's impact.
  */
 
 import * as path from 'path';
@@ -21,9 +24,13 @@ import type {
   TaskResult,
   CombinedScore,
   EvaluationReport,
+  EvaluationSummary,
   ReportMetadata,
   EvalTask,
   HumanFeedback,
+  ComparisonData,
+  ComparisonSummary,
+  TaskComparison,
 } from './types.js';
 import { loadFeedback, writeFeedbackTemplate } from './feedback.js';
 
@@ -71,6 +78,10 @@ export interface PipelineOptions {
   generateFeedbackPath?: string;
   /** Path to feedback JSON for judge prompt enrichment */
   feedbackPath?: string;
+  /** Enable comparison mode: run with AND without skill */
+  compare?: boolean;
+  /** Path to alternative skill for comparison (instead of no-skill baseline) */
+  compareSkillPath?: string;
 }
 
 export interface PipelineResult {
@@ -84,6 +95,158 @@ export interface PipelineResult {
   jsonPath?: string;
   markdownSummary: string;
   feedbackTemplatePath?: string;
+  comparison?: ComparisonData;
+}
+
+/** Internal result from a single evaluation phase. */
+interface PhaseResult {
+  results: TaskResult[];
+  scores: CombinedScore[];
+  allResults: TaskResult[][];
+  allScores: CombinedScore[][];
+  summary: EvaluationSummary;
+  runDetails: Array<{ result: TaskResult; score: CombinedScore }>[];
+}
+
+/**
+ * Run a single evaluation phase (with or without skills).
+ *
+ * Encapsulates: create runner → run N times → score → aggregate.
+ */
+async function runPhase(
+  phaseLabel: string,
+  evaluation: SkillEvaluation,
+  config: EvalConfig,
+  cwd: string,
+  skillsDir: string | undefined,
+  numRuns: number,
+  scorerOptions: ScorerOptions,
+  logBaseDir: string,
+): Promise<PhaseResult> {
+  const runner = await createRunner(config.runnerType, {
+    cwd,
+    model: config.defaultAgentModel,
+    parallel: false,
+    allowedWriteDirs: config.allowedWriteDirs,
+    skillsDir,
+  }, config);
+
+  const allResults: TaskResult[][] = [];
+  const allScores: CombinedScore[][] = [];
+
+  for (let run = 0; run < numRuns; run++) {
+    if (numRuns > 1) {
+      console.log(`\n--- ${phaseLabel}: Run ${run + 1}/${numRuns} (${config.runnerType}) ---\n`);
+    } else {
+      console.log(`\n--- ${phaseLabel}: Running Tasks (${config.runnerType}) ---\n`);
+    }
+
+    const runLogDir = numRuns > 1 ? path.join(logBaseDir, `run-${run + 1}`) : logBaseDir;
+    const results = await runner.runAll(
+      evaluation,
+      (task: EvalTask) => new SessionLogger(task.id, runLogDir)
+    );
+    allResults.push(results);
+
+    if (numRuns > 1) {
+      console.log(`\n--- ${phaseLabel}: Scoring Run ${run + 1}/${numRuns} ---\n`);
+    } else {
+      console.log(`\n--- ${phaseLabel}: Scoring ---\n`);
+    }
+    const scores = await scoreAll(evaluation.tasks, results, scorerOptions);
+    allScores.push(scores);
+  }
+
+  const results = aggregateResults(allResults, allScores);
+  const scores = aggregateScores(allScores);
+
+  const runDetails: Array<{ result: TaskResult; score: CombinedScore }>[] = [];
+  if (numRuns > 1) {
+    for (let t = 0; t < evaluation.tasks.length; t++) {
+      runDetails.push(
+        allResults.map((r, run) => ({
+          result: r[t],
+          score: allScores[run][t],
+        }))
+      );
+    }
+  }
+
+  const summary = computeSummary(results, scores, numRuns);
+
+  return { results, scores, allResults, allScores, summary, runDetails };
+}
+
+/**
+ * Setup local skills for Claude SDK runner.
+ * Returns true if skills were set up and need cleanup.
+ */
+async function setupSkills(
+  skillsDir: string | undefined,
+  config: EvalConfig,
+  cwd: string,
+): Promise<boolean> {
+  if (!skillsDir) return false;
+  if (config.runnerType === 'claude-sdk') {
+    console.log(`Setting up local skills from: ${skillsDir}`);
+    const skillNames = await setupLocalSkills(skillsDir, cwd);
+    console.log(`Skills configured: ${skillNames.join(', ')}`);
+    return true;
+  }
+  console.log(`Skills directory: ${skillsDir} (${config.runnerType} handles discovery natively)`);
+  return false;
+}
+
+/**
+ * Compute comparison data from with-skill and baseline phase results.
+ */
+function computeComparison(
+  withPhase: PhaseResult,
+  basePhase: PhaseResult,
+  baselineLabel: string,
+  compareSkillPath?: string,
+): ComparisonData {
+  const tasks: TaskComparison[] = [];
+
+  for (let i = 0; i < withPhase.results.length; i++) {
+    const w = { result: withPhase.results[i], score: withPhase.scores[i] };
+    const b = { result: basePhase.results[i], score: basePhase.scores[i] };
+
+    tasks.push({
+      taskId: w.result.taskId,
+      withSkill: w,
+      withoutSkill: b,
+      delta: {
+        taskId: w.result.taskId,
+        adherenceDelta: w.score.adherence - b.score.adherence,
+        outputQualityDelta: w.score.outputQuality - b.score.outputQuality,
+        weightedScoreDelta: w.score.weightedScore - b.score.weightedScore,
+        durationDeltaMs: w.result.durationMs - b.result.durationMs,
+        costDeltaUsd: w.result.costUsd - b.result.costUsd,
+      },
+    });
+  }
+
+  const summary: ComparisonSummary = {
+    withSkill: withPhase.summary,
+    withoutSkill: basePhase.summary,
+    delta: {
+      discoveryAccuracyDelta: withPhase.summary.discoveryAccuracy - basePhase.summary.discoveryAccuracy,
+      avgAdherenceDelta: withPhase.summary.avgAdherence - basePhase.summary.avgAdherence,
+      avgOutputQualityDelta: withPhase.summary.avgOutputQuality - basePhase.summary.avgOutputQuality,
+      avgWeightedScoreDelta: withPhase.summary.avgWeightedScore - basePhase.summary.avgWeightedScore,
+      totalDurationDeltaMs: withPhase.summary.totalDurationMs - basePhase.summary.totalDurationMs,
+      totalCostDeltaUsd: withPhase.summary.totalCostUsd - basePhase.summary.totalCostUsd,
+    },
+    baselineLabel,
+  };
+
+  return {
+    enabled: true,
+    compareSkillPath,
+    summary,
+    tasks,
+  };
 }
 
 /**
@@ -92,12 +255,12 @@ export interface PipelineResult {
 export async function runPipeline(options: PipelineOptions): Promise<PipelineResult> {
   const config = await loadConfig(options.configPath, options.configOverrides);
   const cwd = options.cwd || process.cwd();
+  const compareMode = options.compare || !!options.compareSkillPath;
 
   // 1. Parse tasks
   console.log(`Parsing tasks from: ${options.tasksFile}`);
   let evaluation = await parseEvalFile(options.tasksFile);
 
-  // Filter tasks if specified
   if (options.taskFilter) {
     const filterIds = new Set(options.taskFilter.split(',').map((s) => s.trim()));
     evaluation = {
@@ -124,8 +287,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
   console.log(`Running ${evaluation.tasks.length} task(s) for skill: ${evaluation.skillName}`);
 
-  // 2. Setup local skills
-  // Auto-detect skills/ directory relative to tasks file if not explicitly provided
+  // 2. Detect skills directory
   let skillsDir = options.skillsDir;
   if (!skillsDir) {
     const tasksDir = path.dirname(path.resolve(options.tasksFile));
@@ -136,31 +298,47 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
         skillsDir = autoSkillsDir;
       }
     } catch {
-      // No skills/ directory found, that's fine
+      // No skills/ directory found
     }
   }
 
-  // 2b. Setup local skills (Claude SDK copies to .claude/skills/; others pass skillsDir to runner)
-  let skillsSetup = false;
-  if (skillsDir && config.runnerType === 'claude-sdk') {
-    console.log(`Setting up local skills from: ${skillsDir}`);
-    const skillNames = await setupLocalSkills(skillsDir, cwd);
-    skillsSetup = true;
-    console.log(`Skills configured: ${skillNames.join(', ')}`);
-  } else if (skillsDir) {
-    console.log(`Skills directory: ${skillsDir} (${config.runnerType} handles discovery natively)`);
+  // Validate compare-skill path
+  if (options.compareSkillPath) {
+    try {
+      const stat = await fs.stat(options.compareSkillPath);
+      if (!stat.isDirectory()) {
+        throw new Error(`--compare-skill path is not a directory: ${options.compareSkillPath}`);
+      }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new Error(`--compare-skill path not found: ${options.compareSkillPath}`);
+      }
+      throw err;
+    }
   }
 
+  if (compareMode && !skillsDir) {
+    console.warn('Warning: --compare used but no skills directory found. Comparison will have no effect.');
+  }
+
+  const numRuns = options.numRuns ?? 3;
+  const logDir = path.join(config.outputDir, 'logs');
+  const scorerOptions: ScorerOptions = {
+    noDeterministic: options.noDeterministic,
+    noJudge: options.noJudge,
+    judgeOptions: { model: config.defaultJudgeModel },
+  };
+
+  // 3. Run evaluation phase(s)
+  let primaryPhase: PhaseResult;
+  let comparison: ComparisonData | undefined;
+
   try {
-    // 3. Run agent against tasks (N times)
-    const numRuns = options.numRuns ?? 3;
-    const runner = await createRunner(config.runnerType, {
-      cwd,
-      model: config.defaultAgentModel,
-      parallel: false,
-      allowedWriteDirs: config.allowedWriteDirs,
-      skillsDir,
-    }, config);
+    if (compareMode && skillsDir) {
+      // --- Comparison mode: two phases ---
+      const baselineLabel = options.compareSkillPath
+        ? path.basename(options.compareSkillPath)
+        : 'No Skill';
 
     const logDir = path.join(config.outputDir, 'logs');
     const scorerOptions: ScorerOptions = {
@@ -170,101 +348,109 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       humanFeedback,
     };
 
-    const allResults: TaskResult[][] = [];
-    const allScores: CombinedScore[][] = [];
+      console.log(`\nComparison mode: running each task with skill AND ${baselineLabel.toLowerCase()}`);
+      console.log(`Total runs per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)\n`);
 
-    for (let run = 0; run < numRuns; run++) {
-      if (numRuns > 1) {
-        console.log(`\n--- Run ${run + 1}/${numRuns} (${config.runnerType}) ---\n`);
-      } else {
-        console.log(`\n--- Running Tasks (${config.runnerType}) ---\n`);
-      }
+      // Phase 1: With Skill
+      console.log('=== Phase 1/2: With Skill ===');
+      await setupSkills(skillsDir, config, cwd);
 
-      const runLogDir = numRuns > 1 ? path.join(logDir, `run-${run + 1}`) : logDir;
-      const results = await runner.runAll(
-        evaluation,
-        (task: EvalTask) => new SessionLogger(task.id, runLogDir)
+      const withPhase = await runPhase(
+        'With Skill', evaluation, config, cwd, skillsDir, numRuns, scorerOptions,
+        path.join(logDir, 'with-skill'),
       );
-      allResults.push(results);
 
-      // Score this run
-      if (numRuns > 1) {
-        console.log(`\n--- Scoring Run ${run + 1}/${numRuns} ---\n`);
-      } else {
-        console.log('\n--- Scoring ---\n');
+      // Clean up between phases
+      if (config.runnerType === 'claude-sdk') {
+        await cleanupLocalSkills(cwd);
       }
-      const scores = await scoreAll(evaluation.tasks, results, scorerOptions);
-      allScores.push(scores);
-    }
 
-    // Aggregate across runs
-    const results = aggregateResults(allResults, allScores);
-    const scores = aggregateScores(allScores);
-
-    // Build per-run details for the report
-    const runDetails: Array<{ result: TaskResult; score: CombinedScore }>[] = [];
-    if (numRuns > 1) {
-      for (let t = 0; t < evaluation.tasks.length; t++) {
-        runDetails.push(
-          allResults.map((r, run) => ({
-            result: r[t],
-            score: allScores[run][t],
-          }))
-        );
+      // Phase 2: Baseline
+      console.log(`\n=== Phase 2/2: ${baselineLabel} ===`);
+      const baseSkillsDir = options.compareSkillPath || undefined;
+      if (baseSkillsDir) {
+        await setupSkills(baseSkillsDir, config, cwd);
       }
+
+      // Baseline skips deterministic scoring (meaningless without expected skill)
+      const baselineScorerOptions: ScorerOptions = {
+        ...scorerOptions,
+        noDeterministic: true,
+      };
+
+      const basePhase = await runPhase(
+        baselineLabel, evaluation, config, cwd, baseSkillsDir, numRuns, baselineScorerOptions,
+        path.join(logDir, 'baseline'),
+      );
+
+      console.log('\n=== Computing Comparison Deltas ===\n');
+      comparison = computeComparison(withPhase, basePhase, baselineLabel, options.compareSkillPath);
+      primaryPhase = withPhase;
+    } else {
+      // --- Normal mode: single phase ---
+      await setupSkills(skillsDir, config, cwd);
+      primaryPhase = await runPhase('Evaluation', evaluation, config, cwd, skillsDir, numRuns, scorerOptions, logDir);
     }
-
-    // 5. Generate reports
-    console.log('\n--- Generating Reports ---\n');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const reportBaseName = `${evaluation.skillName}-${timestamp}`;
-    const reportPath = path.join(config.outputDir, `${reportBaseName}.md`);
-    const jsonPath = path.join(config.outputDir, `${reportBaseName}.json`);
-
-    const metadata: ReportMetadata = {
-      skillPath: options.tasksFile,
-      runnerType: config.runnerType,
-      agentModel: config.defaultAgentModel,
-      judgeModel: config.defaultJudgeModel,
-    };
-
-    const reportOptions = {
-      evaluation, results, scores, metadata, numRuns, runDetails, humanFeedback,
-    };
-    await generateReport({ ...reportOptions, outputPath: reportPath });
-    const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
-
-    // 6. GitHub summary
-    if (config.githubSummary) {
-      const wrote = await writeGitHubSummary(report);
-      if (wrote) {
-        console.log('GitHub step summary written');
-      }
-    }
-
-    const markdownSummary = generateGitHubSummary(report);
-
-    // 7. Print summary
-    printSummary(report);
-
-    return {
-      passed: report.passed,
-      failureReasons: report.failureReasons,
-      evaluation,
-      results,
-      scores,
-      report,
-      reportPath,
-      jsonPath,
-      markdownSummary,
-      feedbackTemplatePath,
-    };
   } finally {
-    // Cleanup local skills
-    if (skillsSetup) {
+    if (config.runnerType === 'claude-sdk') {
       await cleanupLocalSkills(cwd);
     }
   }
+
+  // 4. Generate reports
+  console.log('\n--- Generating Reports ---\n');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const suffix = comparison ? 'comparison' : '';
+  const reportBaseName = [evaluation.skillName, suffix, timestamp].filter(Boolean).join('-');
+  const reportPath = path.join(config.outputDir, `${reportBaseName}.md`);
+  const jsonPath = path.join(config.outputDir, `${reportBaseName}.json`);
+
+  const metadata: ReportMetadata = {
+    skillPath: options.tasksFile,
+    runnerType: config.runnerType,
+    agentModel: config.defaultAgentModel,
+    judgeModel: config.defaultJudgeModel,
+  };
+
+  const reportOptions = {
+    evaluation,
+    results: primaryPhase.results,
+    scores: primaryPhase.scores,
+    metadata,
+    numRuns,
+    runDetails: primaryPhase.runDetails,
+    comparison,
+  };
+
+  await generateReport({ ...reportOptions, outputPath: reportPath });
+  const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
+
+  if (config.githubSummary) {
+    const wrote = await writeGitHubSummary(report);
+    if (wrote) {
+      console.log('GitHub step summary written');
+    }
+  }
+
+  const markdownSummary = generateGitHubSummary(report);
+  printSummary(report);
+
+  if (comparison) {
+    printComparisonSummary(comparison);
+  }
+
+  return {
+    passed: report.passed,
+    failureReasons: report.failureReasons,
+    evaluation,
+    results: primaryPhase.results,
+    scores: primaryPhase.scores,
+    report,
+    reportPath,
+    jsonPath,
+    markdownSummary,
+    comparison,
+  };
 }
 
 /**
@@ -357,4 +543,22 @@ function printSummary(report: EvaluationReport): void {
     }
   }
   console.log('='.repeat(50));
+}
+
+function printComparisonSummary(comparison: ComparisonData): void {
+  const d = comparison.summary.delta;
+  console.log('\n' + '-'.repeat(50));
+  console.log(`  Skill Impact (vs ${comparison.summary.baselineLabel})`);
+  console.log('-'.repeat(50));
+  console.log(`  Adherence Delta: ${formatDelta(d.avgAdherenceDelta)}`);
+  console.log(`  Output Quality Delta: ${formatDelta(d.avgOutputQualityDelta)}`);
+  console.log(`  Weighted Score Delta: ${formatDelta(d.avgWeightedScoreDelta, 2)}`);
+  console.log(`  Duration Delta: ${formatDelta(d.totalDurationDeltaMs / 1000, 1)}s`);
+  console.log(`  Cost Delta: $${formatDelta(d.totalCostDeltaUsd, 4)}`);
+  console.log('-'.repeat(50));
+}
+
+function formatDelta(value: number, decimals = 2): string {
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}${value.toFixed(decimals)}`;
 }

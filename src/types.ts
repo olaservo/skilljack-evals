@@ -252,6 +252,55 @@ export interface EvaluationReport {
     runDetails?: Array<{ result: TaskResult; score: CombinedScore }>;
   }>;
   humanFeedback?: HumanFeedback;
+  comparison?: ComparisonData;
+}
+
+// ============================================
+// Comparison Types
+// ============================================
+
+/** Which side of a comparison run this represents */
+export type ComparisonMode = 'with_skill' | 'without_skill';
+
+/** Per-task delta metrics between with-skill and baseline runs */
+export interface TaskComparisonDelta {
+  taskId: string;
+  adherenceDelta: number;
+  outputQualityDelta: number;
+  weightedScoreDelta: number;
+  durationDeltaMs: number;
+  costDeltaUsd: number;
+}
+
+/** Per-task comparison data with both sides */
+export interface TaskComparison {
+  taskId: string;
+  withSkill: { result: TaskResult; score: CombinedScore };
+  withoutSkill: { result: TaskResult; score: CombinedScore };
+  delta: TaskComparisonDelta;
+}
+
+/** Summary-level comparison data */
+export interface ComparisonSummary {
+  withSkill: EvaluationSummary;
+  withoutSkill: EvaluationSummary;
+  delta: {
+    discoveryAccuracyDelta: number;
+    avgAdherenceDelta: number;
+    avgOutputQualityDelta: number;
+    avgWeightedScoreDelta: number;
+    totalDurationDeltaMs: number;
+    totalCostDeltaUsd: number;
+  };
+  baselineLabel: string;
+}
+
+/** Comparison data included in report when --compare is used */
+export interface ComparisonData {
+  enabled: boolean;
+  compareSkillPath?: string;
+  summary: ComparisonSummary;
+  tasks: TaskComparison[];
 }
 
 // ============================================

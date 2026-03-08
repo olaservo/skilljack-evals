@@ -53,6 +53,8 @@ program
   .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
   .option('--github-summary', 'Write GitHub Actions step summary')
   .option('--verbose', 'Enable verbose output')
+  .option('--compare', 'Run with and without skill to measure skill impact')
+  .option('--compare-skill <path>', 'Compare current skill against a previous version')
   .action(async (tasksFile: string, options: {
     runner?: string;
     model?: string;
@@ -72,6 +74,8 @@ program
     feedback?: string;
     githubSummary?: boolean;
     verbose?: boolean;
+    compare?: boolean;
+    compareSkill?: string;
   }) => {
     try {
       if (options.runner && !VALID_RUNNER_TYPES.includes(options.runner as RunnerType)) {
@@ -102,6 +106,8 @@ program
         generateFeedbackPath: options.generateFeedback,
         feedbackPath: options.feedback,
         verbose: options.verbose,
+        compare: options.compare || !!options.compareSkill,
+        compareSkillPath: options.compareSkill,
       });
 
       if (!result.passed) {
@@ -192,18 +198,18 @@ program
         humanFeedback = Object.keys(validated).length > 0 ? validated : undefined;
       }
 
-      const reportOpts = {
+      const reportOptions = {
         evaluation, results, scores, metadata: data.metadata,
         humanFeedback,
       };
-      const report = await generateReport({ ...reportOpts, outputPath: options.output });
+      const report = await generateReport({ ...reportOptions, outputPath: options.output });
 
       if (!options.output) {
         console.log(report);
       }
 
       if (options.json) {
-        await generateJsonResults({ ...reportOpts, outputPath: options.json });
+        await generateJsonResults({ ...reportOptions, outputPath: options.json });
       }
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);

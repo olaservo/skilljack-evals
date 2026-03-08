@@ -109,6 +109,21 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   lines.push('</details>');
   lines.push('');
 
+  // Comparison section
+  if (report.comparison) {
+    const d = report.comparison.summary.delta;
+    const ws = report.comparison.summary.withSkill;
+    const bs = report.comparison.summary.withoutSkill;
+    lines.push(`### Skill Impact (vs ${report.comparison.summary.baselineLabel})`);
+    lines.push('');
+    lines.push('| Metric | With Skill | Baseline | Delta |');
+    lines.push('|--------|-----------|----------|-------|');
+    lines.push(`| Adherence | ${ws.avgAdherence.toFixed(1)}/5 | ${bs.avgAdherence.toFixed(1)}/5 | **${formatDelta(d.avgAdherenceDelta)}** |`);
+    lines.push(`| Output Quality | ${ws.avgOutputQuality.toFixed(1)}/5 | ${bs.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
+    lines.push(`| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
+    lines.push('');
+  }
+
   if (!report.passed && report.failureReasons.length > 0) {
     lines.push(`**Failure reasons:** ${report.failureReasons.join('; ')}`);
   }
@@ -134,4 +149,9 @@ function formatCategory(cat: string): string {
     .split('_')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
+}
+
+function formatDelta(value: number, decimals = 2): string {
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}${value.toFixed(decimals)}`;
 }

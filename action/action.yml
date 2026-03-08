@@ -75,6 +75,13 @@ inputs:
   feedback:
     description: 'Path to human review feedback JSON for judge prompt enrichment'
     required: false
+  compare:
+    description: 'Run with and without skill to compute impact deltas (true/false)'
+    required: false
+    default: 'false'
+  compare-skill:
+    description: 'Path to alternative skill version for comparison'
+    required: false
 
 outputs:
   passed:
@@ -89,6 +96,12 @@ outputs:
     description: 'Path to generated JSON report'
   feedback-template-path:
     description: 'Path to generated feedback template (if --generate-feedback used)'
+  adherence-delta:
+    description: 'Adherence delta (with minus without skill), only set in compare mode'
+  output-delta:
+    description: 'Output quality delta (with minus without skill), only set in compare mode'
+  score-delta:
+    description: 'Weighted score delta (with minus without skill), only set in compare mode'
 
 runs:
   using: 'node20'
