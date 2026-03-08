@@ -10,6 +10,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { formatDelta } from './utils/format.js';
 import { parseEvalFile } from './parser.js';
 import { setupLocalSkills, cleanupLocalSkills } from './runner/skill-setup.js';
 import { createRunner } from './runner/runner-factory.js';
@@ -242,7 +243,6 @@ function computeComparison(
   };
 
   return {
-    enabled: true,
     compareSkillPath,
     summary,
     tasks,
@@ -333,6 +333,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   let primaryPhase: PhaseResult;
   let comparison: ComparisonData | undefined;
 
+  let needsCleanup = false;
   try {
     if (compareMode && skillsDir) {
       // --- Comparison mode: two phases ---
@@ -353,7 +354,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
       // Phase 1: With Skill
       console.log('=== Phase 1/2: With Skill ===');
-      await setupSkills(skillsDir, config, cwd);
+      needsCleanup = await setupSkills(skillsDir, config, cwd);
 
       const withPhase = await runPhase(
         'With Skill', evaluation, config, cwd, skillsDir, numRuns, scorerOptions,
@@ -361,21 +362,22 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       );
 
       // Clean up between phases
-      if (config.runnerType === 'claude-sdk') {
+      if (needsCleanup) {
         await cleanupLocalSkills(cwd);
+        needsCleanup = false;
       }
 
       // Phase 2: Baseline
       console.log(`\n=== Phase 2/2: ${baselineLabel} ===`);
       const baseSkillsDir = options.compareSkillPath || undefined;
       if (baseSkillsDir) {
-        await setupSkills(baseSkillsDir, config, cwd);
+        needsCleanup = await setupSkills(baseSkillsDir, config, cwd);
       }
 
-      // Baseline skips deterministic scoring (meaningless without expected skill)
+      // Only skip deterministic for no-skill baseline; version comparison keeps it
       const baselineScorerOptions: ScorerOptions = {
         ...scorerOptions,
-        noDeterministic: true,
+        noDeterministic: options.compareSkillPath ? scorerOptions.noDeterministic : true,
       };
 
       const basePhase = await runPhase(
@@ -388,11 +390,11 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       primaryPhase = withPhase;
     } else {
       // --- Normal mode: single phase ---
-      await setupSkills(skillsDir, config, cwd);
+      needsCleanup = await setupSkills(skillsDir, config, cwd);
       primaryPhase = await runPhase('Evaluation', evaluation, config, cwd, skillsDir, numRuns, scorerOptions, logDir);
     }
   } finally {
-    if (config.runnerType === 'claude-sdk') {
+    if (needsCleanup) {
       await cleanupLocalSkills(cwd);
     }
   }
@@ -558,7 +560,3 @@ function printComparisonSummary(comparison: ComparisonData): void {
   console.log('-'.repeat(50));
 }
 
-function formatDelta(value: number, decimals = 2): string {
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}${value.toFixed(decimals)}`;
-}

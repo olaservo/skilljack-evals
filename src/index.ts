@@ -32,7 +32,6 @@ export type {
   ReportMetadata,
   EvaluationReport,
   HumanFeedback,
-  ComparisonMode,
   TaskComparisonDelta,
   TaskComparison,
   ComparisonSummary,

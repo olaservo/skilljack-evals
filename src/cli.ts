@@ -54,7 +54,7 @@ program
   .option('--github-summary', 'Write GitHub Actions step summary')
   .option('--verbose', 'Enable verbose output')
   .option('--compare', 'Run with and without skill to measure skill impact')
-  .option('--compare-skill <path>', 'Compare current skill against a previous version')
+  .option('--compare-skill <path>', 'Path to baseline skill directory (e.g., previous version) for A/B comparison')
   .action(async (tasksFile: string, options: {
     runner?: string;
     model?: string;

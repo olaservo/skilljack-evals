@@ -6,6 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { formatDelta } from '../utils/format.js';
 import type {
   SkillEvaluation,
   TaskResult,
@@ -421,11 +422,6 @@ function generateComparisonSection(comparison: ComparisonData): string {
   }
 
   return section;
-}
-
-function formatDelta(value: number, decimals = 2): string {
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}${value.toFixed(decimals)}`;
 }
 
 function qualityImpact(delta: number): string {

@@ -80,7 +80,7 @@ inputs:
     required: false
     default: 'false'
   compare-skill:
-    description: 'Path to alternative skill version for comparison'
+    description: 'Path to baseline skill directory (e.g., previous version) for A/B comparison'
     required: false
 
 outputs:

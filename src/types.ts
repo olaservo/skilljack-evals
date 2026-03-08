@@ -259,9 +259,6 @@ export interface EvaluationReport {
 // Comparison Types
 // ============================================
 
-/** Which side of a comparison run this represents */
-export type ComparisonMode = 'with_skill' | 'without_skill';
-
 /** Per-task delta metrics between with-skill and baseline runs */
 export interface TaskComparisonDelta {
   taskId: string;
@@ -297,7 +294,6 @@ export interface ComparisonSummary {
 
 /** Comparison data included in report when --compare is used */
 export interface ComparisonData {
-  enabled: boolean;
   compareSkillPath?: string;
   summary: ComparisonSummary;
   tasks: TaskComparison[];
