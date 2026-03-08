@@ -202,7 +202,7 @@ program
   .description('Create an evaluation template for a skill')
   .argument('<skill_name>', 'Name of the skill')
   .option('-o, --output <path>', 'Output path for template')
-  .option('-n, --num-tasks <number>', 'Number of positive tasks to generate (1 false-positive is always added)', '10')
+  .option('-n, --num-tasks <number>', 'Total number of tasks to generate (includes 1 false-positive)', '10')
   .action(async (skillName: string, options: {
     output?: string;
     numTasks: string;
