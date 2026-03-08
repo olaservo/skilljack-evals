@@ -134,7 +134,7 @@ function mergeScores(
       weightedScore,
       failureCategory,
       reasoning: reasons.join(' | '),
-      checklistResults: judge.checklistResults,
+      checklistResults: judge.checklistResults ?? [],
     };
   }
 
@@ -185,7 +185,7 @@ function mergeScores(
       weightedScore: judge.weightedScore,
       failureCategory: judge.failureCategory,
       reasoning: judge.reasoning,
-      checklistResults: judge.checklistResults,
+      checklistResults: judge.checklistResults ?? [],
     };
   }
 

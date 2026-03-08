@@ -100,7 +100,7 @@ export type FailureCategory =
 export interface ChecklistItemResult {
   item: string;
   passed: boolean;
-  evidence: string;
+  evidence?: string;
 }
 
 export interface JudgeScore {
@@ -111,7 +111,7 @@ export interface JudgeScore {
   weightedScore: number; // 0-1 (normalized)
   failureCategory: FailureCategory;
   reasoning: string;
-  checklistResults: ChecklistItemResult[];
+  checklistResults?: ChecklistItemResult[];
 }
 
 export interface JudgeOptions {
@@ -135,7 +135,7 @@ export interface CombinedScore {
   weightedScore: number; // 0-1 normalized
   failureCategory: FailureCategory;
   reasoning: string;
-  checklistResults: ChecklistItemResult[];
+  checklistResults?: ChecklistItemResult[];
   stddev?: ScoreStddev; // Only populated when N >= 2
 }
 

@@ -142,7 +142,7 @@ export function aggregateScores(allScores: CombinedScore[][]): CombinedScore[] {
       weightedScore: avgWeighted,
       failureCategory: modeCategory,
       reasoning: `Aggregated over ${numRuns} runs: discovery ${discoveryCount}/${numRuns}, mean adherence ${avgAdherence.toFixed(1)}, mean output ${avgOutput.toFixed(1)}`,
-      checklistResults: scores[repIdx].checklistResults,
+      checklistResults: scores[repIdx].checklistResults ?? [],
       stddev,
     });
   }

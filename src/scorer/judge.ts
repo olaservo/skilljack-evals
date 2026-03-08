@@ -129,6 +129,80 @@ export function extractJsonObject(text: string): string | null {
 }
 
 /**
+ * Parse a raw judge response string into a JudgeScore.
+ *
+ * Exported for testing. Extracts JSON, parses scores and checklist results.
+ */
+export function parseJudgeResponseJson(
+  response: string,
+  taskId: string,
+  weights: Map<string, number>
+): JudgeScore {
+  const jsonStr = extractJsonObject(response);
+  if (!jsonStr) {
+    return createErrorScore(taskId, 'Failed to parse judge response');
+  }
+
+  try {
+    const data = JSON.parse(jsonStr);
+
+    const discovery = Number(data.discovery) || 0;
+    const adherence = Number(data.adherence) || 1;
+    const outputQuality = Number(data.output_quality) || 1;
+
+    const adherenceNorm = (adherence - 1) / 4;
+    const outputNorm = (outputQuality - 1) / 4;
+
+    const weightedScore =
+      (weights.get('discovery') ?? 0.3) * discovery +
+      (weights.get('adherence') ?? 0.4) * adherenceNorm +
+      (weights.get('output') ?? 0.3) * outputNorm;
+
+    // Parse checklist results
+    const checklistResults: ChecklistItemResult[] = Array.isArray(data.checklist_results)
+      ? data.checklist_results
+          .filter(
+            (cr: unknown) =>
+              typeof cr === 'object' &&
+              cr !== null &&
+              'item' in (cr as Record<string, unknown>) &&
+              'passed' in (cr as Record<string, unknown>)
+          )
+          .map((cr: { item: string; passed: boolean; evidence?: string }) => ({
+            item: String(cr.item),
+            passed: Boolean(cr.passed),
+            ...(cr.evidence ? { evidence: String(cr.evidence) } : {}),
+          }))
+      : [];
+
+    return {
+      taskId,
+      discovery,
+      adherence,
+      outputQuality,
+      weightedScore,
+      failureCategory: (data.failure_category || 'none') as FailureCategory,
+      reasoning: data.reasoning || '',
+      checklistResults,
+    };
+  } catch {
+    return createErrorScore(taskId, 'Invalid JSON in judge response');
+  }
+}
+
+function createErrorScore(taskId: string, reason: string): JudgeScore {
+  return {
+    taskId,
+    discovery: 0,
+    adherence: 1,
+    outputQuality: 1,
+    weightedScore: 0,
+    failureCategory: 'agent_error',
+    reasoning: reason,
+  };
+}
+
+/**
  * LLM-as-judge for scoring skill evaluation results.
  */
 export class SkillJudge {
@@ -190,79 +264,6 @@ export class SkillJudge {
   }
 
   /**
-   * Parse the judge's JSON response into a JudgeScore.
-   */
-  private parseJudgeResponse(
-    response: string,
-    taskId: string,
-    weights: Map<string, number>
-  ): JudgeScore {
-    const jsonStr = extractJsonObject(response);
-    if (!jsonStr) {
-      return this.createErrorScore(taskId, 'Failed to parse judge response');
-    }
-
-    try {
-      const data = JSON.parse(jsonStr);
-
-      const discovery = Number(data.discovery) || 0;
-      const adherence = Number(data.adherence) || 1;
-      const outputQuality = Number(data.output_quality) || 1;
-
-      const adherenceNorm = (adherence - 1) / 4;
-      const outputNorm = (outputQuality - 1) / 4;
-
-      const weightedScore =
-        (weights.get('discovery') ?? 0.3) * discovery +
-        (weights.get('adherence') ?? 0.4) * adherenceNorm +
-        (weights.get('output') ?? 0.3) * outputNorm;
-
-      // Parse checklist results
-      const checklistResults: ChecklistItemResult[] = Array.isArray(data.checklist_results)
-        ? data.checklist_results
-            .filter(
-              (cr: unknown) =>
-                typeof cr === 'object' &&
-                cr !== null &&
-                'item' in (cr as Record<string, unknown>) &&
-                'passed' in (cr as Record<string, unknown>)
-            )
-            .map((cr: { item: string; passed: boolean; evidence?: string }) => ({
-              item: String(cr.item),
-              passed: Boolean(cr.passed),
-              evidence: String(cr.evidence || ''),
-            }))
-        : [];
-
-      return {
-        taskId,
-        discovery,
-        adherence,
-        outputQuality,
-        weightedScore,
-        failureCategory: (data.failure_category || 'none') as FailureCategory,
-        reasoning: data.reasoning || '',
-        checklistResults,
-      };
-    } catch {
-      return this.createErrorScore(taskId, 'Invalid JSON in judge response');
-    }
-  }
-
-  private createErrorScore(taskId: string, reason: string): JudgeScore {
-    return {
-      taskId,
-      discovery: 0,
-      adherence: 1,
-      outputQuality: 1,
-      weightedScore: 0,
-      failureCategory: 'agent_error',
-      reasoning: reason,
-      checklistResults: [],
-    };
-  }
-
-  /**
    * Score a single evaluation result.
    */
   async judgeResult(task: EvalTask, result: TaskResult): Promise<JudgeScore> {
@@ -313,7 +314,7 @@ export class SkillJudge {
         }
       }
 
-      return this.parseJudgeResponse(responseText, task.id, weights);
+      return parseJudgeResponseJson(responseText, task.id, weights);
     } catch (error) {
       // Fallback: heuristic scoring
       const discovery = result.skillLoads.includes(task.expectedSkillLoad) ? 1 : 0;

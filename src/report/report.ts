@@ -127,7 +127,7 @@ ${score.stddev && (score.stddev.adherence > FLAKY_STDDEV_THRESHOLD || score.stdd
     }
 
     // Show checklist results if available
-    if (score.checklistResults.length > 0) {
+    if (score.checklistResults && score.checklistResults.length > 0) {
       const passed = score.checklistResults.filter((cr) => cr.passed).length;
       report += `\n**Checklist:** ${passed}/${score.checklistResults.length} passed\n\n`;
       for (const cr of score.checklistResults) {
