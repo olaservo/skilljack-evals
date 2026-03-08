@@ -16,6 +16,7 @@ import { runPipeline, scorePipeline } from './pipeline.js';
 import { generateReport, generateJsonResults } from './report/report.js';
 import { SkillJudge } from './scorer/judge.js';
 import type { EvalTask, TaskResult, JudgeScore, SkillEvaluation, CombinedScore } from './types.js';
+import { validateFeedback } from './feedback.js';
 import { VALID_RUNNER_TYPES } from './config.js';
 import type { EvalConfig, RunnerType } from './config.js';
 
@@ -185,17 +186,10 @@ program
       const scores = data.tasks.map((t) => t.score);
 
       // Validate humanFeedback from loaded JSON (may have been hand-edited)
-      let humanFeedback = data.humanFeedback;
-      if (humanFeedback) {
-        for (const [key, value] of Object.entries(humanFeedback)) {
-          if (typeof value !== 'string') {
-            console.warn(`Warning: Invalid feedback value for task "${key}" in loaded JSON — ignoring`);
-            delete humanFeedback[key];
-          }
-        }
-        if (Object.keys(humanFeedback).length === 0) {
-          humanFeedback = undefined;
-        }
+      let humanFeedback: Record<string, string> | undefined;
+      if (data.humanFeedback) {
+        const validated = validateFeedback(data.humanFeedback as Record<string, unknown>);
+        humanFeedback = Object.keys(validated).length > 0 ? validated : undefined;
       }
 
       const reportOpts = {

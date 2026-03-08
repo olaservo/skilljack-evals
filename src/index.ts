@@ -63,7 +63,7 @@ export type { ReportOptions } from './report/report.js';
 export { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
 
 // Feedback
-export { generateFeedbackTemplate, writeFeedbackTemplate, loadFeedback, getFeedbackForTask } from './feedback.js';
+export { generateFeedbackTemplate, writeFeedbackTemplate, loadFeedback, validateFeedback, getFeedbackForTask } from './feedback.js';
 
 // Pipeline
 export { runPipeline, scorePipeline } from './pipeline.js';

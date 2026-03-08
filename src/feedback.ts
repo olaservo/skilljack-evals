@@ -30,7 +30,7 @@ export async function writeFeedbackTemplate(
 ): Promise<void> {
   const template = generateFeedbackTemplate(tasks);
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  await fs.writeFile(outputPath, JSON.stringify(template, null, 2));
+  await fs.writeFile(outputPath, JSON.stringify(template, null, 2) + '\n');
 }
 
 /**
@@ -50,20 +50,36 @@ export async function loadFeedback(
     throw new Error('Invalid feedback file: expected a JSON object with task IDs as keys');
   }
 
+  const validated = validateFeedback(raw);
+
+  // Warn about unknown task IDs
+  for (const key of Object.keys(validated)) {
+    if (!taskIds.has(key)) {
+      console.warn(`Warning: Feedback file contains unknown task ID "${key}" -- ignoring`);
+      delete validated[key];
+    }
+  }
+
+  return validated;
+}
+
+/**
+ * Validate a raw feedback object: warn and skip non-string values,
+ * strip empty entries. Returns a clean HumanFeedback or undefined if empty.
+ */
+export function validateFeedback(
+  raw: Record<string, unknown>
+): HumanFeedback {
   const feedback: HumanFeedback = {};
   for (const [key, value] of Object.entries(raw)) {
     if (typeof value !== 'string') {
-      throw new Error(`Invalid feedback for task "${key}": expected string, got ${typeof value}`);
-    }
-    if (!taskIds.has(key)) {
-      console.warn(`Warning: Feedback file contains unknown task ID "${key}" -- ignoring`);
+      console.warn(`Warning: Invalid feedback value for task "${key}": expected string, got ${typeof value} -- skipping`);
       continue;
     }
     if (value.trim() !== '') {
       feedback[key] = value;
     }
   }
-
   return feedback;
 }
 
