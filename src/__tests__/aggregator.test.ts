@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeStddev, aggregateScores, FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
-import type { CombinedScore } from '../types.js';
+import { computeSummary } from '../report/report.js';
+import type { CombinedScore, TaskResult } from '../types.js';
 
 describe('computeStddev', () => {
   it('returns 0 for empty array', () => {
@@ -61,9 +62,11 @@ describe('aggregateScores', () => {
     expect(aggregateScores([])).toEqual([]);
   });
 
-  it('returns original scores for single run', () => {
+  it('returns original scores for single run without stddev', () => {
     const scores = [makeScore()];
-    expect(aggregateScores([scores])).toBe(scores);
+    const result = aggregateScores([scores]);
+    expect(result).toBe(scores);
+    expect(result[0].stddev).toBeUndefined();
   });
 
   it('averages scores across runs', () => {
@@ -104,5 +107,92 @@ describe('aggregateScores', () => {
 describe('FLAKY_STDDEV_THRESHOLD', () => {
   it('is exported and equals 1.0', () => {
     expect(FLAKY_STDDEV_THRESHOLD).toBe(1.0);
+  });
+});
+
+describe('computeSummary', () => {
+  function makeResult(overrides: Partial<TaskResult> = {}): TaskResult {
+    return {
+      taskId: 'task-1',
+      prompt: 'test prompt',
+      output: 'test output',
+      durationMs: 1000,
+      numTurns: 1,
+      costUsd: 0.01,
+      skillLoads: [],
+      toolCalls: [],
+      isError: false,
+      errorMessage: '',
+      ...overrides,
+    };
+  }
+
+  function makeScore(overrides: Partial<CombinedScore> = {}): CombinedScore {
+    return {
+      taskId: 'task-1',
+      deterministic: null,
+      judge: null,
+      discovery: 1,
+      adherence: 4,
+      outputQuality: 4,
+      weightedScore: 0.8,
+      failureCategory: 'none',
+      reasoning: 'test',
+      ...overrides,
+    };
+  }
+
+  it('produces no stddev for single-run', () => {
+    const results = [makeResult()];
+    const scores = [makeScore()];
+    const summary = computeSummary(results, scores, 1);
+    expect(summary.stddev).toBeUndefined();
+  });
+
+  it('produces summary stddev as mean of per-task stddevs for multi-run', () => {
+    const results = [makeResult({ taskId: 'task-1' }), makeResult({ taskId: 'task-2' })];
+    const scores = [
+      makeScore({
+        taskId: 'task-1',
+        stddev: { discovery: 0.2, adherence: 0.5, outputQuality: 0.6, weightedScore: 0.1 },
+      }),
+      makeScore({
+        taskId: 'task-2',
+        stddev: { discovery: 0.4, adherence: 1.5, outputQuality: 1.0, weightedScore: 0.3 },
+      }),
+    ];
+    const summary = computeSummary(results, scores, 3);
+
+    expect(summary.stddev).toBeDefined();
+    expect(summary.stddev!.discovery).toBeCloseTo(0.3, 10);
+    expect(summary.stddev!.adherence).toBeCloseTo(1.0, 10);
+    expect(summary.stddev!.outputQuality).toBeCloseTo(0.8, 10);
+    expect(summary.stddev!.weightedScore).toBeCloseTo(0.2, 10);
+  });
+
+  it('handles mix of tasks with and without stddev', () => {
+    const results = [makeResult({ taskId: 'task-1' }), makeResult({ taskId: 'task-2' })];
+    const scores = [
+      makeScore({
+        taskId: 'task-1',
+        stddev: { discovery: 0.2, adherence: 0.8, outputQuality: 0.6, weightedScore: 0.1 },
+      }),
+      makeScore({ taskId: 'task-2' }), // no stddev
+    ];
+    const summary = computeSummary(results, scores, 2);
+
+    // Only one task has stddev, so summary stddev should equal that task's stddev
+    expect(summary.stddev).toBeDefined();
+    expect(summary.stddev!.discovery).toBeCloseTo(0.2, 10);
+    expect(summary.stddev!.adherence).toBeCloseTo(0.8, 10);
+    expect(summary.stddev!.outputQuality).toBeCloseTo(0.6, 10);
+    expect(summary.stddev!.weightedScore).toBeCloseTo(0.1, 10);
+  });
+
+  it('produces no stddev when numRuns >= 2 but no tasks have stddev', () => {
+    const results = [makeResult()];
+    const scores = [makeScore()]; // no stddev property
+    const summary = computeSummary(results, scores, 2);
+    expect(summary.stddev).toBeUndefined();
   });
 });

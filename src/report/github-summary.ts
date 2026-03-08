@@ -66,6 +66,8 @@ export function generateGitHubSummary(report: EvaluationReport): string {
     const s = t.score;
     const status = s.failureCategory === 'none' ? 'PASS' : 'FAIL';
     if (isMultiRun) {
+      // Only check adherence and outputQuality against the threshold since they
+      // use the 1-5 scale. Discovery (0/1) and weightedScore (0-1) cannot exceed 1.0.
       const varianceLabel = s.stddev
         ? (s.stddev.adherence > FLAKY_STDDEV_THRESHOLD || s.stddev.outputQuality > FLAKY_STDDEV_THRESHOLD ? ':warning: High' : 'Low')
         : 'N/A';
