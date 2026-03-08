@@ -34,8 +34,10 @@ import type {
   ComparisonData,
   ComparisonSummary,
   TaskComparison,
+  BlindComparisonData,
 } from './types.js';
 import { loadFeedback, writeFeedbackTemplate } from './feedback.js';
+import { SkillJudge, blindCompareAll } from './scorer/judge.js';
 
 /**
  * Load human feedback from a file, validating against known task IDs.
@@ -87,6 +89,8 @@ export interface PipelineOptions {
   compare?: boolean;
   /** Path to alternative skill for comparison (instead of no-skill baseline) */
   compareSkillPath?: string;
+  /** Run blind A/B comparison alongside --compare */
+  blindCompare?: boolean;
 }
 
 export interface PipelineResult {
@@ -101,6 +105,7 @@ export interface PipelineResult {
   markdownSummary: string;
   feedbackTemplatePath?: string;
   comparison?: ComparisonData;
+  blindComparison?: BlindComparisonData;
   crossIterationComparison?: ComparisonResult;
 }
 
@@ -263,6 +268,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   const cwd = options.cwd || process.cwd();
   const compareMode = options.compare || !!options.compareSkillPath;
 
+  if (options.blindCompare && !compareMode) {
+    throw new Error('--blind-compare requires --compare mode');
+  }
+
   // 1. Parse tasks
   console.log(`Parsing tasks from: ${options.tasksFile}`);
   let evaluation = await parseEvalFile(options.tasksFile);
@@ -348,6 +357,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   // 3. Run evaluation phase(s)
   let primaryPhase: PhaseResult;
   let comparison: ComparisonData | undefined;
+  let blindComparison: BlindComparisonData | undefined;
   let crossIterationComparison: ComparisonResult | undefined;
 
   let needsCleanup = false;
@@ -396,6 +406,13 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
       console.log('\n=== Computing Comparison Deltas ===\n');
       comparison = computeComparison(withPhase, basePhase, baselineLabel, options.compareSkillPath);
+
+      if (options.blindCompare) {
+        console.log('\n=== Running Blind A/B Comparison ===\n');
+        const blindJudge = new SkillJudge({ model: config.defaultJudgeModel });
+        blindComparison = await blindCompareAll(comparison.tasks, blindJudge);
+      }
+
       primaryPhase = withPhase;
     } else {
       // --- Normal mode: single phase ---
@@ -451,6 +468,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     numRuns,
     runDetails: primaryPhase.runDetails,
     comparison,
+    blindComparison,
     crossIterationComparison,
   };
 
@@ -470,6 +488,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   if (comparison) {
     printComparisonSummary(comparison);
   }
+  if (blindComparison) {
+    printBlindComparisonSummary(blindComparison);
+  }
   if (crossIterationComparison) {
     console.log(formatComparisonConsole(crossIterationComparison));
   }
@@ -485,6 +506,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     jsonPath,
     markdownSummary,
     comparison,
+    blindComparison,
     crossIterationComparison,
   };
 }
@@ -592,6 +614,21 @@ function printComparisonSummary(comparison: ComparisonData): void {
   console.log(`  Weighted Score Delta: ${formatDelta(d.avgWeightedScoreDelta, 2)}`);
   console.log(`  Duration Delta: ${formatDelta(d.totalDurationDeltaMs / 1000, 1)}s`);
   console.log(`  Cost Delta: $${formatDelta(d.totalCostDeltaUsd, 4)}`);
+  console.log('-'.repeat(50));
+}
+
+function printBlindComparisonSummary(blind: BlindComparisonData): void {
+  const a = blind.aggregate;
+  const total = blind.tasks.length;
+  console.log('\n' + '-'.repeat(50));
+  console.log('  Blind A/B Comparison');
+  console.log('-'.repeat(50));
+  console.log(`  With-skill preferred: ${a.withSkillPreferred}/${total} (${total > 0 ? ((a.withSkillPreferred / total) * 100).toFixed(0) : 0}%)`);
+  console.log(`  Without-skill preferred: ${a.withoutSkillPreferred}/${total} (${total > 0 ? ((a.withoutSkillPreferred / total) * 100).toFixed(0) : 0}%)`);
+  console.log(`  Ties: ${a.ties}/${total}`);
+  if (a.biasSignalCount > 0) {
+    console.log(`  Bias signals: ${a.biasSignalCount} (blind disagrees with standard scoring)`);
+  }
   console.log('-'.repeat(50));
 }
 

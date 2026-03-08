@@ -41,6 +41,9 @@ export type {
   TaskDelta,
   SummaryDelta,
   ComparisonResult,
+  BlindOutputScore,
+  BlindTaskComparison,
+  BlindComparisonData,
 } from './types.js';
 
 // Config
@@ -60,7 +63,7 @@ export { createToolPolicy } from './runner/security.js';
 // Scorer
 export { scoreTask, scoreAll } from './scorer/scorer.js';
 export { scoreDeterministic } from './scorer/deterministic.js';
-export { SkillJudge } from './scorer/judge.js';
+export { SkillJudge, parseBlindJudgeResponse, blindCompareAll } from './scorer/judge.js';
 export { aggregateResults, aggregateScores, computeStddev, FLAKY_STDDEV_THRESHOLD } from './scorer/aggregator.js';
 
 // Session

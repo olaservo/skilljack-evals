@@ -56,6 +56,7 @@ program
   .option('--verbose', 'Enable verbose output')
   .option('--compare', 'Run with and without skill to measure skill impact')
   .option('--compare-skill <path>', 'Path to baseline skill directory (e.g., previous version) for A/B comparison')
+  .option('--blind-compare', 'Run blind A/B comparison alongside --compare')
   .action(async (tasksFile: string, options: {
     runner?: string;
     model?: string;
@@ -78,6 +79,7 @@ program
     verbose?: boolean;
     compare?: boolean;
     compareSkill?: string;
+    blindCompare?: boolean;
   }) => {
     try {
       if (options.runner && !VALID_RUNNER_TYPES.includes(options.runner as RunnerType)) {
@@ -111,6 +113,7 @@ program
         verbose: options.verbose,
         compare: options.compare || !!options.compareSkill,
         compareSkillPath: options.compareSkill,
+        blindCompare: options.blindCompare,
       });
 
       if (!result.passed) {

@@ -37,6 +37,7 @@ async function run(): Promise<void> {
     const compare = core.getInput('compare') === 'true';
     const compareSkillPath = core.getInput('compare-skill') || undefined;
     const compareResultsPath = core.getInput('compare-results') || undefined;
+    const blindCompare = core.getInput('blind-compare') === 'true';
 
     // Handle API keys
     const anthropicKey = core.getInput('anthropic-api-key') || process.env.ANTHROPIC_API_KEY;
@@ -90,6 +91,7 @@ async function run(): Promise<void> {
       compare: compare || !!compareSkillPath,
       compareSkillPath,
       compareResultsPath,
+      blindCompare,
     });
 
     // Set outputs
@@ -106,6 +108,13 @@ async function run(): Promise<void> {
       core.setOutput('adherence-delta', String(result.comparison.summary.delta.avgAdherenceDelta));
       core.setOutput('output-delta', String(result.comparison.summary.delta.avgOutputQualityDelta));
       core.setOutput('score-delta', String(result.comparison.summary.delta.avgWeightedScoreDelta));
+    }
+
+    // Set blind comparison outputs (--blind-compare mode)
+    if (result.blindComparison) {
+      core.setOutput('blind-with-skill-preferred', String(result.blindComparison.aggregate.withSkillPreferred));
+      core.setOutput('blind-without-skill-preferred', String(result.blindComparison.aggregate.withoutSkillPreferred));
+      core.setOutput('blind-bias-signals', String(result.blindComparison.aggregate.biasSignalCount));
     }
 
     // Set cross-iteration comparison outputs (--compare-results mode)

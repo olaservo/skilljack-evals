@@ -253,6 +253,7 @@ export interface EvaluationReport {
   }>;
   humanFeedback?: HumanFeedback;
   comparison?: ComparisonData;
+  blindComparison?: BlindComparisonData;
   crossIterationComparison?: ComparisonResult;
 }
 
@@ -341,6 +342,36 @@ export interface ComparisonResult {
   taskDeltas: TaskDelta[];
   tasksOnlyInCurrent: string[];
   tasksOnlyInPrevious: string[];
+}
+
+// ============================================
+// Blind Comparison Types
+// ============================================
+
+export interface BlindOutputScore {
+  adherence: number;    // 1-5
+  outputQuality: number; // 1-5
+}
+
+export interface BlindTaskComparison {
+  taskId: string;
+  withSkillLabel: 'A' | 'B';           // which label the with-skill output got
+  outputA: BlindOutputScore;
+  outputB: BlindOutputScore;
+  preferred: 'A' | 'B' | 'tie';
+  reasoning: string;
+  preferredCondition: 'with-skill' | 'without-skill' | 'tie';
+  biasSignal: boolean;                  // blind disagrees with standard scoring
+}
+
+export interface BlindComparisonData {
+  tasks: BlindTaskComparison[];
+  aggregate: {
+    withSkillPreferred: number;
+    withoutSkillPreferred: number;
+    ties: number;
+    biasSignalCount: number;
+  };
 }
 
 // ============================================

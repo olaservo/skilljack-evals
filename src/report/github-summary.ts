@@ -137,6 +137,24 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   lines.push('</details>');
   lines.push('');
 
+  // Blind comparison section
+  if (report.blindComparison) {
+    const ba = report.blindComparison.aggregate;
+    const total = report.blindComparison.tasks.length;
+    lines.push('### Blind A/B Comparison');
+    lines.push('');
+    lines.push('| Preference | Count | % |');
+    lines.push('|------------|-------|---|');
+    lines.push(`| With-skill | ${ba.withSkillPreferred} | ${total > 0 ? ((ba.withSkillPreferred / total) * 100).toFixed(0) : 0}% |`);
+    lines.push(`| Without-skill | ${ba.withoutSkillPreferred} | ${total > 0 ? ((ba.withoutSkillPreferred / total) * 100).toFixed(0) : 0}% |`);
+    lines.push(`| Tie | ${ba.ties} | ${total > 0 ? ((ba.ties / total) * 100).toFixed(0) : 0}% |`);
+    lines.push('');
+    if (ba.biasSignalCount > 0) {
+      lines.push(`:warning: **${ba.biasSignalCount} bias signal(s):** blind comparison disagrees with standard scoring`);
+      lines.push('');
+    }
+  }
+
   // Comparison section
   if (report.comparison) {
     const d = report.comparison.summary.delta;
