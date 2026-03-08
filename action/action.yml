@@ -69,6 +69,12 @@ inputs:
   openrouter-api-key:
     description: 'OpenRouter API key for vercel-ai (openrouter:) runner (or use OPENROUTER_API_KEY env var)'
     required: false
+  generate-feedback:
+    description: 'Path to write feedback template JSON after run'
+    required: false
+  feedback:
+    description: 'Path to human review feedback JSON for judge prompt enrichment'
+    required: false
 
 outputs:
   passed:
@@ -81,6 +87,8 @@ outputs:
     description: 'Path to generated markdown report'
   json-path:
     description: 'Path to generated JSON report'
+  feedback-template-path:
+    description: 'Path to generated feedback template (if --generate-feedback used)'
 
 runs:
   using: 'node20'

@@ -51,6 +51,13 @@ export function generateGitHubSummary(report: EvaluationReport): string {
     lines.push('');
   }
 
+  // Human review feedback note
+  if (report.humanFeedback && Object.keys(report.humanFeedback).length > 0) {
+    const feedbackCount = Object.keys(report.humanFeedback).length;
+    lines.push(`> :memo: Human review feedback provided for ${feedbackCount} task(s)`);
+    lines.push('');
+  }
+
   // Per-task details in collapsible
   const isMultiRun = summary.numRuns > 1;
   lines.push('<details><summary>All task results</summary>');

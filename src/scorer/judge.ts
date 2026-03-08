@@ -15,12 +15,14 @@ import type {
   JudgeOptions,
   FailureCategory,
   ChecklistItemResult,
+  HumanFeedback,
 } from '../types.js';
 import {
   isAssistantMessage,
   isResultMessage,
   isTextBlock,
 } from '../types.js';
+import { getFeedbackForTask } from '../feedback.js';
 import { loadConfigSync } from '../config.js';
 
 const JUDGE_PROMPT_TEMPLATE = `You are an expert evaluator for AI agent skills. Score this skill evaluation result.
@@ -184,6 +186,7 @@ export function parseJudgeResponseJson(
       failureCategory: isValidFailureCategory(data.failure_category) ? data.failure_category : 'agent_error',
       reasoning: data.reasoning || '',
       checklistResults,
+      feedbackAddressed: data.feedback_addressed ?? null,
     };
   } catch {
     return createErrorScore(taskId, 'Invalid JSON in judge response');
@@ -234,7 +237,7 @@ export class SkillJudge {
   /**
    * Build the prompt for the judge.
    */
-  private buildJudgePrompt(task: EvalTask, result: TaskResult): string {
+  private buildJudgePrompt(task: EvalTask, result: TaskResult, feedback?: string): string {
     const criteriaLines = task.criteria.map(
       (c) => `- **${capitalize(c.dimension)}** (weight ${c.weight}): ${c.description}`
     );
@@ -266,7 +269,7 @@ export class SkillJudge {
   ]`
       : '';
 
-    return JUDGE_PROMPT_TEMPLATE
+    let prompt = JUDGE_PROMPT_TEMPLATE
       .replace('{prompt}', task.prompt)
       .replace(/{expectedSkill}/g, task.expectedSkillLoad)
       .replace('{criteriaText}', criteriaText)
@@ -275,12 +278,18 @@ export class SkillJudge {
       .replace('{checklistJsonField}', checklistJsonField)
       .replace('{skillLoads}', skillLoads)
       .replace('{output}', result.output.slice(0, this.options.outputTruncation) || '(no output)');
+
+    if (feedback) {
+      prompt += `\n**Previous human reviewer feedback for this task:**\n${feedback}\n\nConsider whether this feedback has been addressed in the current output.\nAlso include in your JSON response: "feedback_addressed": <true or false>\n`;
+    }
+
+    return prompt;
   }
 
   /**
    * Score a single evaluation result.
    */
-  async judgeResult(task: EvalTask, result: TaskResult): Promise<JudgeScore> {
+  async judgeResult(task: EvalTask, result: TaskResult, feedback?: string): Promise<JudgeScore> {
     if (result.isError) {
       return {
         taskId: task.id,
@@ -299,7 +308,7 @@ export class SkillJudge {
       weights.set(c.dimension, c.weight);
     }
 
-    const prompt = this.buildJudgePrompt(task, result);
+    const prompt = this.buildJudgePrompt(task, result, feedback);
 
     try {
       let responseText = '';
@@ -348,11 +357,12 @@ export class SkillJudge {
   /**
    * Score all evaluation results.
    */
-  async judgeAll(tasks: EvalTask[], results: TaskResult[]): Promise<JudgeScore[]> {
+  async judgeAll(tasks: EvalTask[], results: TaskResult[], feedback?: HumanFeedback): Promise<JudgeScore[]> {
     const scores: JudgeScore[] = [];
     for (let i = 0; i < tasks.length; i++) {
       console.log(`Judging task ${tasks[i].id}...`);
-      const score = await this.judgeResult(tasks[i], results[i]);
+      const taskFeedback = getFeedbackForTask(feedback, tasks[i].id);
+      const score = await this.judgeResult(tasks[i], results[i], taskFeedback);
       scores.push(score);
     }
     return scores;

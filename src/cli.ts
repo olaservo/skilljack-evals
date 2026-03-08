@@ -48,6 +48,8 @@ program
   .option('--no-judge', 'Skip LLM judge scoring (deterministic only)')
   .option('--no-deterministic', 'Skip deterministic scoring (LLM judge only)')
   .option('--runs <number>', 'Number of times to run each task (default: 3)')
+  .option('--generate-feedback <path>', 'Generate feedback template JSON with task IDs after run')
+  .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
   .option('--github-summary', 'Write GitHub Actions step summary')
   .option('--verbose', 'Enable verbose output')
   .action(async (tasksFile: string, options: {
@@ -65,6 +67,8 @@ program
     judge?: boolean;
     deterministic?: boolean;
     runs?: string;
+    generateFeedback?: string;
+    feedback?: string;
     githubSummary?: boolean;
     verbose?: boolean;
   }) => {
@@ -94,6 +98,8 @@ program
         noJudge: options.judge === false,
         noDeterministic: options.deterministic === false,
         numRuns: options.runs ? parseInt(options.runs, 10) : undefined,
+        generateFeedbackPath: options.generateFeedback,
+        feedbackPath: options.feedback,
         verbose: options.verbose,
       });
 
@@ -118,11 +124,13 @@ program
   .option('--config <path>', 'Path to eval.config.yaml')
   .option('--no-judge', 'Skip LLM judge')
   .option('--no-deterministic', 'Skip deterministic checks')
+  .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
   .action(async (resultsFile: string, options: {
     judgeModel?: string;
     config?: string;
     judge?: boolean;
     deterministic?: boolean;
+    feedback?: string;
   }) => {
     try {
       const configOverrides: Partial<EvalConfig> = {};
@@ -133,6 +141,7 @@ program
         configOverrides,
         noJudge: options.judge === false,
         noDeterministic: options.deterministic === false,
+        feedbackPath: options.feedback,
       });
 
       if (!result.passed) {
@@ -174,18 +183,17 @@ program
       const results = data.tasks.map((t) => t.result);
       const scores = data.tasks.map((t) => t.score);
 
-      const report = await generateReport(
-        evaluation, results, scores, options.output, data.metadata
-      );
+      const reportOpts = {
+        evaluation, results, scores, metadata: data.metadata,
+      };
+      const report = await generateReport({ ...reportOpts, outputPath: options.output });
 
       if (!options.output) {
         console.log(report);
       }
 
       if (options.json) {
-        await generateJsonResults(
-          evaluation, results, scores, options.json, data.metadata
-        );
+        await generateJsonResults({ ...reportOpts, outputPath: options.json });
       }
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);

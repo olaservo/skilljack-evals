@@ -12,11 +12,13 @@ import type {
   DeterministicResult,
   JudgeScore,
   FailureCategory,
+  HumanFeedback,
 } from '../types.js';
 import { scoreDeterministic } from './deterministic.js';
 import { SkillJudge } from './judge.js';
 import type { JudgeOptions } from '../types.js';
 import { loadConfigSync, getDefaultWeights } from '../config.js';
+import { getFeedbackForTask } from '../feedback.js';
 
 export interface ScorerOptions {
   /** Skip deterministic scoring */
@@ -25,6 +27,8 @@ export interface ScorerOptions {
   noJudge?: boolean;
   /** Judge options */
   judgeOptions?: JudgeOptions;
+  /** Human review feedback keyed by task ID */
+  humanFeedback?: HumanFeedback;
 }
 
 /**
@@ -48,7 +52,8 @@ export async function scoreTask(
   let judgeResult: JudgeScore | null = null;
   if (!options.noJudge && task.criteria.length > 0) {
     const judge = new SkillJudge(options.judgeOptions);
-    judgeResult = await judge.judgeResult(task, result);
+    const taskFeedback = getFeedbackForTask(options.humanFeedback, task.id);
+    judgeResult = await judge.judgeResult(task, result, taskFeedback);
   }
 
   const isNegativeTest = task.expectedSkillLoad === 'none';
