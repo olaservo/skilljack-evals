@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'fs/promises';
+import { formatDelta, formatCategory } from '../utils/format.js';
 import type {
   EvaluationReport,
   EvaluationSummary,
@@ -109,6 +110,22 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   lines.push('</details>');
   lines.push('');
 
+  // Comparison section
+  if (report.comparison) {
+    const d = report.comparison.summary.delta;
+    const ws = report.comparison.summary.withSkill;
+    const bs = report.comparison.summary.withoutSkill;
+    lines.push(`### Skill Impact (vs ${report.comparison.summary.baselineLabel})`);
+    lines.push('');
+    lines.push('| Metric | With Skill | Baseline | Delta |');
+    lines.push('|--------|-----------|----------|-------|');
+    lines.push(`| Discovery | ${(ws.discoveryAccuracy * 100).toFixed(0)}% | ${(bs.discoveryAccuracy * 100).toFixed(0)}% | **${formatDelta(d.discoveryAccuracyDelta * 100, 0)}%** |`);
+    lines.push(`| Adherence | ${ws.avgAdherence.toFixed(1)}/5 | ${bs.avgAdherence.toFixed(1)}/5 | **${formatDelta(d.avgAdherenceDelta)}** |`);
+    lines.push(`| Output Quality | ${ws.avgOutputQuality.toFixed(1)}/5 | ${bs.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
+    lines.push(`| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
+    lines.push('');
+  }
+
   if (!report.passed && report.failureReasons.length > 0) {
     lines.push(`**Failure reasons:** ${report.failureReasons.join('; ')}`);
   }
@@ -128,10 +145,4 @@ export async function writeGitHubSummary(report: EvaluationReport): Promise<bool
   return true;
 }
 
-function formatCategory(cat: string): string {
-  if (cat === 'none') return 'No Failure';
-  return cat
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
+

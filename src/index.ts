@@ -32,6 +32,10 @@ export type {
   ReportMetadata,
   EvaluationReport,
   HumanFeedback,
+  TaskComparisonDelta,
+  TaskComparison,
+  ComparisonSummary,
+  ComparisonData,
 } from './types.js';
 
 // Config

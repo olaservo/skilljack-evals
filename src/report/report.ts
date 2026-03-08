@@ -6,6 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { formatDelta, formatCategory } from '../utils/format.js';
 import type {
   SkillEvaluation,
   TaskResult,
@@ -16,6 +17,7 @@ import type {
   FailureCategory,
   ReportMetadata,
   HumanFeedback,
+  ComparisonData,
 } from '../types.js';
 import { loadConfigSync } from '../config.js';
 import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
@@ -31,11 +33,22 @@ export interface ReportOptions {
   humanFeedback?: HumanFeedback;
 }
 
+export interface ReportOptions {
+  evaluation: SkillEvaluation;
+  results: TaskResult[];
+  scores: CombinedScore[];
+  outputPath?: string;
+  metadata?: ReportMetadata;
+  numRuns?: number;
+  runDetails?: Array<{ result: TaskResult; score: CombinedScore }>[];
+  comparison?: ComparisonData;
+}
+
 /**
  * Generate a markdown report from evaluation results.
  */
 export async function generateReport(options: ReportOptions): Promise<string> {
-  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback } = options;
+  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison } = options;
   const numRuns = options.numRuns ?? 1;
   const config = loadConfigSync();
   const totalTasks = evaluation.tasks.length;
@@ -62,12 +75,15 @@ export async function generateReport(options: ReportOptions): Promise<string> {
 
   // Build report
   const runsLine = numRuns > 1 ? `**Runs per Task:** ${numRuns}\n` : '';
+  const compareLine = comparison
+    ? `**Mode:** Comparison (vs ${comparison.summary.baselineLabel})\n`
+    : '';
 
   let report = `# Skill Evaluation Report: ${evaluation.skillName}
 
 **Generated:** ${new Date().toISOString()}
 **Total Tasks:** ${totalTasks}
-${runsLine}**Result:** ${passed ? 'PASS' : 'FAIL'}
+${runsLine}${compareLine}**Result:** ${passed ? 'PASS' : 'FAIL'}
 ${metaSection}
 ---
 
@@ -111,13 +127,13 @@ ${metaSection}
       const sanitizedId = taskId.replace(/\|/g, '\\|');
       report += `| ${sanitizedId} | ${truncated} | ${addressed} |\n`;
     }
-
-    report += `\n---\n\n`;
-  } else {
-    report += `\n---\n\n`;
   }
 
-  report += `## Task Details\n\n`;
+  if (comparison) {
+    report += generateComparisonSection(comparison);
+  }
+
+  report += `\n---\n\n## Task Details\n\n`;
 
   for (let i = 0; i < evaluation.tasks.length; i++) {
     const task = evaluation.tasks[i];
@@ -225,7 +241,7 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
  * Generate JSON report for programmatic analysis.
  */
 export async function generateJsonResults(options: ReportOptions): Promise<EvaluationReport> {
-  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback } = options;
+  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison } = options;
   const numRuns = options.numRuns ?? 1;
   const config = loadConfigSync();
   const summary = computeSummary(results, scores, numRuns);
@@ -277,6 +293,7 @@ export async function generateJsonResults(options: ReportOptions): Promise<Evalu
     humanFeedback: humanFeedback && Object.keys(humanFeedback).length > 0
       ? humanFeedback
       : undefined,
+    comparison,
   };
 
   if (outputPath) {
@@ -363,10 +380,70 @@ export function computeFailureBreakdown(scores: CombinedScore[]): FailureBreakdo
     .sort((a, b) => b.count - a.count);
 }
 
-function formatCategory(cat: string): string {
-  if (cat === 'none') return 'No Failure';
-  return cat
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
+
+/**
+ * Generate the comparison section for the markdown report.
+ */
+function generateComparisonSection(comparison: ComparisonData): string {
+  const { summary, tasks } = comparison;
+  const ws = summary.withSkill;
+  const bs = summary.withoutSkill;
+  const d = summary.delta;
+
+  let section = `
+---
+
+## Skill Impact Analysis
+
+**Baseline:** ${summary.baselineLabel}
+
+| Metric | With Skill | Baseline | Delta | Impact |
+|--------|-----------|----------|-------|--------|
+| Discovery | ${(ws.discoveryAccuracy * 100).toFixed(0)}% | ${(bs.discoveryAccuracy * 100).toFixed(0)}% | ${formatDelta(d.discoveryAccuracyDelta * 100, 0)}% | ${qualityImpact(d.discoveryAccuracyDelta)} |
+| Avg Adherence | ${ws.avgAdherence.toFixed(2)}/5 | ${bs.avgAdherence.toFixed(2)}/5 | ${formatDelta(d.avgAdherenceDelta)} | ${qualityImpact(d.avgAdherenceDelta)} |
+| Avg Output Quality | ${ws.avgOutputQuality.toFixed(2)}/5 | ${bs.avgOutputQuality.toFixed(2)}/5 | ${formatDelta(d.avgOutputQualityDelta)} | ${qualityImpact(d.avgOutputQualityDelta)} |
+| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | ${formatDelta(d.avgWeightedScoreDelta)} | ${qualityImpact(d.avgWeightedScoreDelta, WEIGHTED_SCORE_IMPACT_THRESHOLD)} |
+| Duration | ${(ws.totalDurationMs / 1000).toFixed(1)}s | ${(bs.totalDurationMs / 1000).toFixed(1)}s | ${formatDelta(d.totalDurationDeltaMs / 1000, 1)}s | ${durationImpact(d.totalDurationDeltaMs)} |
+| Cost | $${ws.totalCostUsd.toFixed(4)} | $${bs.totalCostUsd.toFixed(4)} | $${formatDelta(d.totalCostDeltaUsd, 4)} | ${costImpact(d.totalCostDeltaUsd)} |
+
+### Per-Task Comparison
+
+| Task | Adherence (W / B / Delta) | Output (W / B / Delta) | Weighted (W / B / Delta) |
+|------|--------------------------|----------------------|------------------------|
+`;
+
+  for (const t of tasks) {
+    const w = t.withSkill.score;
+    const b = t.withoutSkill.score;
+    section += `| ${t.taskId} | ${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / ${formatDelta(t.delta.adherenceDelta, 1)} | ${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / ${formatDelta(t.delta.outputQualityDelta, 1)} | ${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / ${formatDelta(t.delta.weightedScoreDelta)} |\n`;
+  }
+
+  return section;
+}
+
+/** Minimum score delta to classify as positive/negative impact (on 1-5 scale, ~2.5% of range). */
+const QUALITY_IMPACT_THRESHOLD = 0.1;
+/** Minimum weighted score delta (on 0-1 scale, ~2% of range). */
+const WEIGHTED_SCORE_IMPACT_THRESHOLD = 0.02;
+/** Minimum duration delta (ms) to classify as slower/faster. */
+const DURATION_IMPACT_THRESHOLD_MS = 1000;
+/** Minimum cost delta (USD) to classify as higher/lower. */
+const COST_IMPACT_THRESHOLD_USD = 0.0001;
+
+function qualityImpact(delta: number, threshold = QUALITY_IMPACT_THRESHOLD): string {
+  if (delta > threshold) return 'Positive';
+  if (delta < -threshold) return 'Negative';
+  return 'Neutral';
+}
+
+function durationImpact(deltaMs: number): string {
+  if (deltaMs > DURATION_IMPACT_THRESHOLD_MS) return 'Slower';
+  if (deltaMs < -DURATION_IMPACT_THRESHOLD_MS) return 'Faster';
+  return 'Similar';
+}
+
+function costImpact(delta: number): string {
+  if (delta > COST_IMPACT_THRESHOLD_USD) return 'Higher';
+  if (delta < -COST_IMPACT_THRESHOLD_USD) return 'Lower';
+  return 'Similar';
 }
