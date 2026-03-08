@@ -89,7 +89,8 @@ export function generateGitHubSummary(report: EvaluationReport): string {
       for (const cr of results) {
         const safeItem = cr.item.replace(/\|/g, '\\|');
         const line = `- ${cr.passed ? 'PASS' : 'FAIL'}: ${safeItem}`;
-        lines.push(!cr.passed && cr.evidence?.trim() ? `${line} — ${cr.evidence.trim()}` : line);
+        const safeEvidence = cr.evidence?.trim().replace(/[|_*`]/g, '\\$&');
+        lines.push(!cr.passed && safeEvidence ? `${line} — ${safeEvidence}` : line);
       }
       lines.push('');
     }

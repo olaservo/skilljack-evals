@@ -181,13 +181,26 @@ export function parseJudgeResponseJson(
       adherence,
       outputQuality,
       weightedScore,
-      failureCategory: (data.failure_category || 'none') as FailureCategory,
+      failureCategory: isValidFailureCategory(data.failure_category) ? data.failure_category : 'agent_error',
       reasoning: data.reasoning || '',
       checklistResults,
     };
   } catch {
     return createErrorScore(taskId, 'Invalid JSON in judge response');
   }
+}
+
+const VALID_FAILURE_CATEGORIES: readonly FailureCategory[] = [
+  'discovery_failure',
+  'false_positive',
+  'instruction_ambiguity',
+  'missing_guidance',
+  'agent_error',
+  'none',
+];
+
+function isValidFailureCategory(value: unknown): value is FailureCategory {
+  return typeof value === 'string' && VALID_FAILURE_CATEGORIES.includes(value as FailureCategory);
 }
 
 function createErrorScore(taskId: string, reason: string): JudgeScore {

@@ -205,6 +205,16 @@ describe('parseJudgeResponseJson', () => {
     expect(score.reasoning).toContain('Invalid JSON');
   });
 
+  it('returns error score for single-quoted JSON with valid structure', () => {
+    const response = "{'discovery': 1, 'adherence': 5, 'output_quality': 4, 'failure_category': 'none', 'reasoning': 'Good'}";
+    const score = parseJudgeResponseJson(response, 'task-sq2', defaultWeights);
+
+    expect(score.failureCategory).toBe('agent_error');
+    expect(score.reasoning).toContain('Invalid JSON');
+    expect(score.discovery).toBe(0);
+    expect(score.weightedScore).toBe(0);
+  });
+
   it('computes weighted score correctly', () => {
     const response = JSON.stringify({
       discovery: 1,
@@ -220,6 +230,53 @@ describe('parseJudgeResponseJson', () => {
     // output=5: 0.3*((5-1)/4) = 0.3*1 = 0.3
     // total = 1.0
     expect(score.weightedScore).toBeCloseTo(1.0);
+  });
+
+  it('falls back to agent_error for unknown failure category', () => {
+    const response = JSON.stringify({
+      discovery: 1,
+      adherence: 3,
+      output_quality: 3,
+      failure_category: 'hallucinated_category',
+      reasoning: 'Some issue',
+    });
+    const score = parseJudgeResponseJson(response, 'task-fc', defaultWeights);
+
+    expect(score.failureCategory).toBe('agent_error');
+  });
+
+  it('accepts all valid failure categories', () => {
+    const categories = [
+      'discovery_failure',
+      'false_positive',
+      'instruction_ambiguity',
+      'missing_guidance',
+      'agent_error',
+      'none',
+    ];
+    for (const cat of categories) {
+      const response = JSON.stringify({
+        discovery: 1,
+        adherence: 5,
+        output_quality: 5,
+        failure_category: cat,
+        reasoning: 'test',
+      });
+      const score = parseJudgeResponseJson(response, `task-${cat}`, defaultWeights);
+      expect(score.failureCategory).toBe(cat);
+    }
+  });
+
+  it('falls back to agent_error when failure_category is missing', () => {
+    const response = JSON.stringify({
+      discovery: 1,
+      adherence: 3,
+      output_quality: 3,
+      reasoning: 'No category provided',
+    });
+    const score = parseJudgeResponseJson(response, 'task-nocat', defaultWeights);
+
+    expect(score.failureCategory).toBe('agent_error');
   });
 
   it('handles response wrapped in markdown code block', () => {
