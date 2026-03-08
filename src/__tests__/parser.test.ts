@@ -1,0 +1,80 @@
+import { describe, it, expect, afterEach } from 'vitest';
+import * as yaml from 'js-yaml';
+import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
+import { createEvalTemplate, validateEvalFile } from '../parser.js';
+
+describe('createEvalTemplate', () => {
+  const tmpFiles: string[] = [];
+
+  afterEach(async () => {
+    for (const f of tmpFiles) {
+      await fs.rm(f, { force: true }).catch(() => {});
+    }
+    tmpFiles.length = 0;
+  });
+
+  it('generates correct number of positive + 1 false-positive task', () => {
+    const template = createEvalTemplate('my-skill', 5);
+    const doc = yaml.load(template) as { tasks: { id: string; deterministic?: { expect_skill_activation: boolean } }[] };
+
+    const positive = doc.tasks.filter(t => t.deterministic?.expect_skill_activation !== false);
+    const fp = doc.tasks.filter(t => t.deterministic?.expect_skill_activation === false);
+
+    expect(positive).toHaveLength(4);
+    expect(fp).toHaveLength(1);
+    expect(doc.tasks).toHaveLength(5);
+  });
+
+  it('ensures at least 1 positive task when numTasks is 1', () => {
+    const template = createEvalTemplate('my-skill', 1);
+    const doc = yaml.load(template) as { tasks: { id: string; deterministic?: { expect_skill_activation: boolean } }[] };
+
+    const positive = doc.tasks.filter(t => t.deterministic?.expect_skill_activation !== false);
+    const fp = doc.tasks.filter(t => t.deterministic?.expect_skill_activation === false);
+
+    expect(positive).toHaveLength(1);
+    expect(fp).toHaveLength(1);
+    // Total is 2 because we always guarantee at least 1 positive + 1 FP
+    expect(doc.tasks).toHaveLength(2);
+  });
+
+  it('produces valid YAML that round-trips', () => {
+    const template = createEvalTemplate('test-skill', 3);
+    const doc = yaml.load(template) as Record<string, unknown>;
+
+    expect(doc).toBeDefined();
+    expect(doc.skill).toBe('test-skill');
+    expect(doc.version).toBe('1.0');
+    expect(Array.isArray(doc.tasks)).toBe(true);
+  });
+
+  it('has unique task IDs', () => {
+    const template = createEvalTemplate('my-skill', 10);
+    const doc = yaml.load(template) as { tasks: { id: string }[] };
+
+    const ids = doc.tasks.map(t => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('false-positive task has expected_skill_load: none', () => {
+    const template = createEvalTemplate('my-skill', 3);
+    const doc = yaml.load(template) as { tasks: { id: string; expected_skill_load?: string; deterministic?: { expect_skill_activation: boolean } }[] };
+
+    const fp = doc.tasks.find(t => t.deterministic?.expect_skill_activation === false);
+    expect(fp).toBeDefined();
+    expect(fp!.expected_skill_load).toBe('none');
+  });
+
+  it('passes validateEvalFile', async () => {
+    const template = createEvalTemplate('my-skill', 5);
+    const tmpFile = path.join(os.tmpdir(), `parser-test-${Date.now()}.yaml`);
+    tmpFiles.push(tmpFile);
+
+    await fs.writeFile(tmpFile, template);
+    const errors = await validateEvalFile(tmpFile);
+
+    expect(errors).toEqual([]);
+  });
+});

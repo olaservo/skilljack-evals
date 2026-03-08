@@ -284,13 +284,13 @@ export function createEvalTemplate(skillName: string, numTasks = 5): string {
 
   // False-positive task: skill should NOT activate for this prompt
   const fpTaskId = `${prefix}-fp-001`;
-  const fpTask = `  # False-positive test — include prompts that are similar but should NOT trigger the skill.
+  tasks.push(`  # False-positive test — include prompts that are similar but should NOT trigger the skill.
   # These catch over-eager activation and are just as important as positive tests.
   - id: ${fpTaskId}
     prompt: "TODO: Write a prompt that is related but should NOT trigger ${skillName}"
     expected_skill_load: none
     deterministic:
-      expect_skill_activation: false`;
+      expect_skill_activation: false`);
 
   return `# Eval tasks for ${skillName}
 # See "Writing Effective Evals" in the README for test design tips.
@@ -306,7 +306,5 @@ defaults:
 
 tasks:
 ${tasks.join('\n\n')}
-
-${fpTask}
 `;
 }

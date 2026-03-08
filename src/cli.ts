@@ -202,7 +202,7 @@ program
   .description('Create an evaluation template for a skill')
   .argument('<skill_name>', 'Name of the skill')
   .option('-o, --output <path>', 'Output path for template')
-  .option('-n, --num-tasks <number>', 'Number of placeholder tasks', '10')
+  .option('-n, --num-tasks <number>', 'Total number of tasks to generate (includes 1 false-positive)', '10')
   .action(async (skillName: string, options: {
     output?: string;
     numTasks: string;
@@ -215,7 +215,8 @@ program
     const template = createEvalTemplate(skillName, numTasks);
     await fs.writeFile(outputPath, template);
 
-    console.log(`Created evaluation template: ${outputPath}`);
+    const numPositive = Math.max(1, numTasks - 1);
+    console.log(`Created evaluation template: ${outputPath} (${numPositive} positive tasks + 1 false-positive)`);
     console.log();
     console.log('Next steps:');
     console.log(`1. Edit ${outputPath} to add real evaluation tasks`);
