@@ -170,7 +170,7 @@ ${score.stddev && (score.stddev.adherence > FLAKY_STDDEV_THRESHOLD || score.stdd
     // Show human feedback if present for this task
     if (humanFeedback && humanFeedback[task.id]) {
       report += `\n**Human Feedback:**\n> ${humanFeedback[task.id].replace(/\n/g, '\n> ')}\n`;
-      if (score.judge?.feedbackAddressed != null) {
+      if (score.judge?.feedbackAddressed !== undefined) {
         report += `**Feedback Addressed:** ${score.judge.feedbackAddressed ? 'Yes' : 'No'}\n`;
       }
     }

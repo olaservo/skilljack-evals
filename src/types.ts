@@ -123,7 +123,7 @@ export interface JudgeScore {
   failureCategory: FailureCategory;
   reasoning: string;
   checklistResults: ChecklistItemResult[];
-  feedbackAddressed?: boolean | null; // true = addressed, false = not, null/undefined = no feedback
+  feedbackAddressed?: boolean; // true = addressed, false = not, undefined = no feedback
 }
 
 export interface JudgeOptions {

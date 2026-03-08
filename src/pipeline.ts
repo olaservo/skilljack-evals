@@ -37,7 +37,12 @@ async function loadHumanFeedback(
   if (!feedbackPath) return undefined;
   const taskIds = new Set(tasks.map(t => t.id));
   const feedback = await loadFeedback(feedbackPath, taskIds);
-  console.log(`Loaded human feedback for ${Object.keys(feedback).length} task(s) from: ${feedbackPath}`);
+  const count = Object.keys(feedback).length;
+  if (count === 0) {
+    console.log(`Feedback file loaded from ${feedbackPath} but no non-empty entries found — skipping`);
+    return undefined;
+  }
+  console.log(`Loaded human feedback for ${count} task(s) from: ${feedbackPath}`);
   return feedback;
 }
 
@@ -108,6 +113,14 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
   // Load human feedback if provided
   const humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
+
+  // Generate feedback template early (only needs task IDs, available even if run fails)
+  let feedbackTemplatePath: string | undefined;
+  if (options.generateFeedbackPath) {
+    await writeFeedbackTemplate(evaluation.tasks, options.generateFeedbackPath);
+    feedbackTemplatePath = options.generateFeedbackPath;
+    console.log(`Feedback template written to: ${feedbackTemplatePath}`);
+  }
 
   console.log(`Running ${evaluation.tasks.length} task(s) for skill: ${evaluation.skillName}`);
 
@@ -199,14 +212,6 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
           }))
         );
       }
-    }
-
-    // Generate feedback template if requested
-    let feedbackTemplatePath: string | undefined;
-    if (options.generateFeedbackPath) {
-      await writeFeedbackTemplate(evaluation.tasks, options.generateFeedbackPath);
-      feedbackTemplatePath = options.generateFeedbackPath;
-      console.log(`Feedback template written to: ${feedbackTemplatePath}`);
     }
 
     // 5. Generate reports

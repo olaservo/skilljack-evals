@@ -184,9 +184,23 @@ program
       const results = data.tasks.map((t) => t.result);
       const scores = data.tasks.map((t) => t.score);
 
+      // Validate humanFeedback from loaded JSON (may have been hand-edited)
+      let humanFeedback = data.humanFeedback;
+      if (humanFeedback) {
+        for (const [key, value] of Object.entries(humanFeedback)) {
+          if (typeof value !== 'string') {
+            console.warn(`Warning: Invalid feedback value for task "${key}" in loaded JSON — ignoring`);
+            delete humanFeedback[key];
+          }
+        }
+        if (Object.keys(humanFeedback).length === 0) {
+          humanFeedback = undefined;
+        }
+      }
+
       const reportOpts = {
         evaluation, results, scores, metadata: data.metadata,
-        humanFeedback: data.humanFeedback,
+        humanFeedback,
       };
       const report = await generateReport({ ...reportOpts, outputPath: options.output });
 
@@ -309,6 +323,7 @@ program
   .option('--skill-loads <skills>', 'Comma-separated list of skills loaded', '')
   .option('--checklist <items>', 'Comma-separated golden checklist items', '')
   .option('--model <model>', 'Judge model (default: haiku)')
+  .option('--feedback <text>', 'Human review feedback text for this task')
   .option('-o, --output-file <path>', 'Output JSON file (default: stdout)')
   .action(async (options: {
     taskId: string;
@@ -318,6 +333,7 @@ program
     skillLoads: string;
     checklist: string;
     model?: string;
+    feedback?: string;
     outputFile?: string;
   }) => {
     const task: EvalTask = {
@@ -347,7 +363,7 @@ program
 
     const judge = new SkillJudge({ model: options.model });
     console.error(`Judging task ${options.taskId}...`);
-    const score = await judge.judgeResult(task, result);
+    const score = await judge.judgeResult(task, result, options.feedback);
 
     const json = JSON.stringify(score, null, 2);
     if (options.outputFile) {

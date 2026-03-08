@@ -186,7 +186,7 @@ export function parseJudgeResponseJson(
       failureCategory: isValidFailureCategory(data.failure_category) ? data.failure_category : 'agent_error',
       reasoning: data.reasoning || '',
       checklistResults,
-      feedbackAddressed: data.feedback_addressed ?? null,
+      feedbackAddressed: typeof data.feedback_addressed === 'boolean' ? data.feedback_addressed : undefined,
     };
   } catch {
     return createErrorScore(taskId, 'Invalid JSON in judge response');
