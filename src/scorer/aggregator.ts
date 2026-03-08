@@ -14,6 +14,12 @@ export const FLAKY_STDDEV_THRESHOLD = 1.0;
 /**
  * Compute sample standard deviation (N-1 denominator).
  * Returns 0 when fewer than 2 values are provided.
+ *
+ * @param values - Array of numeric values
+ * @param mean - Pre-computed arithmetic mean of `values`. If provided, it must
+ *               be the true mean of the given values; an incorrect value will
+ *               produce an incorrect result. When omitted, the mean is computed
+ *               internally.
  */
 export function computeStddev(values: number[], mean?: number): number {
   if (values.length < 2) return 0;

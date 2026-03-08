@@ -71,7 +71,7 @@ export function generateGitHubSummary(report: EvaluationReport): string {
       const varianceLabel = s.stddev
         ? (s.stddev.adherence > FLAKY_STDDEV_THRESHOLD || s.stddev.outputQuality > FLAKY_STDDEV_THRESHOLD ? ':warning: High' : 'Low')
         : 'N/A';
-      lines.push(`| ${t.task.id} | ${s.discovery.toFixed(1)} | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
+      lines.push(`| ${t.task.id} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
     } else {
       lines.push(`| ${t.task.id} | ${s.discovery} | ${s.adherence}/5 | ${s.outputQuality}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
     }
