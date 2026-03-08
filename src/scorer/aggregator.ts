@@ -7,12 +7,18 @@
 import type { TaskResult, CombinedScore, FailureCategory, ScoreStddev } from '../types.js';
 
 /**
+ * Stddev threshold (on the 1-5 scale) above which a task is flagged as "potentially flaky."
+ */
+export const FLAKY_STDDEV_THRESHOLD = 1.0;
+
+/**
  * Compute sample standard deviation (N-1 denominator).
  * Returns 0 when fewer than 2 values are provided.
  */
-export function computeStddev(values: number[], mean: number): number {
+export function computeStddev(values: number[], mean?: number): number {
   if (values.length < 2) return 0;
-  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1);
+  const m = mean ?? values.reduce((sum, v) => sum + v, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + (v - m) ** 2, 0) / (values.length - 1);
   return Math.sqrt(variance);
 }
 

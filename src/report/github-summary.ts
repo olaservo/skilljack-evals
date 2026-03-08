@@ -11,6 +11,7 @@ import type {
   FailureBreakdown,
   CombinedScore,
 } from '../types.js';
+import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
 
 /**
  * Generate a condensed summary for GitHub Actions.
@@ -64,9 +65,10 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   for (const t of tasks) {
     const s = t.score;
     const status = s.failureCategory === 'none' ? 'PASS' : 'FAIL';
-    if (isMultiRun && s.stddev) {
-      const isFlaky = s.stddev.adherence > 1.0 || s.stddev.outputQuality > 1.0;
-      const varianceLabel = isFlaky ? ':warning: High' : 'Low';
+    if (isMultiRun) {
+      const varianceLabel = s.stddev
+        ? (s.stddev.adherence > FLAKY_STDDEV_THRESHOLD || s.stddev.outputQuality > FLAKY_STDDEV_THRESHOLD ? ':warning: High' : 'Low')
+        : 'N/A';
       lines.push(`| ${t.task.id} | ${s.discovery.toFixed(1)} | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
     } else {
       lines.push(`| ${t.task.id} | ${s.discovery} | ${s.adherence}/5 | ${s.outputQuality}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);

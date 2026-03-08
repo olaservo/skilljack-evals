@@ -50,7 +50,7 @@ export { createToolPolicy } from './runner/security.js';
 export { scoreTask, scoreAll } from './scorer/scorer.js';
 export { scoreDeterministic } from './scorer/deterministic.js';
 export { SkillJudge } from './scorer/judge.js';
-export { aggregateResults, aggregateScores, computeStddev } from './scorer/aggregator.js';
+export { aggregateResults, aggregateScores, computeStddev, FLAKY_STDDEV_THRESHOLD } from './scorer/aggregator.js';
 
 // Session
 export { SessionLogger } from './session/session-logger.js';
