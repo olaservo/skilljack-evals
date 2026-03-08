@@ -128,6 +128,14 @@ export interface CombinedScore {
   weightedScore: number; // 0-1 normalized
   failureCategory: FailureCategory;
   reasoning: string;
+  stddev?: ScoreStddev; // Only populated when N >= 2
+}
+
+export interface ScoreStddev {
+  discovery: number;
+  adherence: number;
+  outputQuality: number;
+  weightedScore: number;
 }
 
 // ============================================
@@ -189,6 +197,7 @@ export interface EvaluationSummary {
   avgWeightedScore: number; // 0-1
   totalDurationMs: number;
   totalCostUsd: number;
+  stddev?: ScoreStddev; // Only populated when N >= 2
 }
 
 export interface FailureBreakdown {

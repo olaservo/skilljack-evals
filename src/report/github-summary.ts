@@ -28,9 +28,9 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   lines.push('| Metric | Value | Status |');
   lines.push('|--------|-------|--------|');
   lines.push(`| Discovery Rate | ${(summary.discoveryAccuracy * 100).toFixed(0)}% (${Math.round(summary.discoveryAccuracy * summary.totalTasks)}/${summary.totalTasks}) | ${summary.discoveryAccuracy >= 0.8 ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Avg Adherence | ${summary.avgAdherence.toFixed(1)}/5 | ${summary.avgAdherence >= 4.0 ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Avg Output Quality | ${summary.avgOutputQuality.toFixed(1)}/5 | ${summary.avgOutputQuality >= 4.0 ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Weighted Score | ${summary.avgWeightedScore.toFixed(2)} | |`);
+  lines.push(`| Avg Adherence | ${summary.avgAdherence.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.adherence.toFixed(1)}` : ''} | ${summary.avgAdherence >= 4.0 ? 'PASS' : 'FAIL'} |`);
+  lines.push(`| Avg Output Quality | ${summary.avgOutputQuality.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.outputQuality.toFixed(1)}` : ''} | ${summary.avgOutputQuality >= 4.0 ? 'PASS' : 'FAIL'} |`);
+  lines.push(`| Weighted Score | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | |`);
   lines.push(`| Duration | ${(summary.totalDurationMs / 1000).toFixed(1)}s | |`);
   lines.push(`| Cost | $${summary.totalCostUsd.toFixed(4)} | |`);
   lines.push('');
@@ -51,14 +51,26 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   }
 
   // Per-task details in collapsible
+  const isMultiRun = summary.numRuns > 1;
   lines.push('<details><summary>All task results</summary>');
   lines.push('');
-  lines.push('| Task | Discovery | Adherence | Output | Weighted | Status |');
-  lines.push('|------|-----------|-----------|--------|----------|--------|');
+  if (isMultiRun) {
+    lines.push('| Task | Discovery | Adherence | Output | Weighted | Variance | Status |');
+    lines.push('|------|-----------|-----------|--------|----------|----------|--------|');
+  } else {
+    lines.push('| Task | Discovery | Adherence | Output | Weighted | Status |');
+    lines.push('|------|-----------|-----------|--------|----------|--------|');
+  }
   for (const t of tasks) {
     const s = t.score;
     const status = s.failureCategory === 'none' ? 'PASS' : 'FAIL';
-    lines.push(`| ${t.task.id} | ${s.discovery} | ${s.adherence}/5 | ${s.outputQuality}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
+    if (isMultiRun && s.stddev) {
+      const isFlaky = s.stddev.adherence > 1.0 || s.stddev.outputQuality > 1.0;
+      const varianceLabel = isFlaky ? ':warning: High' : 'Low';
+      lines.push(`| ${t.task.id} | ${s.discovery.toFixed(1)} | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
+    } else {
+      lines.push(`| ${t.task.id} | ${s.discovery} | ${s.adherence}/5 | ${s.outputQuality}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
+    }
   }
   lines.push('');
   lines.push('</details>');

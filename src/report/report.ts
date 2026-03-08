@@ -17,6 +17,7 @@ import type {
   ReportMetadata,
 } from '../types.js';
 import { loadConfigSync } from '../config.js';
+import { computeStddev } from '../scorer/aggregator.js';
 
 /**
  * Generate a markdown report from evaluation results.
@@ -68,10 +69,10 @@ ${metaSection}
 
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
-| **Discovery Accuracy** | ${(summary.discoveryAccuracy * 100).toFixed(1)}% | ${(config.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? 'PASS' : 'FAIL'} |
-| **Avg Adherence Score** | ${summary.avgAdherence.toFixed(2)}/5.0 | ${config.scoreThreshold.toFixed(1)} | ${summary.avgAdherence >= config.scoreThreshold ? 'PASS' : 'FAIL'} |
-| **Avg Output Quality** | ${summary.avgOutputQuality.toFixed(2)}/5.0 | ${config.scoreThreshold.toFixed(1)} | ${summary.avgOutputQuality >= config.scoreThreshold ? 'PASS' : 'FAIL'} |
-| **Avg Weighted Score** | ${summary.avgWeightedScore.toFixed(2)} | | |
+| **Discovery Accuracy** | ${(summary.discoveryAccuracy * 100).toFixed(1)}%${summary.stddev ? ` \u00B1 ${(summary.stddev.discovery * 100).toFixed(1)}%` : ''} | ${(config.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? 'PASS' : 'FAIL'} |
+| **Avg Adherence Score** | ${summary.avgAdherence.toFixed(2)}/5.0${summary.stddev ? ` \u00B1 ${summary.stddev.adherence.toFixed(2)}` : ''} | ${config.scoreThreshold.toFixed(1)} | ${summary.avgAdherence >= config.scoreThreshold ? 'PASS' : 'FAIL'} |
+| **Avg Output Quality** | ${summary.avgOutputQuality.toFixed(2)}/5.0${summary.stddev ? ` \u00B1 ${summary.stddev.outputQuality.toFixed(2)}` : ''} | ${config.scoreThreshold.toFixed(1)} | ${summary.avgOutputQuality >= config.scoreThreshold ? 'PASS' : 'FAIL'} |
+| **Avg Weighted Score** | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | | |
 | **Total Duration** | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |
 | **Total Cost** | $${summary.totalCostUsd.toFixed(4)} | | |
 
@@ -108,11 +109,11 @@ ${metaSection}
 
 | Dimension | Score | Status |
 |-----------|-------|--------|
-| Discovery | ${Math.round(score.discovery)} | ${score.discovery >= 1 ? 'PASS' : 'FAIL'} |
-| Adherence | ${score.adherence}/5 | ${score.adherence >= 4 ? 'PASS' : 'FAIL'} |
-| Output Quality | ${score.outputQuality}/5 | ${score.outputQuality >= 4 ? 'PASS' : 'FAIL'} |
-| **Weighted** | **${score.weightedScore.toFixed(2)}** | |
-
+| Discovery | ${Math.round(score.discovery)}${score.stddev ? ` \u00B1 ${score.stddev.discovery.toFixed(2)}` : ''} | ${score.discovery >= 1 ? 'PASS' : 'FAIL'} |
+| Adherence | ${score.adherence.toFixed(1)}/5${score.stddev ? ` \u00B1 ${score.stddev.adherence.toFixed(1)}` : ''} | ${score.adherence >= 4 ? 'PASS' : 'FAIL'} |
+| Output Quality | ${score.outputQuality.toFixed(1)}/5${score.stddev ? ` \u00B1 ${score.stddev.outputQuality.toFixed(1)}` : ''} | ${score.outputQuality >= 4 ? 'PASS' : 'FAIL'} |
+| **Weighted** | **${score.weightedScore.toFixed(2)}${score.stddev ? ` \u00B1 ${score.stddev.weightedScore.toFixed(2)}` : ''}** | |
+${score.stddev && (score.stddev.adherence > 1.0 || score.stddev.outputQuality > 1.0) ? `\n> **Warning: Potentially Flaky** \u2014 High variance across runs (adherence \u03C3=${score.stddev.adherence.toFixed(2)}, output \u03C3=${score.stddev.outputQuality.toFixed(2)})\n` : ''}
 **Failure Category:** ${formatCategory(score.failureCategory)}
 `;
 
@@ -253,22 +254,38 @@ export function computeSummary(
     ? scores.reduce((sum, s) => sum + s.discovery, 0) / totalTasks
     : 0;
 
-  return {
+  const avgAdherence = totalTasks > 0
+    ? scores.reduce((sum, s) => sum + s.adherence, 0) / totalTasks
+    : 0;
+  const avgOutputQuality = totalTasks > 0
+    ? scores.reduce((sum, s) => sum + s.outputQuality, 0) / totalTasks
+    : 0;
+  const avgWeightedScore = totalTasks > 0
+    ? scores.reduce((sum, s) => sum + s.weightedScore, 0) / totalTasks
+    : 0;
+
+  const summary: EvaluationSummary = {
     totalTasks,
     numRuns,
     discoveryAccuracy: avgDiscovery,
-    avgAdherence: totalTasks > 0
-      ? scores.reduce((sum, s) => sum + s.adherence, 0) / totalTasks
-      : 0,
-    avgOutputQuality: totalTasks > 0
-      ? scores.reduce((sum, s) => sum + s.outputQuality, 0) / totalTasks
-      : 0,
-    avgWeightedScore: totalTasks > 0
-      ? scores.reduce((sum, s) => sum + s.weightedScore, 0) / totalTasks
-      : 0,
+    avgAdherence,
+    avgOutputQuality,
+    avgWeightedScore,
     totalDurationMs: results.reduce((sum, r) => sum + r.durationMs, 0),
     totalCostUsd: results.reduce((sum, r) => sum + r.costUsd, 0),
   };
+
+  // Compute summary-level stddev across per-task scores when multi-run
+  if (numRuns >= 2 && totalTasks >= 2) {
+    summary.stddev = {
+      discovery: computeStddev(scores.map(s => s.discovery), avgDiscovery),
+      adherence: computeStddev(scores.map(s => s.adherence), avgAdherence),
+      outputQuality: computeStddev(scores.map(s => s.outputQuality), avgOutputQuality),
+      weightedScore: computeStddev(scores.map(s => s.weightedScore), avgWeightedScore),
+    };
+  }
+
+  return summary;
 }
 
 /**

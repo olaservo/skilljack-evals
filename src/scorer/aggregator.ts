@@ -4,7 +4,17 @@
  * Merges N independent runs per task into single averaged results and scores.
  */
 
-import type { TaskResult, CombinedScore, FailureCategory } from '../types.js';
+import type { TaskResult, CombinedScore, FailureCategory, ScoreStddev } from '../types.js';
+
+/**
+ * Compute sample standard deviation (N-1 denominator).
+ * Returns 0 when fewer than 2 values are provided.
+ */
+export function computeStddev(values: number[], mean: number): number {
+  if (values.length < 2) return 0;
+  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1);
+  return Math.sqrt(variance);
+}
 
 /**
  * Aggregate multiple runs of TaskResult[] into a single TaskResult per task.
@@ -78,6 +88,14 @@ export function aggregateScores(allScores: CombinedScore[][]): CombinedScore[] {
     const avgOutput = scores.reduce((sum, s) => sum + s.outputQuality, 0) / numRuns;
     const avgWeighted = scores.reduce((sum, s) => sum + s.weightedScore, 0) / numRuns;
 
+    // Compute sample standard deviations
+    const stddev: ScoreStddev = {
+      discovery: computeStddev(scores.map(s => s.discovery), avgDiscovery),
+      adherence: computeStddev(scores.map(s => s.adherence), avgAdherence),
+      outputQuality: computeStddev(scores.map(s => s.outputQuality), avgOutput),
+      weightedScore: computeStddev(scores.map(s => s.weightedScore), avgWeighted),
+    };
+
     // Mode of failure categories
     const catCounts = new Map<FailureCategory, number>();
     for (const s of scores) {
@@ -104,6 +122,7 @@ export function aggregateScores(allScores: CombinedScore[][]): CombinedScore[] {
       weightedScore: avgWeighted,
       failureCategory: modeCategory,
       reasoning: `Aggregated over ${numRuns} runs: discovery ${discoveryCount}/${numRuns}, mean adherence ${avgAdherence.toFixed(1)}, mean output ${avgOutput.toFixed(1)}`,
+      stddev,
     });
   }
 
