@@ -108,7 +108,8 @@ ${metaSection}
       const truncated = sanitized.length > 80
         ? sanitized.slice(0, 77) + '...'
         : sanitized;
-      report += `| ${taskId} | ${truncated} | ${addressed} |\n`;
+      const sanitizedId = taskId.replace(/\|/g, '\\|');
+      report += `| ${sanitizedId} | ${truncated} | ${addressed} |\n`;
     }
 
     report += `\n---\n\n`;
