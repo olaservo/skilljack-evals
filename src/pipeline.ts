@@ -318,7 +318,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   }
 
   if (compareMode && !skillsDir) {
-    console.warn('Warning: --compare used but no skills directory found. Comparison will have no effect.');
+    console.warn('Warning: --compare used but no skills directory found. Falling back to normal mode (no comparison will be generated).');
   }
 
   const numRuns = options.numRuns ?? 3;
@@ -327,6 +327,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     noDeterministic: options.noDeterministic,
     noJudge: options.noJudge,
     judgeOptions: { model: config.defaultJudgeModel },
+    humanFeedback,
   };
 
   // 3. Run evaluation phase(s)
@@ -341,15 +342,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
         ? path.basename(options.compareSkillPath)
         : 'No Skill';
 
-    const logDir = path.join(config.outputDir, 'logs');
-    const scorerOptions: ScorerOptions = {
-      noDeterministic: options.noDeterministic,
-      noJudge: options.noJudge,
-      judgeOptions: { model: config.defaultJudgeModel },
-      humanFeedback,
-    };
-
-      console.log(`\nComparison mode: running each task with skill AND ${baselineLabel.toLowerCase()}`);
+      console.log(`\nComparison mode: running each task with skill AND "${baselineLabel}"`);
       console.log(`Total runs per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)\n`);
 
       // Phase 1: With Skill
@@ -369,7 +362,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
       // Phase 2: Baseline
       console.log(`\n=== Phase 2/2: ${baselineLabel} ===`);
-      const baseSkillsDir = options.compareSkillPath || undefined;
+      const baseSkillsDir = options.compareSkillPath;
       if (baseSkillsDir) {
         needsCleanup = await setupSkills(baseSkillsDir, config, cwd);
       }
@@ -552,6 +545,7 @@ function printComparisonSummary(comparison: ComparisonData): void {
   console.log('\n' + '-'.repeat(50));
   console.log(`  Skill Impact (vs ${comparison.summary.baselineLabel})`);
   console.log('-'.repeat(50));
+  console.log(`  Discovery Delta: ${formatDelta(d.discoveryAccuracyDelta * 100, 0)}%`);
   console.log(`  Adherence Delta: ${formatDelta(d.avgAdherenceDelta)}`);
   console.log(`  Output Quality Delta: ${formatDelta(d.avgOutputQualityDelta)}`);
   console.log(`  Weighted Score Delta: ${formatDelta(d.avgWeightedScoreDelta, 2)}`);

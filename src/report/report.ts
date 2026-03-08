@@ -75,12 +75,15 @@ export async function generateReport(options: ReportOptions): Promise<string> {
 
   // Build report
   const runsLine = numRuns > 1 ? `**Runs per Task:** ${numRuns}\n` : '';
+  const compareLine = comparison
+    ? `**Mode:** Comparison (vs ${comparison.summary.baselineLabel})\n`
+    : '';
 
   let report = `# Skill Evaluation Report: ${evaluation.skillName}
 
 **Generated:** ${new Date().toISOString()}
 **Total Tasks:** ${totalTasks}
-${runsLine}**Result:** ${passed ? 'PASS' : 'FAIL'}
+${runsLine}${compareLine}**Result:** ${passed ? 'PASS' : 'FAIL'}
 ${metaSection}
 ---
 
@@ -403,6 +406,7 @@ function generateComparisonSection(comparison: ComparisonData): string {
 
 | Metric | With Skill | Baseline | Delta | Impact |
 |--------|-----------|----------|-------|--------|
+| Discovery | ${(ws.discoveryAccuracy * 100).toFixed(0)}% | ${(bs.discoveryAccuracy * 100).toFixed(0)}% | ${formatDelta(d.discoveryAccuracyDelta * 100, 0)}% | |
 | Avg Adherence | ${ws.avgAdherence.toFixed(2)}/5 | ${bs.avgAdherence.toFixed(2)}/5 | ${formatDelta(d.avgAdherenceDelta)} | ${qualityImpact(d.avgAdherenceDelta)} |
 | Avg Output Quality | ${ws.avgOutputQuality.toFixed(2)}/5 | ${bs.avgOutputQuality.toFixed(2)}/5 | ${formatDelta(d.avgOutputQualityDelta)} | ${qualityImpact(d.avgOutputQualityDelta)} |
 | Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | ${formatDelta(d.avgWeightedScoreDelta)} | ${qualityImpact(d.avgWeightedScoreDelta)} |
@@ -424,20 +428,27 @@ function generateComparisonSection(comparison: ComparisonData): string {
   return section;
 }
 
+/** Minimum score delta to classify as positive/negative impact (on 0-5 scale). */
+const QUALITY_IMPACT_THRESHOLD = 0.1;
+/** Minimum duration delta (ms) to classify as slower/faster. */
+const DURATION_IMPACT_THRESHOLD_MS = 1000;
+/** Minimum cost delta (USD) to classify as higher/lower. */
+const COST_IMPACT_THRESHOLD_USD = 0.0001;
+
 function qualityImpact(delta: number): string {
-  if (delta > 0.1) return 'Positive';
-  if (delta < -0.1) return 'Negative';
+  if (delta > QUALITY_IMPACT_THRESHOLD) return 'Positive';
+  if (delta < -QUALITY_IMPACT_THRESHOLD) return 'Negative';
   return 'Neutral';
 }
 
 function durationImpact(deltaMs: number): string {
-  if (deltaMs > 1000) return 'Slower';
-  if (deltaMs < -1000) return 'Faster';
+  if (deltaMs > DURATION_IMPACT_THRESHOLD_MS) return 'Slower';
+  if (deltaMs < -DURATION_IMPACT_THRESHOLD_MS) return 'Faster';
   return 'Similar';
 }
 
 function costImpact(delta: number): string {
-  if (delta > 0.0001) return 'Higher';
-  if (delta < -0.0001) return 'Lower';
+  if (delta > COST_IMPACT_THRESHOLD_USD) return 'Higher';
+  if (delta < -COST_IMPACT_THRESHOLD_USD) return 'Lower';
   return 'Similar';
 }
