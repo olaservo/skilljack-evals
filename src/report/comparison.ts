@@ -121,11 +121,12 @@ export function compareResults(
       weightedScore: score.weightedScore,
     };
 
+    const round3 = (v: number) => Math.round(v * 1000) / 1000;
     const delta: ScoreSnapshot = {
-      discovery: current.discovery - prev.discovery,
-      adherence: current.adherence - prev.adherence,
-      outputQuality: current.outputQuality - prev.outputQuality,
-      weightedScore: current.weightedScore - prev.weightedScore,
+      discovery: round3(current.discovery - prev.discovery),
+      adherence: round3(current.adherence - prev.adherence),
+      outputQuality: round3(current.outputQuality - prev.outputQuality),
+      weightedScore: round3(current.weightedScore - prev.weightedScore),
     };
 
     const roundedWeighted = Math.round(delta.weightedScore * 1000) / 1000;
@@ -180,10 +181,10 @@ export function compareResults(
     previous: prevSummary,
     current: currSummary,
     delta: {
-      discoveryAccuracy: currSummary.discoveryAccuracy - prevSummary.discoveryAccuracy,
-      avgAdherence: currSummary.avgAdherence - prevSummary.avgAdherence,
-      avgOutputQuality: currSummary.avgOutputQuality - prevSummary.avgOutputQuality,
-      avgWeightedScore: currSummary.avgWeightedScore - prevSummary.avgWeightedScore,
+      discoveryAccuracy: Math.round((currSummary.discoveryAccuracy - prevSummary.discoveryAccuracy) * 1000) / 1000,
+      avgAdherence: Math.round((currSummary.avgAdherence - prevSummary.avgAdherence) * 1000) / 1000,
+      avgOutputQuality: Math.round((currSummary.avgOutputQuality - prevSummary.avgOutputQuality) * 1000) / 1000,
+      avgWeightedScore: Math.round((currSummary.avgWeightedScore - prevSummary.avgWeightedScore) * 1000) / 1000,
     },
   };
 
@@ -317,7 +318,7 @@ function summaryRow(label: string, prev: string, curr: string, delta: string, va
 function formatTransition(prev: number, curr: number): string {
   const delta = curr - prev;
   const sign = delta > 0 ? '+' : '';
-  const fmt = (v: number) => Number.isInteger(v) ? String(v) : v.toFixed(2);
+  const fmt = (v: number) => v.toFixed(1);
   return `${fmt(prev)} → ${fmt(curr)} (${sign}${fmt(delta)})`;
 }
 

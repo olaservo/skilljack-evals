@@ -293,6 +293,14 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
   console.log(`Running ${evaluation.tasks.length} task(s) for skill: ${evaluation.skillName}`);
 
+  // 1b. Validate comparison file early (before expensive pipeline run)
+  let previousReport: Awaited<ReturnType<typeof loadPreviousReport>> | undefined;
+  if (options.compareResultsPath) {
+    console.log(`Validating comparison file: ${options.compareResultsPath}`);
+    previousReport = await loadPreviousReport(options.compareResultsPath);
+    console.log('Comparison file validated successfully');
+  }
+
   // 2. Detect skills directory
   let skillsDir = options.skillsDir;
   if (!skillsDir) {
@@ -396,9 +404,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     }
 
     // Compare with previous results if requested (cross-iteration comparison)
-    if (options.compareResultsPath) {
+    if (previousReport) {
       console.log('\n--- Comparing with Previous Results ---\n');
-      const previousReport = await loadPreviousReport(options.compareResultsPath);
       if (previousReport.skillName !== evaluation.skillName) {
         console.warn(`Warning: Skill name mismatch — current: "${evaluation.skillName}", previous: "${previousReport.skillName}"`);
       }
