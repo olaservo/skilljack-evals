@@ -509,7 +509,7 @@ export function parseBlindJudgeResponse(
 }
 
 /** Minimum weighted score delta to classify bias signal. */
-const BLIND_BIAS_THRESHOLD = 0.02;
+export const BLIND_BIAS_THRESHOLD = 0.02;
 
 /**
  * Run blind comparison for all tasks in a comparison set.

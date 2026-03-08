@@ -63,7 +63,7 @@ export { createToolPolicy } from './runner/security.js';
 // Scorer
 export { scoreTask, scoreAll } from './scorer/scorer.js';
 export { scoreDeterministic } from './scorer/deterministic.js';
-export { SkillJudge, parseBlindJudgeResponse, blindCompareAll } from './scorer/judge.js';
+export { SkillJudge, parseBlindJudgeResponse, blindCompareAll, BLIND_BIAS_THRESHOLD } from './scorer/judge.js';
 export { aggregateResults, aggregateScores, computeStddev, FLAKY_STDDEV_THRESHOLD } from './scorer/aggregator.js';
 
 // Session
@@ -74,7 +74,7 @@ export { generateReport, generateJsonResults, computeSummary, computeFailureBrea
 export type { ReportOptions } from './report/report.js';
 export { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
 export { loadPreviousReport, compareResults, formatComparisonMarkdown, formatComparisonConsole } from './report/comparison.js';
-export { formatDelta, formatCategory } from './utils/format.js';
+export { formatDelta, formatCategory, pct } from './utils/format.js';
 
 // Feedback
 export { generateFeedbackTemplate, writeFeedbackTemplate, loadFeedback, validateFeedback, getFeedbackForTask } from './feedback.js';

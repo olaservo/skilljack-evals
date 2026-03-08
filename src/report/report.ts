@@ -468,6 +468,7 @@ function generateBlindComparisonSection(blind: BlindComparisonData): string {
 ## Blind A/B Comparison
 
 The judge evaluated both outputs without knowing which used the skill.
+Assignment shows the label order: with-skill / without-skill (e.g. A/B means A = with-skill, B = without-skill).
 
 | Preference | Count | Percentage |
 |------------|-------|------------|
