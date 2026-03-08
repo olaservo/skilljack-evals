@@ -111,7 +111,7 @@ export interface JudgeScore {
   weightedScore: number; // 0-1 (normalized)
   failureCategory: FailureCategory;
   reasoning: string;
-  checklistResults?: ChecklistItemResult[];
+  checklistResults: ChecklistItemResult[];
 }
 
 export interface JudgeOptions {

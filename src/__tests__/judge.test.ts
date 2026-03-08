@@ -106,12 +106,12 @@ describe('parseJudgeResponseJson', () => {
     expect(score.failureCategory).toBe('none');
     expect(score.reasoning).toBe('Agent performed well');
     expect(score.checklistResults).toHaveLength(2);
-    expect(score.checklistResults![0]).toEqual({
+    expect(score.checklistResults[0]).toEqual({
       item: 'Used correct format',
       passed: true,
       evidence: 'Output matches expected format',
     });
-    expect(score.checklistResults![1]).toEqual({
+    expect(score.checklistResults[1]).toEqual({
       item: 'Included header',
       passed: false,
       evidence: 'Header was missing',
@@ -152,9 +152,9 @@ describe('parseJudgeResponseJson', () => {
     const score = parseJudgeResponseJson(response, 'task-3', defaultWeights);
 
     expect(score.checklistResults).toHaveLength(2);
-    expect(score.checklistResults![0].item).toBe('Valid item');
-    expect(score.checklistResults![1].item).toBe('Also valid');
-    expect(score.checklistResults![1].passed).toBe(false);
+    expect(score.checklistResults[0].item).toBe('Valid item');
+    expect(score.checklistResults[1].item).toBe('Also valid');
+    expect(score.checklistResults[1].passed).toBe(false);
   });
 
   it('coerces non-standard types in checklist results', () => {
@@ -172,12 +172,12 @@ describe('parseJudgeResponseJson', () => {
     const score = parseJudgeResponseJson(response, 'task-4', defaultWeights);
 
     expect(score.checklistResults).toHaveLength(2);
-    expect(score.checklistResults![0].item).toBe('123');
-    expect(score.checklistResults![0].passed).toBe(true);
-    expect(score.checklistResults![0].evidence).toBe('coerced');
-    expect(score.checklistResults![1].item).toBe('text');
-    expect(score.checklistResults![1].passed).toBe(false);
-    expect(score.checklistResults![1].evidence).toBeUndefined();
+    expect(score.checklistResults[0].item).toBe('123');
+    expect(score.checklistResults[0].passed).toBe(true);
+    expect(score.checklistResults[0].evidence).toBe('coerced');
+    expect(score.checklistResults[1].item).toBe('text');
+    expect(score.checklistResults[1].passed).toBe(false);
+    expect(score.checklistResults[1].evidence).toBeUndefined();
   });
 
   it('returns error score for unparseable response', () => {
