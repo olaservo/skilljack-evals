@@ -78,12 +78,12 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   }
   // Per-task checklist summaries
   const tasksWithChecklist = tasks.filter(
-    (t) => t.score.checklistResults.length > 0
+    (t) => (t.score.checklistResults ?? []).length > 0
   );
   if (tasksWithChecklist.length > 0) {
     lines.push('');
     for (const t of tasksWithChecklist) {
-      const results = t.score.checklistResults;
+      const results = t.score.checklistResults ?? [];
       const passed = results.filter((cr) => cr.passed).length;
       lines.push(`**${t.task.id} checklist:** ${passed}/${results.length}`);
       for (const cr of results) {
