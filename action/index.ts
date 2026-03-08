@@ -36,6 +36,7 @@ async function run(): Promise<void> {
     const feedbackPath = core.getInput('feedback') || undefined;
     const compare = core.getInput('compare') === 'true';
     const compareSkillPath = core.getInput('compare-skill') || undefined;
+    const compareResultsPath = core.getInput('compare-results') || undefined;
 
     // Handle API keys
     const anthropicKey = core.getInput('anthropic-api-key') || process.env.ANTHROPIC_API_KEY;
@@ -88,6 +89,7 @@ async function run(): Promise<void> {
       feedbackPath,
       compare: compare || !!compareSkillPath,
       compareSkillPath,
+      compareResultsPath,
     });
 
     // Set outputs
@@ -98,11 +100,17 @@ async function run(): Promise<void> {
     core.setOutput('json-path', result.jsonPath || '');
     core.setOutput('feedback-template-path', result.feedbackTemplatePath || '');
 
-    // Set comparison outputs
+    // Set comparison outputs (--compare mode)
     if (result.comparison) {
       core.setOutput('adherence-delta', String(result.comparison.summary.delta.avgAdherenceDelta));
       core.setOutput('output-delta', String(result.comparison.summary.delta.avgOutputQualityDelta));
       core.setOutput('score-delta', String(result.comparison.summary.delta.avgWeightedScoreDelta));
+    }
+
+    // Set cross-iteration comparison outputs (--compare-results mode)
+    if (result.crossIterationComparison) {
+      const hasRegressions = result.crossIterationComparison.taskDeltas.some((t) => t.significantChange === 'regressed');
+      core.setOutput('has-regressions', String(hasRegressions));
     }
 
     // Write job summary

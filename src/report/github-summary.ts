@@ -60,6 +60,32 @@ export function generateGitHubSummary(report: EvaluationReport): string {
     lines.push('');
   }
 
+  // Cross-iteration comparison section
+  if (report.crossIterationComparison) {
+    const c = report.crossIterationComparison;
+    const sd = c.summaryDelta.delta;
+    const arrow = (v: number) => v > 0.001 ? ':arrow_up:' : v < -0.001 ? ':arrow_down:' : '';
+    lines.push('### Comparison vs. Previous');
+    lines.push('');
+    lines.push('| Metric | Delta | |');
+    lines.push('|--------|-------|-|');
+    lines.push(`| Discovery | ${formatDelta(sd.discoveryAccuracy * 100)}% | ${arrow(sd.discoveryAccuracy)} |`);
+    lines.push(`| Adherence | ${formatDelta(sd.avgAdherence)} | ${arrow(sd.avgAdherence)} |`);
+    lines.push(`| Output Quality | ${formatDelta(sd.avgOutputQuality)} | ${arrow(sd.avgOutputQuality)} |`);
+    lines.push(`| Weighted Score | ${formatDelta(sd.avgWeightedScore)} | ${arrow(sd.avgWeightedScore)} |`);
+    lines.push('');
+
+    const regressions = c.taskDeltas.filter((t) => t.significantChange === 'regressed');
+    const improvements = c.taskDeltas.filter((t) => t.significantChange === 'improved');
+    if (regressions.length > 0) {
+      lines.push(`:warning: **${regressions.length} task(s) regressed:** ${regressions.map((t) => t.taskId).join(', ')}`);
+    }
+    if (improvements.length > 0) {
+      lines.push(`:sparkles: **${improvements.length} task(s) improved:** ${improvements.map((t) => t.taskId).join(', ')}`);
+    }
+    lines.push('');
+  }
+
   // Per-task details in collapsible
   const isMultiRun = summary.numRuns > 1;
   lines.push('<details><summary>All task results</summary>');
@@ -144,5 +170,4 @@ export async function writeGitHubSummary(report: EvaluationReport): Promise<bool
   await fs.appendFile(summaryPath, summary + '\n');
   return true;
 }
-
 

@@ -52,6 +52,7 @@ program
   .option('--generate-feedback <path>', 'Generate feedback template JSON with task IDs after run')
   .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
   .option('--github-summary', 'Write GitHub Actions step summary')
+  .option('--compare-results <path>', 'Path to previous JSON results for comparison')
   .option('--verbose', 'Enable verbose output')
   .option('--compare', 'Run with and without skill to measure skill impact')
   .option('--compare-skill <path>', 'Path to baseline skill directory (e.g., previous version) for A/B comparison')
@@ -73,6 +74,7 @@ program
     generateFeedback?: string;
     feedback?: string;
     githubSummary?: boolean;
+    compareResults?: string;
     verbose?: boolean;
     compare?: boolean;
     compareSkill?: string;
@@ -105,6 +107,7 @@ program
         numRuns: options.runs ? parseInt(options.runs, 10) : undefined,
         generateFeedbackPath: options.generateFeedback,
         feedbackPath: options.feedback,
+        compareResultsPath: options.compareResults,
         verbose: options.verbose,
         compare: options.compare || !!options.compareSkill,
         compareSkillPath: options.compareSkill,

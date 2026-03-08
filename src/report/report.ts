@@ -11,6 +11,7 @@ import type {
   SkillEvaluation,
   TaskResult,
   CombinedScore,
+  ComparisonResult,
   EvaluationReport,
   EvaluationSummary,
   FailureBreakdown,
@@ -21,6 +22,7 @@ import type {
 } from '../types.js';
 import { loadConfigSync } from '../config.js';
 import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
+import { formatComparisonMarkdown } from './comparison.js';
 
 export interface ReportOptions {
   evaluation: SkillEvaluation;
@@ -31,24 +33,15 @@ export interface ReportOptions {
   numRuns?: number;
   runDetails?: Array<{ result: TaskResult; score: CombinedScore }>[];
   humanFeedback?: HumanFeedback;
-}
-
-export interface ReportOptions {
-  evaluation: SkillEvaluation;
-  results: TaskResult[];
-  scores: CombinedScore[];
-  outputPath?: string;
-  metadata?: ReportMetadata;
-  numRuns?: number;
-  runDetails?: Array<{ result: TaskResult; score: CombinedScore }>[];
   comparison?: ComparisonData;
+  crossIterationComparison?: ComparisonResult;
 }
 
 /**
  * Generate a markdown report from evaluation results.
  */
 export async function generateReport(options: ReportOptions): Promise<string> {
-  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison } = options;
+  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, crossIterationComparison } = options;
   const numRuns = options.numRuns ?? 1;
   const config = loadConfigSync();
   const totalTasks = evaluation.tasks.length;
@@ -131,6 +124,11 @@ ${metaSection}
 
   if (comparison) {
     report += generateComparisonSection(comparison);
+  }
+
+  if (crossIterationComparison) {
+    report += '\n---\n\n';
+    report += formatComparisonMarkdown(crossIterationComparison);
   }
 
   report += `\n---\n\n## Task Details\n\n`;
@@ -241,7 +239,7 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
  * Generate JSON report for programmatic analysis.
  */
 export async function generateJsonResults(options: ReportOptions): Promise<EvaluationReport> {
-  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison } = options;
+  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, crossIterationComparison } = options;
   const numRuns = options.numRuns ?? 1;
   const config = loadConfigSync();
   const summary = computeSummary(results, scores, numRuns);
@@ -294,6 +292,7 @@ export async function generateJsonResults(options: ReportOptions): Promise<Evalu
       ? humanFeedback
       : undefined,
     comparison,
+    crossIterationComparison,
   };
 
   if (outputPath) {

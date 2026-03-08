@@ -20,10 +20,12 @@ import { generateReport, generateJsonResults, computeSummary } from './report/re
 import { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
 import { loadConfig, type EvalConfig } from './config.js';
 import { aggregateResults, aggregateScores } from './scorer/aggregator.js';
+import { loadPreviousReport, compareResults, formatComparisonConsole } from './report/comparison.js';
 import type {
   SkillEvaluation,
   TaskResult,
   CombinedScore,
+  ComparisonResult,
   EvaluationReport,
   EvaluationSummary,
   ReportMetadata,
@@ -73,6 +75,8 @@ export interface PipelineOptions {
   noJudge?: boolean;
   /** Number of times to run each task (default: 3) */
   numRuns?: number;
+  /** Path to previous JSON results for comparison */
+  compareResultsPath?: string;
   /** Enable verbose logging */
   verbose?: boolean;
   /** Path to write feedback template JSON after run */
@@ -97,6 +101,7 @@ export interface PipelineResult {
   markdownSummary: string;
   feedbackTemplatePath?: string;
   comparison?: ComparisonData;
+  crossIterationComparison?: ComparisonResult;
 }
 
 /** Internal result from a single evaluation phase. */
@@ -335,6 +340,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   // 3. Run evaluation phase(s)
   let primaryPhase: PhaseResult;
   let comparison: ComparisonData | undefined;
+  let crossIterationComparison: ComparisonResult | undefined;
 
   let needsCleanup = false;
   try {
@@ -388,6 +394,24 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       needsCleanup = await setupSkills(skillsDir, config, cwd);
       primaryPhase = await runPhase('Evaluation', evaluation, config, cwd, skillsDir, numRuns, scorerOptions, logDir);
     }
+
+    // Compare with previous results if requested (cross-iteration comparison)
+    if (options.compareResultsPath) {
+      console.log('\n--- Comparing with Previous Results ---\n');
+      const previousReport = await loadPreviousReport(options.compareResultsPath);
+      if (previousReport.skillName !== evaluation.skillName) {
+        console.warn(`Warning: Skill name mismatch — current: "${evaluation.skillName}", previous: "${previousReport.skillName}"`);
+      }
+      const currentSummary = computeSummary(primaryPhase.results, primaryPhase.scores, numRuns);
+      crossIterationComparison = compareResults(primaryPhase.scores, currentSummary, previousReport);
+
+      if (crossIterationComparison.tasksOnlyInCurrent.length > 0) {
+        console.warn(`Warning: ${crossIterationComparison.tasksOnlyInCurrent.length} task(s) in current results not found in previous: ${crossIterationComparison.tasksOnlyInCurrent.join(', ')}`);
+      }
+      if (crossIterationComparison.tasksOnlyInPrevious.length > 0) {
+        console.warn(`Warning: ${crossIterationComparison.tasksOnlyInPrevious.length} task(s) in previous results not found in current: ${crossIterationComparison.tasksOnlyInPrevious.join(', ')}`);
+      }
+    }
   } finally {
     if (needsCleanup) {
       await cleanupLocalSkills(cwd);
@@ -417,6 +441,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     numRuns,
     runDetails: primaryPhase.runDetails,
     comparison,
+    crossIterationComparison,
   };
 
   await generateReport({ ...reportOptions, outputPath: reportPath });
@@ -435,6 +460,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   if (comparison) {
     printComparisonSummary(comparison);
   }
+  if (crossIterationComparison) {
+    console.log(formatComparisonConsole(crossIterationComparison));
+  }
 
   return {
     passed: report.passed,
@@ -447,6 +475,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     jsonPath,
     markdownSummary,
     comparison,
+    crossIterationComparison,
   };
 }
 

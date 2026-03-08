@@ -253,6 +253,7 @@ export interface EvaluationReport {
   }>;
   humanFeedback?: HumanFeedback;
   comparison?: ComparisonData;
+  crossIterationComparison?: ComparisonResult;
 }
 
 // ============================================
@@ -298,6 +299,48 @@ export interface ComparisonData {
   compareSkillPath?: string;
   summary: ComparisonSummary;
   tasks: TaskComparison[];
+}
+
+/** Score snapshot for cross-iteration comparison */
+export interface ScoreSnapshot {
+  discovery: number;
+  adherence: number;
+  outputQuality: number;
+  weightedScore: number;
+}
+
+/** Summary snapshot for cross-iteration comparison */
+export interface SummarySnapshot {
+  discoveryAccuracy: number;
+  avgAdherence: number;
+  avgOutputQuality: number;
+  avgWeightedScore: number;
+}
+
+/** Per-task delta for cross-iteration comparison */
+export interface TaskDelta {
+  taskId: string;
+  previous: ScoreSnapshot;
+  current: ScoreSnapshot;
+  delta: ScoreSnapshot;
+  significantChange: 'improved' | 'regressed' | 'unchanged';
+}
+
+/** Summary-level delta for cross-iteration comparison */
+export interface SummaryDelta {
+  previous: SummarySnapshot;
+  current: SummarySnapshot;
+  delta: SummarySnapshot;
+}
+
+/** Cross-iteration comparison result (--compare-results) */
+export interface ComparisonResult {
+  previousTimestamp: string;
+  previousSkillName: string;
+  summaryDelta: SummaryDelta;
+  taskDeltas: TaskDelta[];
+  tasksOnlyInCurrent: string[];
+  tasksOnlyInPrevious: string[];
 }
 
 // ============================================
