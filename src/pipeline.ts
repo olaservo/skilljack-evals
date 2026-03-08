@@ -27,6 +27,20 @@ import type {
 } from './types.js';
 import { loadFeedback, writeFeedbackTemplate } from './feedback.js';
 
+/**
+ * Load human feedback from a file, validating against known task IDs.
+ */
+async function loadHumanFeedback(
+  feedbackPath: string | undefined,
+  tasks: EvalTask[]
+): Promise<HumanFeedback | undefined> {
+  if (!feedbackPath) return undefined;
+  const taskIds = new Set(tasks.map(t => t.id));
+  const feedback = await loadFeedback(feedbackPath, taskIds);
+  console.log(`Loaded human feedback for ${Object.keys(feedback).length} task(s) from: ${feedbackPath}`);
+  return feedback;
+}
+
 export interface PipelineOptions {
   /** Path to tasks YAML file */
   tasksFile: string;
@@ -93,13 +107,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   }
 
   // Load human feedback if provided
-  let humanFeedback: HumanFeedback | undefined;
-  if (options.feedbackPath) {
-    const taskIds = new Set(evaluation.tasks.map(t => t.id));
-    humanFeedback = await loadFeedback(options.feedbackPath, taskIds);
-    const feedbackCount = Object.keys(humanFeedback).length;
-    console.log(`Loaded human feedback for ${feedbackCount} task(s) from: ${options.feedbackPath}`);
-  }
+  const humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
 
   console.log(`Running ${evaluation.tasks.length} task(s) for skill: ${evaluation.skillName}`);
 
@@ -277,13 +285,7 @@ export async function scorePipeline(
   const results: TaskResult[] = data.results;
 
   // Load human feedback if provided
-  let humanFeedback: HumanFeedback | undefined;
-  if (options.feedbackPath) {
-    const taskIds = new Set(evaluation.tasks.map((t: EvalTask) => t.id));
-    humanFeedback = await loadFeedback(options.feedbackPath, taskIds);
-    const feedbackCount = Object.keys(humanFeedback).length;
-    console.log(`Loaded human feedback for ${feedbackCount} task(s) from: ${options.feedbackPath}`);
-  }
+  const humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
 
   const scorerOptions: ScorerOptions = {
     noDeterministic: options.noDeterministic,

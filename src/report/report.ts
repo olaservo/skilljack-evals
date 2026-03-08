@@ -104,9 +104,10 @@ ${metaSection}
       const addressed = score?.judge?.feedbackAddressed === true ? 'Yes'
         : score?.judge?.feedbackAddressed === false ? 'No'
         : 'N/A';
-      const truncated = feedbackText.length > 80
-        ? feedbackText.slice(0, 77) + '...'
-        : feedbackText;
+      const sanitized = feedbackText.replace(/\n/g, ' ').replace(/\|/g, '\\|');
+      const truncated = sanitized.length > 80
+        ? sanitized.slice(0, 77) + '...'
+        : sanitized;
       report += `| ${taskId} | ${truncated} | ${addressed} |\n`;
     }
 
@@ -168,7 +169,7 @@ ${score.stddev && (score.stddev.adherence > FLAKY_STDDEV_THRESHOLD || score.stdd
 
     // Show human feedback if present for this task
     if (humanFeedback && humanFeedback[task.id]) {
-      report += `\n**Human Feedback:** ${humanFeedback[task.id]}\n`;
+      report += `\n**Human Feedback:**\n> ${humanFeedback[task.id].replace(/\n/g, '\n> ')}\n`;
       if (score.judge?.feedbackAddressed != null) {
         report += `**Feedback Addressed:** ${score.judge.feedbackAddressed ? 'Yes' : 'No'}\n`;
       }

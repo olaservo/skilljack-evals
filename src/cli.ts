@@ -174,6 +174,7 @@ program
         skillName: string;
         tasks: Array<{ task: EvalTask; result: TaskResult; score: CombinedScore }>;
         metadata?: { skillPath: string; agentModel: string; judgeModel: string };
+        humanFeedback?: Record<string, string>;
       };
 
       const evaluation: SkillEvaluation = {
@@ -185,6 +186,7 @@ program
 
       const reportOpts = {
         evaluation, results, scores, metadata: data.metadata,
+        humanFeedback: data.humanFeedback,
       };
       const report = await generateReport({ ...reportOpts, outputPath: options.output });
 

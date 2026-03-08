@@ -56,7 +56,7 @@ export async function loadFeedback(
       throw new Error(`Invalid feedback for task "${key}": expected string, got ${typeof value}`);
     }
     if (!taskIds.has(key)) {
-      console.warn(`Warning: Feedback file contains unknown task ID "${key}" — ignoring`);
+      console.warn(`Warning: Feedback file contains unknown task ID "${key}" -- ignoring`);
       continue;
     }
     if (value.trim() !== '') {
