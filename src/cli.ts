@@ -202,13 +202,17 @@ program
   .description('Create an evaluation template for a skill')
   .argument('<skill_name>', 'Name of the skill')
   .option('-o, --output <path>', 'Output path for template')
-  .option('-n, --num-tasks <number>', 'Total number of tasks to generate (includes 1 false-positive)', '10')
+  .option('-n, --num-tasks <number>', 'Number of positive tasks to generate (1 false-positive is always added)', '10')
   .action(async (skillName: string, options: {
     output?: string;
     numTasks: string;
   }) => {
     const outputPath = options.output || path.join(process.cwd(), 'evals', skillName, 'tasks.yaml');
     const numTasks = parseInt(options.numTasks, 10);
+    if (isNaN(numTasks) || numTasks < 1) {
+      console.error('Error: --num-tasks must be a positive integer');
+      process.exit(1);
+    }
 
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
