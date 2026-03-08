@@ -5,7 +5,7 @@
  */
 
 import * as fs from 'fs/promises';
-import { formatDelta } from '../utils/format.js';
+import { formatDelta, formatCategory } from '../utils/format.js';
 import type {
   EvaluationReport,
   EvaluationSummary,
@@ -145,11 +145,4 @@ export async function writeGitHubSummary(report: EvaluationReport): Promise<bool
   return true;
 }
 
-function formatCategory(cat: string): string {
-  if (cat === 'none') return 'No Failure';
-  return cat
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
 

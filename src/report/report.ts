@@ -6,7 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { formatDelta } from '../utils/format.js';
+import { formatDelta, formatCategory } from '../utils/format.js';
 import type {
   SkillEvaluation,
   TaskResult,
@@ -380,13 +380,6 @@ export function computeFailureBreakdown(scores: CombinedScore[]): FailureBreakdo
     .sort((a, b) => b.count - a.count);
 }
 
-function formatCategory(cat: string): string {
-  if (cat === 'none') return 'No Failure';
-  return cat
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
 
 /**
  * Generate the comparison section for the markdown report.

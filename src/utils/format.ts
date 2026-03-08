@@ -10,3 +10,14 @@ export function formatDelta(value: number, decimals = 2): string {
   if (formatted === `-${zeroStr}`) return zeroStr;
   return formatted;
 }
+
+/**
+ * Format a failure category slug as a human-readable label.
+ */
+export function formatCategory(cat: string): string {
+  if (cat === 'none') return 'No Failure';
+  return cat
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}

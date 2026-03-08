@@ -305,16 +305,17 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
   // Validate compare-skill path
   if (options.compareSkillPath) {
+    let stat;
     try {
-      const stat = await fs.stat(options.compareSkillPath);
-      if (!stat.isDirectory()) {
-        throw new Error(`--compare-skill path is not a directory: ${options.compareSkillPath}`);
-      }
+      stat = await fs.stat(options.compareSkillPath);
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new Error(`--compare-skill path not found: ${options.compareSkillPath}`);
       }
       throw err;
+    }
+    if (!stat.isDirectory()) {
+      throw new Error(`--compare-skill path is not a directory: ${options.compareSkillPath}`);
     }
   }
 
