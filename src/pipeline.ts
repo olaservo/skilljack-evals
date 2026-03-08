@@ -318,7 +318,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   }
 
   if (compareMode && !skillsDir) {
-    console.warn('Warning: --compare used but no skills directory found. Falling back to normal mode (no comparison will be generated).');
+    throw new Error('--compare requires a skills directory but none was found. Provide a skill via the evaluation YAML or use --compare-skill to specify a baseline skill path.');
   }
 
   const numRuns = options.numRuns ?? 3;

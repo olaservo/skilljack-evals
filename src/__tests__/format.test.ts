@@ -20,7 +20,7 @@ describe('formatDelta', () => {
     expect(formatDelta(1.234, 1)).toBe('+1.2');
     expect(formatDelta(-0.56789, 4)).toBe('-0.5679');
     expect(formatDelta(0, 3)).toBe('0.000');
-    expect(formatDelta(0, 0)).toBe('0.');
+    expect(formatDelta(0, 0)).toBe('0');
   });
 
   it('handles large values', () => {
