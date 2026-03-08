@@ -137,7 +137,23 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   lines.push('</details>');
   lines.push('');
 
-  // Blind comparison section
+  // Comparison section (primary data first)
+  if (report.comparison) {
+    const d = report.comparison.summary.delta;
+    const ws = report.comparison.summary.withSkill;
+    const bs = report.comparison.summary.withoutSkill;
+    lines.push(`### Skill Impact (vs ${report.comparison.summary.baselineLabel})`);
+    lines.push('');
+    lines.push('| Metric | With Skill | Baseline | Delta |');
+    lines.push('|--------|-----------|----------|-------|');
+    lines.push(`| Discovery | ${(ws.discoveryAccuracy * 100).toFixed(0)}% | ${(bs.discoveryAccuracy * 100).toFixed(0)}% | **${formatDelta(d.discoveryAccuracyDelta * 100, 0)}%** |`);
+    lines.push(`| Adherence | ${ws.avgAdherence.toFixed(1)}/5 | ${bs.avgAdherence.toFixed(1)}/5 | **${formatDelta(d.avgAdherenceDelta)}** |`);
+    lines.push(`| Output Quality | ${ws.avgOutputQuality.toFixed(1)}/5 | ${bs.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
+    lines.push(`| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
+    lines.push('');
+  }
+
+  // Blind comparison section (cross-validation, shown after primary comparison)
   if (report.blindComparison) {
     const ba = report.blindComparison.aggregate;
     const total = report.blindComparison.tasks.length;
@@ -157,22 +173,6 @@ export function generateGitHubSummary(report: EvaluationReport): string {
       lines.push(`:warning: **${ba.failedCount} blind judge call(s) failed** — recorded as ties with neutral scores`);
       lines.push('');
     }
-  }
-
-  // Comparison section
-  if (report.comparison) {
-    const d = report.comparison.summary.delta;
-    const ws = report.comparison.summary.withSkill;
-    const bs = report.comparison.summary.withoutSkill;
-    lines.push(`### Skill Impact (vs ${report.comparison.summary.baselineLabel})`);
-    lines.push('');
-    lines.push('| Metric | With Skill | Baseline | Delta |');
-    lines.push('|--------|-----------|----------|-------|');
-    lines.push(`| Discovery | ${(ws.discoveryAccuracy * 100).toFixed(0)}% | ${(bs.discoveryAccuracy * 100).toFixed(0)}% | **${formatDelta(d.discoveryAccuracyDelta * 100, 0)}%** |`);
-    lines.push(`| Adherence | ${ws.avgAdherence.toFixed(1)}/5 | ${bs.avgAdherence.toFixed(1)}/5 | **${formatDelta(d.avgAdherenceDelta)}** |`);
-    lines.push(`| Output Quality | ${ws.avgOutputQuality.toFixed(1)}/5 | ${bs.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
-    lines.push(`| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
-    lines.push('');
   }
 
   if (!report.passed && report.failureReasons.length > 0) {

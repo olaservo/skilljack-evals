@@ -415,14 +415,14 @@ export class SkillJudge {
    * Score all evaluation results.
    */
   async judgeAll(tasks: EvalTask[], results: TaskResult[], feedback?: HumanFeedback): Promise<JudgeScore[]> {
-    const scores: JudgeScore[] = [];
-    for (let i = 0; i < tasks.length; i++) {
-      console.log(`Judging task ${tasks[i].id}...`);
-      const taskFeedback = getFeedbackForTask(feedback, tasks[i].id);
-      const score = await this.judgeResult(tasks[i], results[i], taskFeedback);
-      scores.push(score);
-    }
-    return scores;
+    // TODO: Add concurrency cap (e.g. p-limit) if used with large task sets to avoid API rate limits.
+    return Promise.all(
+      tasks.map((task, i) => {
+        console.log(`Judging task ${task.id}...`);
+        const taskFeedback = getFeedbackForTask(feedback, task.id);
+        return this.judgeResult(task, results[i], taskFeedback);
+      })
+    );
   }
 
   /**
@@ -528,12 +528,14 @@ export function parseBlindJudgeResponse(
   }
 }
 
-/** Minimum weighted score delta to classify bias signal. */
-export const BLIND_BIAS_THRESHOLD = 0.02;
+/** Minimum weighted score delta to classify bias signal (on 0-1 scale). */
+export const BLIND_BIAS_THRESHOLD = 0.05;
 
 export interface BlindCompareOptions {
   /** Override the random function (default: Math.random). Useful for deterministic tests. */
   randomFn?: () => number;
+  /** Override the bias detection threshold (default: BLIND_BIAS_THRESHOLD). */
+  biasThreshold?: number;
 }
 
 /**
@@ -548,6 +550,7 @@ export async function blindCompareAll(
   options?: BlindCompareOptions,
 ): Promise<BlindComparisonData> {
   const random = options?.randomFn ?? Math.random;
+  const threshold = options?.biasThreshold ?? BLIND_BIAS_THRESHOLD;
 
   async function processTask(task: TaskComparison): Promise<BlindTaskComparison> {
     const withSkillIsA = random() < 0.5;
@@ -594,8 +597,8 @@ export async function blindCompareAll(
 
     // Detect bias signal: standard scoring prefers with-skill but blind prefers without (or vice versa)
     const standardDelta = task.delta.weightedScoreDelta;
-    const standardPrefersWithSkill = standardDelta > BLIND_BIAS_THRESHOLD;
-    const standardPrefersWithout = standardDelta < -BLIND_BIAS_THRESHOLD;
+    const standardPrefersWithSkill = standardDelta > threshold;
+    const standardPrefersWithout = standardDelta < -threshold;
     const biasSignal =
       preferredCondition !== 'tie' &&
       ((standardPrefersWithSkill && preferredCondition === 'without-skill') ||
@@ -614,6 +617,7 @@ export async function blindCompareAll(
     };
   }
 
+  // TODO: Add concurrency cap (e.g. p-limit) if used with large task sets to avoid API rate limits.
   const blindTasks = await Promise.all(tasks.map(processTask));
 
   const aggregate = {

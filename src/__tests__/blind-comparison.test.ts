@@ -78,8 +78,8 @@ function makeBlindTask(
   standardDelta: number,
 ): BlindTaskComparison {
   // Detect bias: standard prefers one, blind prefers the other
-  const standardPrefersWithSkill = standardDelta > 0.02;
-  const standardPrefersWithout = standardDelta < -0.02;
+  const standardPrefersWithSkill = standardDelta > BLIND_BIAS_THRESHOLD;
+  const standardPrefersWithout = standardDelta < -BLIND_BIAS_THRESHOLD;
   const biasSignal =
     preferredCondition !== 'tie' &&
     ((standardPrefersWithSkill && preferredCondition === 'without-skill') ||
@@ -140,7 +140,7 @@ describe('Blind comparison bias detection', () => {
   });
 
   it('no bias when standard delta is within threshold (neutral)', () => {
-    // Standard delta = 0.01, under 0.02 threshold
+    // Standard delta = 0.01, under BLIND_BIAS_THRESHOLD
     const task = makeBlindTask('task-1', 'without-skill', 0.01);
     expect(task.biasSignal).toBe(false);
   });
