@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type {
   BlindTaskComparison,
   BlindComparisonData,
@@ -6,6 +6,7 @@ import type {
   TaskResult,
   CombinedScore,
 } from '../types.js';
+import { blindCompareAll, BLIND_BIAS_THRESHOLD, SkillJudge } from '../scorer/judge.js';
 
 /** Helper to create a minimal TaskResult */
 function makeResult(taskId: string, output = 'test output'): TaskResult {
@@ -87,8 +88,8 @@ function makeBlindTask(
   return {
     taskId,
     withSkillLabel: 'A',
-    outputA: { adherence: 4, outputQuality: 4 },
-    outputB: { adherence: 3, outputQuality: 3 },
+    outputA: { instructionFollowing: 4, outputQuality: 4 },
+    outputB: { instructionFollowing: 3, outputQuality: 3 },
     preferred: preferredCondition === 'with-skill' ? 'A' : preferredCondition === 'without-skill' ? 'B' : 'tie',
     reasoning: 'test reasoning',
     preferredCondition,
@@ -150,8 +151,8 @@ describe('Blind comparison label mapping', () => {
     const task: BlindTaskComparison = {
       taskId: 'task-1',
       withSkillLabel: 'A',
-      outputA: { adherence: 5, outputQuality: 5 },
-      outputB: { adherence: 3, outputQuality: 3 },
+      outputA: { instructionFollowing: 5, outputQuality: 5 },
+      outputB: { instructionFollowing: 3, outputQuality: 3 },
       preferred: 'A',
       reasoning: 'A is better',
       preferredCondition: 'with-skill',
@@ -165,8 +166,8 @@ describe('Blind comparison label mapping', () => {
     const task: BlindTaskComparison = {
       taskId: 'task-1',
       withSkillLabel: 'B',
-      outputA: { adherence: 3, outputQuality: 3 },
-      outputB: { adherence: 5, outputQuality: 5 },
+      outputA: { instructionFollowing: 3, outputQuality: 3 },
+      outputB: { instructionFollowing: 5, outputQuality: 5 },
       preferred: 'B',
       reasoning: 'B is better',
       preferredCondition: 'with-skill',
@@ -180,8 +181,8 @@ describe('Blind comparison label mapping', () => {
     const task: BlindTaskComparison = {
       taskId: 'task-1',
       withSkillLabel: 'B',
-      outputA: { adherence: 5, outputQuality: 5 },
-      outputB: { adherence: 3, outputQuality: 3 },
+      outputA: { instructionFollowing: 5, outputQuality: 5 },
+      outputB: { instructionFollowing: 3, outputQuality: 3 },
       preferred: 'A',
       reasoning: 'A is better',
       preferredCondition: 'without-skill',
@@ -230,5 +231,122 @@ describe('Blind comparison aggregate computation', () => {
     expect(aggregate.withoutSkillPreferred).toBe(0);
     expect(aggregate.ties).toBe(0);
     expect(aggregate.biasSignalCount).toBe(0);
+  });
+});
+
+describe('blindCompareAll integration', () => {
+  function createMockJudge(
+    response: { outputA: { instructionFollowing: number; outputQuality: number }; outputB: { instructionFollowing: number; outputQuality: number }; preferred: 'A' | 'B' | 'tie'; reasoning: string } | null,
+  ) {
+    return {
+      blindCompare: vi.fn().mockResolvedValue(response),
+    } as unknown as SkillJudge;
+  }
+
+  it('maps judge results and detects bias correctly', async () => {
+    const mockJudge = createMockJudge({
+      outputA: { instructionFollowing: 5, outputQuality: 5 },
+      outputB: { instructionFollowing: 2, outputQuality: 2 },
+      preferred: 'A',
+      reasoning: 'A is clearly better',
+    });
+
+    // Standard scoring prefers with-skill (delta > 0)
+    const tasks = [makeTaskComparison('task-1', 0.8, 0.3)];
+    // Pin randomFn so with-skill is always A
+    const result = await blindCompareAll(tasks, mockJudge, { randomFn: () => 0.1 });
+
+    expect(result.tasks).toHaveLength(1);
+    expect(mockJudge.blindCompare).toHaveBeenCalledOnce();
+    expect(result.tasks[0].withSkillLabel).toBe('A');
+    expect(result.tasks[0].preferredCondition).toBe('with-skill');
+    expect(result.tasks[0].biasSignal).toBe(false); // both agree
+    expect(result.tasks[0].failed).toBe(false);
+    expect(result.aggregate.withSkillPreferred).toBe(1);
+    expect(result.aggregate.ties).toBe(0);
+  });
+
+  it('detects bias when blind disagrees with standard', async () => {
+    // Blind prefers B (without-skill), standard prefers with-skill
+    const mockJudge = createMockJudge({
+      outputA: { instructionFollowing: 2, outputQuality: 2 },
+      outputB: { instructionFollowing: 5, outputQuality: 5 },
+      preferred: 'B',
+      reasoning: 'B is better',
+    });
+
+    const tasks = [makeTaskComparison('task-1', 0.8, 0.3)]; // standard prefers with-skill
+    const result = await blindCompareAll(tasks, mockJudge, { randomFn: () => 0.1 }); // with-skill = A
+
+    expect(result.tasks[0].preferredCondition).toBe('without-skill');
+    expect(result.tasks[0].biasSignal).toBe(true);
+    expect(result.aggregate.biasSignalCount).toBe(1);
+  });
+
+  it('handles failed blind judge calls gracefully', async () => {
+    const mockJudge = createMockJudge(null);
+
+    const tasks = [makeTaskComparison('task-1', 0.8, 0.3)];
+    const result = await blindCompareAll(tasks, mockJudge, { randomFn: () => 0.1 });
+
+    expect(result.tasks[0].failed).toBe(true);
+    expect(result.tasks[0].preferredCondition).toBe('tie');
+    expect(result.tasks[0].biasSignal).toBe(false);
+    expect(result.aggregate.failedCount).toBe(1);
+    expect(result.aggregate.ties).toBe(1);
+  });
+
+  it('respects randomFn for deterministic label assignment', async () => {
+    const mockJudge = createMockJudge({
+      outputA: { instructionFollowing: 3, outputQuality: 3 },
+      outputB: { instructionFollowing: 3, outputQuality: 3 },
+      preferred: 'tie',
+      reasoning: 'Equal',
+    });
+
+    const tasks = [makeTaskComparison('task-1', 0.5, 0.5)];
+
+    // randomFn returns 0.9 → with-skill should be B
+    const result = await blindCompareAll(tasks, mockJudge, { randomFn: () => 0.9 });
+    expect(result.tasks[0].withSkillLabel).toBe('B');
+
+    // randomFn returns 0.1 → with-skill should be A
+    const result2 = await blindCompareAll(tasks, mockJudge, { randomFn: () => 0.1 });
+    expect(result2.tasks[0].withSkillLabel).toBe('A');
+  });
+
+  it('runs multiple tasks concurrently', async () => {
+    const callOrder: string[] = [];
+    const mockJudge = {
+      blindCompare: vi.fn().mockImplementation(async (_prompt: string, _a: string, _b: string) => {
+        callOrder.push('start');
+        // Simulate async work
+        await new Promise(r => setTimeout(r, 10));
+        callOrder.push('end');
+        return {
+          outputA: { instructionFollowing: 4, outputQuality: 4 },
+          outputB: { instructionFollowing: 3, outputQuality: 3 },
+          preferred: 'A' as const,
+          reasoning: 'A is better',
+        };
+      }),
+    } as unknown as SkillJudge;
+
+    const tasks = [
+      makeTaskComparison('task-1', 0.8, 0.3),
+      makeTaskComparison('task-2', 0.7, 0.4),
+      makeTaskComparison('task-3', 0.6, 0.5),
+    ];
+
+    const result = await blindCompareAll(tasks, mockJudge, { randomFn: () => 0.1 });
+
+    expect(result.tasks).toHaveLength(3);
+    expect(mockJudge.blindCompare).toHaveBeenCalledTimes(3);
+    // All 3 starts should happen before any ends (concurrent execution)
+    const starts = callOrder.filter(c => c === 'start');
+    const firstEnd = callOrder.indexOf('end');
+    expect(starts.length).toBe(3);
+    // With Promise.all, all starts happen before the first end
+    expect(callOrder.slice(0, 3)).toEqual(['start', 'start', 'start']);
   });
 });

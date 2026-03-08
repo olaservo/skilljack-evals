@@ -84,8 +84,8 @@ describe('generateGitHubSummary', () => {
           {
             taskId: 'task-1',
             withSkillLabel: 'A',
-            outputA: { adherence: 5, outputQuality: 5 },
-            outputB: { adherence: 3, outputQuality: 3 },
+            outputA: { instructionFollowing: 5, outputQuality: 5 },
+            outputB: { instructionFollowing: 3, outputQuality: 3 },
             preferred: 'A',
             reasoning: 'A is better',
             preferredCondition: 'with-skill',
@@ -95,8 +95,8 @@ describe('generateGitHubSummary', () => {
           {
             taskId: 'task-2',
             withSkillLabel: 'B',
-            outputA: { adherence: 4, outputQuality: 4 },
-            outputB: { adherence: 4, outputQuality: 4 },
+            outputA: { instructionFollowing: 4, outputQuality: 4 },
+            outputB: { instructionFollowing: 4, outputQuality: 4 },
             preferred: 'tie',
             reasoning: 'Equal',
             preferredCondition: 'tie',

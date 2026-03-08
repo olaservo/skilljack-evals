@@ -349,8 +349,8 @@ export interface ComparisonResult {
 // ============================================
 
 export interface BlindOutputScore {
-  adherence: number;    // 1-5
-  outputQuality: number; // 1-5
+  instructionFollowing: number; // 1-5 (generic rubric, distinct from skill-specific "adherence")
+  outputQuality: number;       // 1-5
 }
 
 export interface BlindTaskComparison {

@@ -91,25 +91,39 @@ Respond with a JSON object:
 \`\`\`
 `;
 
+/**
+ * Blind comparison prompt template.
+ *
+ * Design note: This prompt intentionally uses a *generic* rubric — it does NOT
+ * reference skill-specific criteria, checklist items, or the expected skill.
+ * That keeps the judge blind to which output used the skill. As a result, the
+ * "instruction_following" dimension here is broader than the standard judge's
+ * "adherence" (which measures compliance with the *skill's* instructions).
+ * Some disagreement between blind and standard scores is expected and does not
+ * necessarily indicate bias — it may reflect the different evaluation rubrics.
+ *
+ * The template uses indexed placeholders (__PROMPT__, __OUTPUT_A__, __OUTPUT_B__)
+ * to avoid conflicts if agent output contains curly-brace template markers.
+ */
 const BLIND_COMPARE_PROMPT_TEMPLATE = `You are an expert evaluator comparing two AI agent outputs for the same task. You do NOT know which output used a skill and which did not. Evaluate both fairly.
 
 ## Task Prompt
-{prompt}
+__PROMPT__
 
 ## Output A
-{outputA}
+__OUTPUT_A__
 
 ## Output B
-{outputB}
+__OUTPUT_B__
 
 ## Scoring Instructions
 
 Score each output on two dimensions:
 
-1. **Adherence (1-5)**: How well does the output follow good practices and instructions?
-   - 5 = Excellent adherence
+1. **Instruction Following (1-5)**: How well does the output follow good practices and instructions?
+   - 5 = Excellent instruction following
    - 3 = Acceptable
-   - 1 = Poor adherence
+   - 1 = Poor instruction following
 
 2. **Output Quality (1-5)**: Does the output meet the task requirements?
    - 5 = Excellent quality
@@ -121,8 +135,8 @@ Score each output on two dimensions:
 Respond with a JSON object:
 \`\`\`json
 {
-  "output_a": { "adherence": <1-5>, "output_quality": <1-5> },
-  "output_b": { "adherence": <1-5>, "output_quality": <1-5> },
+  "output_a": { "instruction_following": <1-5>, "output_quality": <1-5> },
+  "output_b": { "instruction_following": <1-5>, "output_quality": <1-5> },
   "preferred": "<A, B, or tie>",
   "reasoning": "<brief explanation of preference>"
 }
@@ -419,10 +433,16 @@ export class SkillJudge {
     outputA: string,
     outputB: string,
   ): Promise<{ outputA: BlindOutputScore; outputB: BlindOutputScore; preferred: 'A' | 'B' | 'tie'; reasoning: string } | null> {
-    const judgePrompt = BLIND_COMPARE_PROMPT_TEMPLATE
-      .replace('{prompt}', prompt)
-      .replace('{outputA}', outputA.slice(0, this.options.outputTruncation) || '(no output)')
-      .replace('{outputB}', outputB.slice(0, this.options.outputTruncation) || '(no output)');
+    // Single-pass replacement avoids one substitution injecting a marker consumed by the next.
+    const replacements: Record<string, string> = {
+      '__PROMPT__': prompt,
+      '__OUTPUT_A__': outputA.slice(0, this.options.outputTruncation) || '(no output)',
+      '__OUTPUT_B__': outputB.slice(0, this.options.outputTruncation) || '(no output)',
+    };
+    const judgePrompt = BLIND_COMPARE_PROMPT_TEMPLATE.replace(
+      /__PROMPT__|__OUTPUT_A__|__OUTPUT_B__/g,
+      (match) => replacements[match],
+    );
 
     try {
       let responseText = '';
@@ -482,12 +502,12 @@ export function parseBlindJudgeResponse(
     };
 
     const outputA: BlindOutputScore = {
-      adherence: clamp(data.output_a.adherence, 1, 5),
+      instructionFollowing: clamp(data.output_a.instruction_following, 1, 5),
       outputQuality: clamp(data.output_a.output_quality, 1, 5),
     };
 
     const outputB: BlindOutputScore = {
-      adherence: clamp(data.output_b.adherence, 1, 5),
+      instructionFollowing: clamp(data.output_b.instruction_following, 1, 5),
       outputQuality: clamp(data.output_b.output_quality, 1, 5),
     };
 
@@ -511,20 +531,26 @@ export function parseBlindJudgeResponse(
 /** Minimum weighted score delta to classify bias signal. */
 export const BLIND_BIAS_THRESHOLD = 0.02;
 
+export interface BlindCompareOptions {
+  /** Override the random function (default: Math.random). Useful for deterministic tests. */
+  randomFn?: () => number;
+}
+
 /**
  * Run blind comparison for all tasks in a comparison set.
  *
- * Randomizes A/B assignment per task, calls the blind judge, maps results
- * back, and detects bias signals.
+ * Randomizes A/B assignment per task, calls the blind judge in parallel,
+ * maps results back, and detects bias signals.
  */
 export async function blindCompareAll(
   tasks: TaskComparison[],
   judge: SkillJudge,
+  options?: BlindCompareOptions,
 ): Promise<BlindComparisonData> {
-  const blindTasks: BlindTaskComparison[] = [];
+  const random = options?.randomFn ?? Math.random;
 
-  for (const task of tasks) {
-    const withSkillIsA = Math.random() < 0.5;
+  async function processTask(task: TaskComparison): Promise<BlindTaskComparison> {
+    const withSkillIsA = random() < 0.5;
     const withSkillLabel: 'A' | 'B' = withSkillIsA ? 'A' : 'B';
 
     const outputA = withSkillIsA
@@ -540,18 +566,17 @@ export async function blindCompareAll(
     if (!result) {
       // Failed blind judge call → tie, no bias signal
       console.warn(`Blind comparison failed for task ${task.taskId}, recording as tie`);
-      blindTasks.push({
+      return {
         taskId: task.taskId,
         withSkillLabel,
-        outputA: { adherence: 3, outputQuality: 3 },
-        outputB: { adherence: 3, outputQuality: 3 },
+        outputA: { instructionFollowing: 3, outputQuality: 3 },
+        outputB: { instructionFollowing: 3, outputQuality: 3 },
         preferred: 'tie',
         reasoning: 'Blind judge call failed',
         preferredCondition: 'tie',
         biasSignal: false,
         failed: true,
-      });
-      continue;
+      };
     }
 
     // Map preference back to condition
@@ -576,7 +601,7 @@ export async function blindCompareAll(
       ((standardPrefersWithSkill && preferredCondition === 'without-skill') ||
        (standardPrefersWithout && preferredCondition === 'with-skill'));
 
-    blindTasks.push({
+    return {
       taskId: task.taskId,
       withSkillLabel,
       outputA: result.outputA,
@@ -586,8 +611,10 @@ export async function blindCompareAll(
       preferredCondition,
       biasSignal,
       failed: false,
-    });
+    };
   }
+
+  const blindTasks = await Promise.all(tasks.map(processTask));
 
   const aggregate = {
     withSkillPreferred: blindTasks.filter(t => t.preferredCondition === 'with-skill').length,

@@ -478,13 +478,13 @@ Assignment shows the label order: with-skill / without-skill (e.g. A/B means A =
 
 ### Per-Task Blind Results
 
-| Task | Assignment | A Adherence | A Output | B Adherence | B Output | Preferred | Condition | Bias? |
-|------|------------|-------------|----------|-------------|----------|-----------|-----------|-------|
+| Task | Assignment | A Instr. Following | A Output | B Instr. Following | B Output | Preferred | Condition | Bias? |
+|------|------------|---------------------|----------|---------------------|----------|-----------|-----------|-------|
 `;
 
   for (const t of blind.tasks) {
     const labels = t.withSkillLabel === 'A' ? 'A/B' : 'B/A';
-    section += `| ${t.taskId} | ${labels} | ${t.outputA.adherence}/5 | ${t.outputA.outputQuality}/5 | ${t.outputB.adherence}/5 | ${t.outputB.outputQuality}/5 | ${t.preferred} | ${t.preferredCondition} | ${t.biasSignal ? 'Yes' : 'No'} |\n`;
+    section += `| ${t.taskId} | ${labels} | ${t.outputA.instructionFollowing}/5 | ${t.outputA.outputQuality}/5 | ${t.outputB.instructionFollowing}/5 | ${t.outputB.outputQuality}/5 | ${t.preferred} | ${t.preferredCondition} | ${t.biasSignal ? 'Yes' : 'No'} |\n`;
   }
 
   if (a.biasSignalCount > 0) {
