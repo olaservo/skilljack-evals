@@ -258,10 +258,13 @@ export async function validateEvalFile(filePath: string): Promise<string[]> {
  */
 export function createEvalTemplate(skillName: string, numTasks = 5): string {
   const prefix = skillName.slice(0, 2).toLowerCase();
+  const numPositive = Math.max(1, numTasks - 1);
 
-  const tasks = Array.from({ length: numTasks }, (_, i) => {
+  const tasks = Array.from({ length: numPositive }, (_, i) => {
     const taskId = `${prefix}-${String(i + 1).padStart(3, '0')}`;
     return `  - id: ${taskId}
+    # Tip: Vary phrasing and detail level across tasks. Use realistic context
+    # (file paths, column names) instead of generic placeholders.
     prompt: "TODO: Write a realistic prompt that should trigger ${skillName}"
     expected_skill_load: ${skillName}
     deterministic:
@@ -271,13 +274,27 @@ export function createEvalTemplate(skillName: string, numTasks = 5): string {
       discovery: { weight: 0.3, description: "Should load ${skillName} based on task context" }
       adherence: { weight: 0.4, description: "Should follow ${skillName} instructions" }
       output: { weight: 0.3, description: "Should produce quality output meeting requirements" }
+    # Tip: Write checklist items that are specific, observable, and verifiable.
+    # Good: "The output file is valid JSON" / Bad: "The output is good"
     golden_checklist:
-      - "TODO: Add expected behavior 1"
-      - "TODO: Add expected behavior 2"
-      - "TODO: Add expected behavior 3"`;
+      - "TODO: Add specific, verifiable expected behavior"
+      - "TODO: Add observable outcome that can be objectively checked"
+      - "TODO: Add countable or measurable requirement"`;
   });
 
-  return `skill: ${skillName}
+  // False-positive task: skill should NOT activate for this prompt
+  const fpTaskId = `${prefix}-fp-001`;
+  const fpTask = `  # False-positive test — include prompts that are similar but should NOT trigger the skill.
+  # These catch over-eager activation and are just as important as positive tests.
+  - id: ${fpTaskId}
+    prompt: "TODO: Write a prompt that is related but should NOT trigger ${skillName}"
+    expected_skill_load: none
+    deterministic:
+      expect_skill_activation: false`;
+
+  return `# Eval tasks for ${skillName}
+# See "Writing Effective Evals" in the README for test design tips.
+skill: ${skillName}
 version: "1.0"
 
 defaults:
@@ -289,5 +306,7 @@ defaults:
 
 tasks:
 ${tasks.join('\n\n')}
+
+${fpTask}
 `;
 }

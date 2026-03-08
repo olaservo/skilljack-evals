@@ -62,6 +62,55 @@ skilljack-evals run evals/my-skill/tasks.yaml --verbose
 
 This workflow ensures your skill is discoverable from the right prompts, doesn't activate when it shouldn't, and produces the output quality you expect.
 
+## Writing Effective Evals
+
+Practical tips for writing eval tasks that surface real issues and drive meaningful skill improvements. Adapted from the [agentskills.io evaluation guide](https://agentskills.io/skill-creation/evaluating-skills).
+
+### Test Case Design
+
+- **Start small** — 2-3 tasks are enough for a first run. Expand after you see initial results.
+- **Vary your prompts** — use different phrasings, detail levels, and formality. `"hey can you format this CSV"` tests something different than `"Parse the CSV at data/sales.csv and output a summary table"`.
+- **Cover edge cases** — include at least one boundary condition: malformed input, an ambiguous request, or a prompt that's close but shouldn't trigger the skill.
+- **Use realistic context** — include file paths, column names, and specifics rather than generic placeholders like "process this data".
+
+### Golden Checklist Writing
+
+Good checklist items are specific, observable, and verifiable:
+
+```yaml
+golden_checklist:
+  - "The output file is valid JSON"              # programmatically verifiable
+  - "The chart has labeled axes"                  # specific and observable
+  - "The report includes at least 3 recommendations"  # countable
+```
+
+Weak checklist items hurt scoring accuracy:
+
+```yaml
+golden_checklist:
+  - "The output is good"                          # too vague to evaluate
+  - "Uses exactly the phrase 'Total Revenue: $X'" # too brittle — correct output with different wording fails
+```
+
+**Guidelines:**
+- Prefer items that can be checked objectively
+- Remove items that always pass regardless of skill quality — they inflate scores without adding signal
+- Review the checklist after your first run and fix items that are too easy, too hard, or unverifiable
+
+### Skill Improvement Strategies
+
+- **Generalize from feedback** — address underlying issues broadly rather than adding narrow patches for specific test cases
+- **Keep the skill lean** — fewer, better instructions often outperform exhaustive rules. If pass rates plateau despite adding more rules, try removing some
+- **Explain the why** — `"Validate JSON before writing because partial writes corrupt state"` works better than `"ALWAYS validate JSON, NEVER skip validation"`
+- **Bundle repeated work** — if every eval run independently writes a similar helper script, add it to the skill's `scripts/` directory
+
+### Scoring Principles
+
+- **Require concrete evidence for a PASS** — don't give the benefit of the doubt
+- **Review the checklist, not just results** — notice when items always pass (too easy), always fail (too hard), or can't be objectively verified
+
+For detailed guidance, see the full [evaluation documentation on agentskills.io](https://agentskills.io/skill-creation/evaluating-skills).
+
 ## Multi-Runner Support
 
 Three runners are available, selected via the `--runner` CLI flag:
