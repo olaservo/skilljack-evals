@@ -15,22 +15,28 @@ import type {
   FailureBreakdown,
   FailureCategory,
   ReportMetadata,
+  HumanFeedback,
 } from '../types.js';
 import { loadConfigSync } from '../config.js';
 import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
 
+export interface ReportOptions {
+  evaluation: SkillEvaluation;
+  results: TaskResult[];
+  scores: CombinedScore[];
+  outputPath?: string;
+  metadata?: ReportMetadata;
+  numRuns?: number;
+  runDetails?: Array<{ result: TaskResult; score: CombinedScore }>[];
+  humanFeedback?: HumanFeedback;
+}
+
 /**
  * Generate a markdown report from evaluation results.
  */
-export async function generateReport(
-  evaluation: SkillEvaluation,
-  results: TaskResult[],
-  scores: CombinedScore[],
-  outputPath?: string,
-  metadata?: ReportMetadata,
-  numRuns = 1,
-  runDetails?: Array<{ result: TaskResult; score: CombinedScore }>[]
-): Promise<string> {
+export async function generateReport(options: ReportOptions): Promise<string> {
+  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback } = options;
+  const numRuns = options.numRuns ?? 1;
   const config = loadConfigSync();
   const totalTasks = evaluation.tasks.length;
   const summary = computeSummary(results, scores, numRuns);
@@ -87,7 +93,31 @@ ${metaSection}
     report += `| ${displayCat} | ${fb.count} | ${fb.percentage.toFixed(1)}% |\n`;
   }
 
-  report += `\n---\n\n## Task Details\n\n`;
+  // Human Review section (only when feedback provided)
+  if (humanFeedback && Object.keys(humanFeedback).length > 0) {
+    report += `\n## Human Review\n\n`;
+    report += `| Task | Feedback | Addressed? |\n`;
+    report += `|------|----------|------------|\n`;
+
+    for (const [taskId, feedbackText] of Object.entries(humanFeedback)) {
+      const score = scores.find(s => s.taskId === taskId);
+      const addressed = score?.judge?.feedbackAddressed === true ? 'Yes'
+        : score?.judge?.feedbackAddressed === false ? 'No'
+        : 'N/A';
+      const sanitized = feedbackText.replace(/\n/g, ' ').replace(/\|/g, '\\|');
+      const truncated = sanitized.length > 80
+        ? sanitized.slice(0, 77) + '...'
+        : sanitized;
+      const sanitizedId = taskId.replace(/\|/g, '\\|');
+      report += `| ${sanitizedId} | ${truncated} | ${addressed} |\n`;
+    }
+
+    report += `\n---\n\n`;
+  } else {
+    report += `\n---\n\n`;
+  }
+
+  report += `## Task Details\n\n`;
 
   for (let i = 0; i < evaluation.tasks.length; i++) {
     const task = evaluation.tasks[i];
@@ -140,6 +170,14 @@ ${score.stddev && (score.stddev.adherence > FLAKY_STDDEV_THRESHOLD || score.stdd
       }
     }
 
+    // Show human feedback if present for this task
+    if (humanFeedback && humanFeedback[task.id]) {
+      report += `\n**Human Feedback:**\n> ${humanFeedback[task.id].replace(/\n/g, '\n> ')}\n`;
+      if (score.judge?.feedbackAddressed !== undefined) {
+        report += `**Feedback Addressed:** ${score.judge.feedbackAddressed ? 'Yes' : 'No'}\n`;
+      }
+    }
+
     report += `\n**Reasoning:** ${score.reasoning || 'No reasoning provided'}
 
 <details>
@@ -186,15 +224,9 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
 /**
  * Generate JSON report for programmatic analysis.
  */
-export async function generateJsonResults(
-  evaluation: SkillEvaluation,
-  results: TaskResult[],
-  scores: CombinedScore[],
-  outputPath?: string,
-  metadata?: ReportMetadata,
-  numRuns = 1,
-  runDetails?: Array<{ result: TaskResult; score: CombinedScore }>[]
-): Promise<EvaluationReport> {
+export async function generateJsonResults(options: ReportOptions): Promise<EvaluationReport> {
+  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback } = options;
+  const numRuns = options.numRuns ?? 1;
   const config = loadConfigSync();
   const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
@@ -242,6 +274,9 @@ export async function generateJsonResults(
       score: scores[i],
       runDetails: runDetails?.[i],
     })),
+    humanFeedback: humanFeedback && Object.keys(humanFeedback).length > 0
+      ? humanFeedback
+      : undefined,
   };
 
   if (outputPath) {

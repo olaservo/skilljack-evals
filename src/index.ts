@@ -31,6 +31,7 @@ export type {
   FailureBreakdown,
   ReportMetadata,
   EvaluationReport,
+  HumanFeedback,
 } from './types.js';
 
 // Config
@@ -58,7 +59,11 @@ export { SessionLogger } from './session/session-logger.js';
 
 // Report
 export { generateReport, generateJsonResults, computeSummary, computeFailureBreakdown } from './report/report.js';
+export type { ReportOptions } from './report/report.js';
 export { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
+
+// Feedback
+export { generateFeedbackTemplate, writeFeedbackTemplate, loadFeedback, validateFeedback, getFeedbackForTask } from './feedback.js';
 
 // Pipeline
 export { runPipeline, scorePipeline } from './pipeline.js';

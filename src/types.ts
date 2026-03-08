@@ -86,6 +86,17 @@ export interface DeterministicResult {
 }
 
 // ============================================
+// Human Feedback Types
+// ============================================
+
+/**
+ * Human review feedback keyed by task ID.
+ * Empty string = task passed review (no feedback).
+ * Non-empty string = reviewer comments on issues.
+ */
+export type HumanFeedback = Record<string, string>;
+
+// ============================================
 // Judge Types
 // ============================================
 
@@ -112,6 +123,7 @@ export interface JudgeScore {
   failureCategory: FailureCategory;
   reasoning: string;
   checklistResults: ChecklistItemResult[];
+  feedbackAddressed?: boolean; // true = addressed, false = not, undefined = no feedback
 }
 
 export interface JudgeOptions {
@@ -239,6 +251,7 @@ export interface EvaluationReport {
     sessionLogPath?: string;
     runDetails?: Array<{ result: TaskResult; score: CombinedScore }>;
   }>;
+  humanFeedback?: HumanFeedback;
 }
 
 // ============================================

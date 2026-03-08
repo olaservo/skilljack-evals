@@ -45,9 +45,17 @@ export function generateGitHubSummary(report: EvaluationReport): string {
     lines.push('|------|----------|---------|');
     for (const f of failures) {
       const cat = formatCategory(f.score.failureCategory);
-      const reason = f.score.reasoning.slice(0, 80) + (f.score.reasoning.length > 80 ? '...' : '');
-      lines.push(`| ${f.task.id} | ${cat} | ${reason} |`);
+      const reason = (f.score.reasoning.slice(0, 80) + (f.score.reasoning.length > 80 ? '...' : '')).replace(/\|/g, '\\|');
+      const taskId = f.task.id.replace(/\|/g, '\\|');
+      lines.push(`| ${taskId} | ${cat} | ${reason} |`);
     }
+    lines.push('');
+  }
+
+  // Human review feedback note
+  if (report.humanFeedback && Object.keys(report.humanFeedback).length > 0) {
+    const feedbackCount = Object.keys(report.humanFeedback).length;
+    lines.push(`> :memo: Human review feedback provided for ${feedbackCount} task(s)`);
     lines.push('');
   }
 
@@ -65,15 +73,16 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   for (const t of tasks) {
     const s = t.score;
     const status = s.failureCategory === 'none' ? 'PASS' : 'FAIL';
+    const taskId = t.task.id.replace(/\|/g, '\\|');
     if (isMultiRun) {
       // Only check adherence and outputQuality against the threshold since they
       // use the 1-5 scale. Discovery (0/1) and weightedScore (0-1) cannot exceed 1.0.
       const varianceLabel = s.stddev
         ? (s.stddev.adherence > FLAKY_STDDEV_THRESHOLD || s.stddev.outputQuality > FLAKY_STDDEV_THRESHOLD ? ':warning: High' : 'Low')
         : 'N/A';
-      lines.push(`| ${t.task.id} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
+      lines.push(`| ${taskId} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
     } else {
-      lines.push(`| ${t.task.id} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
+      lines.push(`| ${taskId} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
     }
   }
   // Per-task checklist summaries

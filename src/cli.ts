@@ -16,6 +16,7 @@ import { runPipeline, scorePipeline } from './pipeline.js';
 import { generateReport, generateJsonResults } from './report/report.js';
 import { SkillJudge } from './scorer/judge.js';
 import type { EvalTask, TaskResult, JudgeScore, SkillEvaluation, CombinedScore } from './types.js';
+import { validateFeedback } from './feedback.js';
 import { VALID_RUNNER_TYPES } from './config.js';
 import type { EvalConfig, RunnerType } from './config.js';
 
@@ -48,6 +49,8 @@ program
   .option('--no-judge', 'Skip LLM judge scoring (deterministic only)')
   .option('--no-deterministic', 'Skip deterministic scoring (LLM judge only)')
   .option('--runs <number>', 'Number of times to run each task (default: 3)')
+  .option('--generate-feedback <path>', 'Generate feedback template JSON with task IDs after run')
+  .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
   .option('--github-summary', 'Write GitHub Actions step summary')
   .option('--verbose', 'Enable verbose output')
   .action(async (tasksFile: string, options: {
@@ -65,6 +68,8 @@ program
     judge?: boolean;
     deterministic?: boolean;
     runs?: string;
+    generateFeedback?: string;
+    feedback?: string;
     githubSummary?: boolean;
     verbose?: boolean;
   }) => {
@@ -94,6 +99,8 @@ program
         noJudge: options.judge === false,
         noDeterministic: options.deterministic === false,
         numRuns: options.runs ? parseInt(options.runs, 10) : undefined,
+        generateFeedbackPath: options.generateFeedback,
+        feedbackPath: options.feedback,
         verbose: options.verbose,
       });
 
@@ -118,11 +125,13 @@ program
   .option('--config <path>', 'Path to eval.config.yaml')
   .option('--no-judge', 'Skip LLM judge')
   .option('--no-deterministic', 'Skip deterministic checks')
+  .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
   .action(async (resultsFile: string, options: {
     judgeModel?: string;
     config?: string;
     judge?: boolean;
     deterministic?: boolean;
+    feedback?: string;
   }) => {
     try {
       const configOverrides: Partial<EvalConfig> = {};
@@ -133,6 +142,7 @@ program
         configOverrides,
         noJudge: options.judge === false,
         noDeterministic: options.deterministic === false,
+        feedbackPath: options.feedback,
       });
 
       if (!result.passed) {
@@ -165,6 +175,7 @@ program
         skillName: string;
         tasks: Array<{ task: EvalTask; result: TaskResult; score: CombinedScore }>;
         metadata?: { skillPath: string; agentModel: string; judgeModel: string };
+        humanFeedback?: Record<string, string>;
       };
 
       const evaluation: SkillEvaluation = {
@@ -174,18 +185,25 @@ program
       const results = data.tasks.map((t) => t.result);
       const scores = data.tasks.map((t) => t.score);
 
-      const report = await generateReport(
-        evaluation, results, scores, options.output, data.metadata
-      );
+      // Validate humanFeedback from loaded JSON (may have been hand-edited)
+      let humanFeedback: Record<string, string> | undefined;
+      if (data.humanFeedback) {
+        const validated = validateFeedback(data.humanFeedback as Record<string, unknown>);
+        humanFeedback = Object.keys(validated).length > 0 ? validated : undefined;
+      }
+
+      const reportOpts = {
+        evaluation, results, scores, metadata: data.metadata,
+        humanFeedback,
+      };
+      const report = await generateReport({ ...reportOpts, outputPath: options.output });
 
       if (!options.output) {
         console.log(report);
       }
 
       if (options.json) {
-        await generateJsonResults(
-          evaluation, results, scores, options.json, data.metadata
-        );
+        await generateJsonResults({ ...reportOpts, outputPath: options.json });
       }
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
@@ -299,6 +317,7 @@ program
   .option('--skill-loads <skills>', 'Comma-separated list of skills loaded', '')
   .option('--checklist <items>', 'Comma-separated golden checklist items', '')
   .option('--model <model>', 'Judge model (default: haiku)')
+  .option('--feedback <text>', 'Human review feedback text for this task')
   .option('-o, --output-file <path>', 'Output JSON file (default: stdout)')
   .action(async (options: {
     taskId: string;
@@ -308,6 +327,7 @@ program
     skillLoads: string;
     checklist: string;
     model?: string;
+    feedback?: string;
     outputFile?: string;
   }) => {
     const task: EvalTask = {
@@ -337,7 +357,7 @@ program
 
     const judge = new SkillJudge({ model: options.model });
     console.error(`Judging task ${options.taskId}...`);
-    const score = await judge.judgeResult(task, result);
+    const score = await judge.judgeResult(task, result, options.feedback);
 
     const json = JSON.stringify(score, null, 2);
     if (options.outputFile) {

@@ -23,7 +23,28 @@ import type {
   EvaluationReport,
   ReportMetadata,
   EvalTask,
+  HumanFeedback,
 } from './types.js';
+import { loadFeedback, writeFeedbackTemplate } from './feedback.js';
+
+/**
+ * Load human feedback from a file, validating against known task IDs.
+ */
+async function loadHumanFeedback(
+  feedbackPath: string | undefined,
+  tasks: EvalTask[]
+): Promise<HumanFeedback | undefined> {
+  if (!feedbackPath) return undefined;
+  const taskIds = new Set(tasks.map(t => t.id));
+  const feedback = await loadFeedback(feedbackPath, taskIds);
+  const count = Object.keys(feedback).length;
+  if (count === 0) {
+    console.log(`Feedback file loaded from ${feedbackPath} but no non-empty entries found — skipping`);
+    return undefined;
+  }
+  console.log(`Loaded human feedback for ${count} task(s) from: ${feedbackPath}`);
+  return feedback;
+}
 
 export interface PipelineOptions {
   /** Path to tasks YAML file */
@@ -46,6 +67,10 @@ export interface PipelineOptions {
   numRuns?: number;
   /** Enable verbose logging */
   verbose?: boolean;
+  /** Path to write feedback template JSON after run */
+  generateFeedbackPath?: string;
+  /** Path to feedback JSON for judge prompt enrichment */
+  feedbackPath?: string;
 }
 
 export interface PipelineResult {
@@ -58,6 +83,7 @@ export interface PipelineResult {
   reportPath?: string;
   jsonPath?: string;
   markdownSummary: string;
+  feedbackTemplatePath?: string;
 }
 
 /**
@@ -83,6 +109,17 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
   if (evaluation.tasks.length === 0) {
     throw new Error('No tasks to run');
+  }
+
+  // Load human feedback if provided
+  const humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
+
+  // Generate feedback template early (only needs task IDs, available even if run fails)
+  let feedbackTemplatePath: string | undefined;
+  if (options.generateFeedbackPath) {
+    await writeFeedbackTemplate(evaluation.tasks, options.generateFeedbackPath);
+    feedbackTemplatePath = options.generateFeedbackPath;
+    console.log(`Feedback template written to: ${feedbackTemplatePath}`);
   }
 
   console.log(`Running ${evaluation.tasks.length} task(s) for skill: ${evaluation.skillName}`);
@@ -130,6 +167,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       noDeterministic: options.noDeterministic,
       noJudge: options.noJudge,
       judgeOptions: { model: config.defaultJudgeModel },
+      humanFeedback,
     };
 
     const allResults: TaskResult[][] = [];
@@ -190,8 +228,11 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       judgeModel: config.defaultJudgeModel,
     };
 
-    await generateReport(evaluation, results, scores, reportPath, metadata, numRuns, runDetails);
-    const report = await generateJsonResults(evaluation, results, scores, jsonPath, metadata, numRuns, runDetails);
+    const reportOptions = {
+      evaluation, results, scores, metadata, numRuns, runDetails, humanFeedback,
+    };
+    await generateReport({ ...reportOptions, outputPath: reportPath });
+    const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
 
     // 6. GitHub summary
     if (config.githubSummary) {
@@ -216,6 +257,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       reportPath,
       jsonPath,
       markdownSummary,
+      feedbackTemplatePath,
     };
   } finally {
     // Cleanup local skills
@@ -235,6 +277,7 @@ export async function scorePipeline(
     configOverrides?: Partial<EvalConfig>;
     noJudge?: boolean;
     noDeterministic?: boolean;
+    feedbackPath?: string;
   } = {}
 ): Promise<PipelineResult> {
   const config = await loadConfig(options.configPath, options.configOverrides);
@@ -246,10 +289,14 @@ export async function scorePipeline(
   };
   const results: TaskResult[] = data.results;
 
+  // Load human feedback if provided
+  const humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
+
   const scorerOptions: ScorerOptions = {
     noDeterministic: options.noDeterministic,
     noJudge: options.noJudge,
     judgeOptions: { model: config.defaultJudgeModel },
+    humanFeedback,
   };
 
   console.log(`Scoring ${results.length} result(s)...`);
@@ -267,8 +314,11 @@ export async function scorePipeline(
     judgeModel: config.defaultJudgeModel,
   };
 
-  await generateReport(evaluation, results, scores, reportPath, metadata);
-  const report = await generateJsonResults(evaluation, results, scores, jsonPath, metadata);
+  const reportOptions = {
+    evaluation, results, scores, metadata, humanFeedback,
+  };
+  await generateReport({ ...reportOptions, outputPath: reportPath });
+  const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
 
   const markdownSummary = generateGitHubSummary(report);
   printSummary(report);
