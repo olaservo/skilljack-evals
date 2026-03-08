@@ -295,10 +295,10 @@ function printSummary(report: EvaluationReport): void {
   if (s.numRuns > 1) {
     console.log(`  Runs: ${s.numRuns}`);
   }
-  console.log(`  Discovery: ${(s.discoveryAccuracy * 100).toFixed(0)}%`);
-  console.log(`  Avg Adherence: ${s.avgAdherence.toFixed(2)}/5`);
-  console.log(`  Avg Output Quality: ${s.avgOutputQuality.toFixed(2)}/5`);
-  console.log(`  Weighted Score: ${s.avgWeightedScore.toFixed(2)}`);
+  console.log(`  Discovery: ${(s.discoveryAccuracy * 100).toFixed(0)}%${s.stddev ? ` (\u00B1 ${(s.stddev.discovery * 100).toFixed(1)}%)` : ''}`);
+  console.log(`  Avg Adherence: ${s.avgAdherence.toFixed(2)}/5${s.stddev ? ` (\u00B1 ${s.stddev.adherence.toFixed(2)})` : ''}`);
+  console.log(`  Avg Output Quality: ${s.avgOutputQuality.toFixed(2)}/5${s.stddev ? ` (\u00B1 ${s.stddev.outputQuality.toFixed(2)})` : ''}`);
+  console.log(`  Weighted Score: ${s.avgWeightedScore.toFixed(2)}${s.stddev ? ` (\u00B1 ${s.stddev.weightedScore.toFixed(2)})` : ''}`);
   console.log(`  Duration: ${(s.totalDurationMs / 1000).toFixed(1)}s | Cost: $${s.totalCostUsd.toFixed(4)}`);
   if (!report.passed && report.failureReasons.length > 0) {
     console.log(`\n  Failures:`);
