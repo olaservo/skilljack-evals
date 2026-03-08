@@ -12,6 +12,13 @@ export function formatDelta(value: number, decimals = 2): string {
 }
 
 /**
+ * Format a percentage string from count/total. Returns '0' when total is 0.
+ */
+export function pct(count: number, total: number): string {
+  return total > 0 ? ((count / total) * 100).toFixed(0) : '0';
+}
+
+/**
  * Format a failure category slug as a human-readable label.
  */
 export function formatCategory(cat: string): string {

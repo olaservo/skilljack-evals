@@ -6,7 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { formatDelta, formatCategory } from '../utils/format.js';
+import { formatDelta, formatCategory, pct } from '../utils/format.js';
 import type {
   SkillEvaluation,
   TaskResult,
@@ -471,14 +471,14 @@ The judge evaluated both outputs without knowing which used the skill.
 
 | Preference | Count | Percentage |
 |------------|-------|------------|
-| With-skill preferred | ${a.withSkillPreferred} | ${total > 0 ? ((a.withSkillPreferred / total) * 100).toFixed(0) : 0}% |
-| Without-skill preferred | ${a.withoutSkillPreferred} | ${total > 0 ? ((a.withoutSkillPreferred / total) * 100).toFixed(0) : 0}% |
-| Tie | ${a.ties} | ${total > 0 ? ((a.ties / total) * 100).toFixed(0) : 0}% |
+| With-skill preferred | ${a.withSkillPreferred} | ${pct(a.withSkillPreferred, total)}% |
+| Without-skill preferred | ${a.withoutSkillPreferred} | ${pct(a.withoutSkillPreferred, total)}% |
+| Tie | ${a.ties} | ${pct(a.ties, total)}% |
 
 ### Per-Task Blind Results
 
-| Task | Labels (W/B) | A Adherence | A Output | B Adherence | B Output | Preferred | Condition | Bias? |
-|------|-------------|-------------|----------|-------------|----------|-----------|-----------|-------|
+| Task | Assignment | A Adherence | A Output | B Adherence | B Output | Preferred | Condition | Bias? |
+|------|------------|-------------|----------|-------------|----------|-----------|-----------|-------|
 `;
 
   for (const t of blind.tasks) {

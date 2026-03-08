@@ -362,6 +362,7 @@ export interface BlindTaskComparison {
   reasoning: string;
   preferredCondition: 'with-skill' | 'without-skill' | 'tie';
   biasSignal: boolean;                  // blind disagrees with standard scoring
+  failed: boolean;                      // true when blind judge call failed
 }
 
 export interface BlindComparisonData {

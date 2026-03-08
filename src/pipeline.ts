@@ -10,7 +10,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { formatDelta } from './utils/format.js';
+import { formatDelta, pct } from './utils/format.js';
 import { parseEvalFile } from './parser.js';
 import { setupLocalSkills, cleanupLocalSkills } from './runner/skill-setup.js';
 import { createRunner } from './runner/runner-factory.js';
@@ -623,8 +623,8 @@ function printBlindComparisonSummary(blind: BlindComparisonData): void {
   console.log('\n' + '-'.repeat(50));
   console.log('  Blind A/B Comparison');
   console.log('-'.repeat(50));
-  console.log(`  With-skill preferred: ${a.withSkillPreferred}/${total} (${total > 0 ? ((a.withSkillPreferred / total) * 100).toFixed(0) : 0}%)`);
-  console.log(`  Without-skill preferred: ${a.withoutSkillPreferred}/${total} (${total > 0 ? ((a.withoutSkillPreferred / total) * 100).toFixed(0) : 0}%)`);
+  console.log(`  With-skill preferred: ${a.withSkillPreferred}/${total} (${pct(a.withSkillPreferred, total)}%)`);
+  console.log(`  Without-skill preferred: ${a.withoutSkillPreferred}/${total} (${pct(a.withoutSkillPreferred, total)}%)`);
   console.log(`  Ties: ${a.ties}/${total}`);
   if (a.biasSignalCount > 0) {
     console.log(`  Bias signals: ${a.biasSignalCount} (blind disagrees with standard scoring)`);

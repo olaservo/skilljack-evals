@@ -90,6 +90,7 @@ describe('generateGitHubSummary', () => {
             reasoning: 'A is better',
             preferredCondition: 'with-skill',
             biasSignal: false,
+            failed: false,
           },
           {
             taskId: 'task-2',
@@ -100,6 +101,7 @@ describe('generateGitHubSummary', () => {
             reasoning: 'Equal',
             preferredCondition: 'tie',
             biasSignal: false,
+            failed: false,
           },
         ],
         aggregate: {

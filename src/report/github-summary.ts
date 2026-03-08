@@ -5,7 +5,7 @@
  */
 
 import * as fs from 'fs/promises';
-import { formatDelta, formatCategory } from '../utils/format.js';
+import { formatDelta, formatCategory, pct } from '../utils/format.js';
 import type {
   EvaluationReport,
   EvaluationSummary,
@@ -145,9 +145,9 @@ export function generateGitHubSummary(report: EvaluationReport): string {
     lines.push('');
     lines.push('| Preference | Count | % |');
     lines.push('|------------|-------|---|');
-    lines.push(`| With-skill | ${ba.withSkillPreferred} | ${total > 0 ? ((ba.withSkillPreferred / total) * 100).toFixed(0) : 0}% |`);
-    lines.push(`| Without-skill | ${ba.withoutSkillPreferred} | ${total > 0 ? ((ba.withoutSkillPreferred / total) * 100).toFixed(0) : 0}% |`);
-    lines.push(`| Tie | ${ba.ties} | ${total > 0 ? ((ba.ties / total) * 100).toFixed(0) : 0}% |`);
+    lines.push(`| With-skill | ${ba.withSkillPreferred} | ${pct(ba.withSkillPreferred, total)}% |`);
+    lines.push(`| Without-skill | ${ba.withoutSkillPreferred} | ${pct(ba.withoutSkillPreferred, total)}% |`);
+    lines.push(`| Tie | ${ba.ties} | ${pct(ba.ties, total)}% |`);
     lines.push('');
     if (ba.biasSignalCount > 0) {
       lines.push(`:warning: **${ba.biasSignalCount} bias signal(s):** blind comparison disagrees with standard scoring`);

@@ -93,6 +93,7 @@ function makeBlindTask(
     reasoning: 'test reasoning',
     preferredCondition,
     biasSignal,
+    failed: false,
   };
 }
 
@@ -103,7 +104,7 @@ function computeAggregate(tasks: BlindTaskComparison[]): BlindComparisonData['ag
     withoutSkillPreferred: tasks.filter(t => t.preferredCondition === 'without-skill').length,
     ties: tasks.filter(t => t.preferredCondition === 'tie').length,
     biasSignalCount: tasks.filter(t => t.biasSignal).length,
-    failedCount: tasks.filter(t => t.reasoning === 'Blind judge call failed').length,
+    failedCount: tasks.filter(t => t.failed).length,
   };
 }
 
@@ -155,6 +156,7 @@ describe('Blind comparison label mapping', () => {
       reasoning: 'A is better',
       preferredCondition: 'with-skill',
       biasSignal: false,
+      failed: false,
     };
     expect(task.preferredCondition).toBe('with-skill');
   });
@@ -169,6 +171,7 @@ describe('Blind comparison label mapping', () => {
       reasoning: 'B is better',
       preferredCondition: 'with-skill',
       biasSignal: false,
+      failed: false,
     };
     expect(task.preferredCondition).toBe('with-skill');
   });
@@ -183,6 +186,7 @@ describe('Blind comparison label mapping', () => {
       reasoning: 'A is better',
       preferredCondition: 'without-skill',
       biasSignal: false,
+      failed: false,
     };
     expect(task.preferredCondition).toBe('without-skill');
   });
