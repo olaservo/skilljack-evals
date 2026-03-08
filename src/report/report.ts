@@ -112,6 +112,8 @@ ${metaSection}
     }
 
     report += `\n---\n\n`;
+  } else {
+    report += `\n---\n\n`;
   }
 
   report += `## Task Details\n\n`;
