@@ -57,6 +57,9 @@ export async function loadPreviousReport(filePath: string): Promise<EvaluationRe
     if (!task.score || typeof task.score.taskId !== 'string') {
       throw new Error('Comparison file has task entries without score.taskId');
     }
+    if (typeof task.score.weightedScore !== 'number') {
+      throw new Error(`Comparison file task "${task.score.taskId}" is missing numeric score fields`);
+    }
   }
 
   return data as EvaluationReport;
@@ -116,7 +119,13 @@ export function compareResults(
 
     let significantChange: TaskDelta['significantChange'] = 'unchanged';
     if (isSignificant) {
-      significantChange = delta.weightedScore > 0 ? 'improved' : 'regressed';
+      // Use weighted score as primary signal, fall back to adherence for tie-breaking
+      if (delta.weightedScore > 0 || (delta.weightedScore === 0 && delta.adherence > 0)) {
+        significantChange = 'improved';
+      } else if (delta.weightedScore < 0 || (delta.weightedScore === 0 && delta.adherence < 0)) {
+        significantChange = 'regressed';
+      }
+      // else stays 'unchanged' when both deltas are exactly zero
     }
 
     taskDeltas.push({
@@ -302,7 +311,8 @@ function formatSignedDelta(value: number): string {
 function formatTransition(prev: number, curr: number): string {
   const delta = curr - prev;
   const sign = delta > 0 ? '+' : '';
-  return `${prev} → ${curr} (${sign}${delta})`;
+  const fmt = (v: number) => Number.isInteger(v) ? String(v) : v.toFixed(2);
+  return `${fmt(prev)} → ${fmt(curr)} (${sign}${fmt(delta)})`;
 }
 
 function formatTransitionDecimal(prev: number, curr: number): string {

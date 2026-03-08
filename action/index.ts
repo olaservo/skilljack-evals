@@ -99,6 +99,7 @@ async function run(): Promise<void> {
     core.setOutput('report-path', result.reportPath || '');
     core.setOutput('json-path', result.jsonPath || '');
     core.setOutput('feedback-template-path', result.feedbackTemplatePath || '');
+    core.setOutput('has-regressions', 'false');
 
     // Set comparison outputs (--compare mode)
     if (result.comparison) {

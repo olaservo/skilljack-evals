@@ -405,8 +405,11 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       const currentSummary = computeSummary(primaryPhase.results, primaryPhase.scores, numRuns);
       crossIterationComparison = compareResults(primaryPhase.scores, currentSummary, previousReport);
 
+      if (crossIterationComparison.taskDeltas.length === 0 && primaryPhase.scores.length > 0) {
+        console.warn('Warning: No tasks matched between current and previous results. Comparison may not be meaningful.');
+      }
       if (crossIterationComparison.tasksOnlyInCurrent.length > 0) {
-        console.warn(`Warning: ${crossIterationComparison.tasksOnlyInCurrent.length} task(s) in current results not found in previous: ${crossIterationComparison.tasksOnlyInCurrent.join(', ')}`);
+        console.warn(`Warning: ${crossIterationComparison.tasksOnlyInCurrent.length} task(s) in current results not found in previous: ${crossIterationComparison.tasksOnlyInCurrent.join(', ')}`)
       }
       if (crossIterationComparison.tasksOnlyInPrevious.length > 0) {
         console.warn(`Warning: ${crossIterationComparison.tasksOnlyInPrevious.length} task(s) in previous results not found in current: ${crossIterationComparison.tasksOnlyInPrevious.join(', ')}`);

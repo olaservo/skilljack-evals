@@ -153,6 +153,26 @@ describe('loadPreviousReport', () => {
     const loaded = await loadPreviousReport(filePath);
     expect(loaded.skillName).toBe('test-skill');
   });
+
+  it('throws for task with non-numeric weightedScore', async () => {
+    const filePath = await writeTmpJson({
+      skillName: 'test',
+      summary: {},
+      tasks: [{ task: {}, result: {}, score: { taskId: 'task-1', weightedScore: 'bad' } }],
+    });
+    await expect(loadPreviousReport(filePath))
+      .rejects.toThrow('missing numeric score fields');
+  });
+
+  it('throws for task with missing weightedScore', async () => {
+    const filePath = await writeTmpJson({
+      skillName: 'test',
+      summary: {},
+      tasks: [{ task: {}, result: {}, score: { taskId: 'task-1' } }],
+    });
+    await expect(loadPreviousReport(filePath))
+      .rejects.toThrow('missing numeric score fields');
+  });
 });
 
 describe('compareResults', () => {
@@ -292,6 +312,37 @@ describe('compareResults', () => {
     const task2 = result.taskDeltas.find((t) => t.taskId === 'task-2')!;
     // weightedScore delta = 0.9 - 0.7 = 0.2, which exceeds SIGNIFICANCE_THRESHOLD_WEIGHTED
     expect(task2.significantChange).toBe('improved');
+  });
+
+  it('classifies as improved when weightedScore is zero but adherence improved', () => {
+    const previous = makeReport();
+    // Adherence improves by 1 (significant), but weightedScore stays the same
+    const currentScores = [
+      makeScore({ taskId: 'task-1', discovery: 1, adherence: 5, outputQuality: 4, weightedScore: 0.8 }),
+      makeScore({ taskId: 'task-2', discovery: 0.6, adherence: 4, outputQuality: 4, weightedScore: 0.7 }),
+    ];
+    const currentSummary = makeSummary();
+
+    const result = compareResults(currentScores, currentSummary, previous);
+    const task1 = result.taskDeltas.find((t) => t.taskId === 'task-1')!;
+    expect(task1.delta.adherence).toBe(1);
+    expect(task1.delta.weightedScore).toBe(0);
+    expect(task1.significantChange).toBe('improved');
+  });
+
+  it('classifies as regressed when weightedScore is zero but adherence regressed', () => {
+    const previous = makeReport();
+    const currentScores = [
+      makeScore({ taskId: 'task-1', discovery: 1, adherence: 3, outputQuality: 4, weightedScore: 0.8 }),
+      makeScore({ taskId: 'task-2', discovery: 0.6, adherence: 4, outputQuality: 4, weightedScore: 0.7 }),
+    ];
+    const currentSummary = makeSummary();
+
+    const result = compareResults(currentScores, currentSummary, previous);
+    const task1 = result.taskDeltas.find((t) => t.taskId === 'task-1')!;
+    expect(task1.delta.adherence).toBe(-1);
+    expect(task1.delta.weightedScore).toBe(0);
+    expect(task1.significantChange).toBe('regressed');
   });
 
   it('stores previous and current values in task deltas', () => {
