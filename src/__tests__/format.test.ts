@@ -33,4 +33,11 @@ describe('formatDelta', () => {
     expect(formatDelta(0.001, 3)).toBe('+0.001');
     expect(formatDelta(-0.0001, 4)).toBe('-0.0001');
   });
+
+  it('normalizes negative zero to unsigned zero', () => {
+    expect(formatDelta(-0.004)).toBe('0.00');
+    expect(formatDelta(-0.004, 2)).toBe('0.00');
+    expect(formatDelta(-0.0004, 3)).toBe('0.000');
+    expect(formatDelta(-0.4, 0)).toBe('0');
+  });
 });

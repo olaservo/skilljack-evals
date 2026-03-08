@@ -219,6 +219,7 @@ function computeComparison(
       withoutSkill: b,
       delta: {
         taskId: w.result.taskId,
+        discoveryDelta: w.score.discovery - b.score.discovery,
         adherenceDelta: w.score.adherence - b.score.adherence,
         outputQualityDelta: w.score.outputQuality - b.score.outputQuality,
         weightedScoreDelta: w.score.weightedScore - b.score.weightedScore,

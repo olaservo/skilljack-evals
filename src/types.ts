@@ -262,6 +262,7 @@ export interface EvaluationReport {
 /** Per-task delta metrics between with-skill and baseline runs */
 export interface TaskComparisonDelta {
   taskId: string;
+  discoveryDelta: number;
   adherenceDelta: number;
   outputQualityDelta: number;
   weightedScoreDelta: number;
