@@ -109,7 +109,7 @@ ${metaSection}
 
 | Dimension | Score | Status |
 |-----------|-------|--------|
-| Discovery | ${Math.round(score.discovery)}${score.stddev ? ` \u00B1 ${score.stddev.discovery.toFixed(2)}` : ''} | ${score.discovery >= 1 ? 'PASS' : 'FAIL'} |
+| Discovery | ${Math.round(score.discovery)}${score.stddev ? ` \u00B1 ${(score.stddev.discovery * 100).toFixed(0)}%` : ''} | ${score.discovery >= 1 ? 'PASS' : 'FAIL'} |
 | Adherence | ${score.adherence.toFixed(1)}/5${score.stddev ? ` \u00B1 ${score.stddev.adherence.toFixed(1)}` : ''} | ${score.adherence >= 4 ? 'PASS' : 'FAIL'} |
 | Output Quality | ${score.outputQuality.toFixed(1)}/5${score.stddev ? ` \u00B1 ${score.stddev.outputQuality.toFixed(1)}` : ''} | ${score.outputQuality >= 4 ? 'PASS' : 'FAIL'} |
 | **Weighted** | **${score.weightedScore.toFixed(2)}${score.stddev ? ` \u00B1 ${score.stddev.weightedScore.toFixed(2)}` : ''}** | |
@@ -275,17 +275,18 @@ export function computeSummary(
     totalCostUsd: results.reduce((sum, r) => sum + r.costUsd, 0),
   };
 
-  // Compute summary-level stddev across per-task mean scores when multi-run.
-  // Note: this measures variance across tasks (how spread are per-task averages),
-  // whereas task-level stddev measures variance across runs for a single task.
-  // With a single task, all stddev values will be 0 (no cross-task spread).
+  // Compute summary-level stddev as the mean of per-task stddevs (cross-run variability).
+  // This tells users "on average, how much do scores vary across runs."
   if (numRuns >= 2) {
-    summary.stddev = {
-      discovery: computeStddev(scores.map(s => s.discovery), avgDiscovery),
-      adherence: computeStddev(scores.map(s => s.adherence), avgAdherence),
-      outputQuality: computeStddev(scores.map(s => s.outputQuality), avgOutputQuality),
-      weightedScore: computeStddev(scores.map(s => s.weightedScore), avgWeightedScore),
-    };
+    const tasksWithStddev = scores.filter(s => s.stddev);
+    if (tasksWithStddev.length > 0) {
+      summary.stddev = {
+        discovery: tasksWithStddev.reduce((sum, s) => sum + s.stddev!.discovery, 0) / tasksWithStddev.length,
+        adherence: tasksWithStddev.reduce((sum, s) => sum + s.stddev!.adherence, 0) / tasksWithStddev.length,
+        outputQuality: tasksWithStddev.reduce((sum, s) => sum + s.stddev!.outputQuality, 0) / tasksWithStddev.length,
+        weightedScore: tasksWithStddev.reduce((sum, s) => sum + s.stddev!.weightedScore, 0) / tasksWithStddev.length,
+      };
+    }
   }
 
   return summary;
