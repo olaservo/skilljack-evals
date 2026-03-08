@@ -16,7 +16,7 @@ import type {
   ScoreSnapshot,
   SummarySnapshot,
 } from '../types.js';
-import { formatDelta } from './format-utils.js';
+import { formatDelta, ARROW_DIRECTION_EPSILON } from './format-utils.js';
 
 export const SIGNIFICANCE_THRESHOLD_ADHERENCE = 1;
 export const SIGNIFICANCE_THRESHOLD_WEIGHTED = 0.15;
@@ -49,6 +49,15 @@ export async function loadPreviousReport(filePath: string): Promise<EvaluationRe
   }
   if (!report.summary || typeof report.summary !== 'object') {
     throw new Error('Comparison file is not a valid EvaluationReport: missing "summary"');
+  }
+  const summary = report.summary as Record<string, unknown>;
+  if (
+    typeof summary.discoveryAccuracy !== 'number' ||
+    typeof summary.avgAdherence !== 'number' ||
+    typeof summary.avgOutputQuality !== 'number' ||
+    typeof summary.avgWeightedScore !== 'number'
+  ) {
+    throw new Error('Comparison file summary is missing required numeric fields');
   }
   if (!Array.isArray(report.tasks)) {
     throw new Error('Comparison file is not a valid EvaluationReport: missing "tasks" array');
@@ -119,9 +128,10 @@ export function compareResults(
       weightedScore: current.weightedScore - prev.weightedScore,
     };
 
+    const roundedWeighted = Math.round(delta.weightedScore * 1000) / 1000;
     const isSignificant =
       Math.abs(delta.adherence) >= SIGNIFICANCE_THRESHOLD_ADHERENCE ||
-      Math.abs(delta.weightedScore) >= SIGNIFICANCE_THRESHOLD_WEIGHTED;
+      Math.abs(roundedWeighted) >= SIGNIFICANCE_THRESHOLD_WEIGHTED;
 
     let significantChange: TaskDelta['significantChange'] = 'unchanged';
     if (isSignificant) {
@@ -274,10 +284,10 @@ export function formatComparisonConsole(comparison: ComparisonResult): string {
   lines.push('-'.repeat(50));
   lines.push('  Comparison vs. Previous');
   lines.push('-'.repeat(50));
-  lines.push(`  Discovery:    ${formatSignedDelta(d.discoveryAccuracy * 100)}%`);
-  lines.push(`  Adherence:    ${formatSignedDelta(d.avgAdherence)}`);
-  lines.push(`  Output:       ${formatSignedDelta(d.avgOutputQuality)}`);
-  lines.push(`  Weighted:     ${formatSignedDelta(d.avgWeightedScore)}`);
+  lines.push(`  Discovery:    ${formatDelta(d.discoveryAccuracy * 100)}%`);
+  lines.push(`  Adherence:    ${formatDelta(d.avgAdherence)}`);
+  lines.push(`  Output:       ${formatDelta(d.avgOutputQuality)}`);
+  lines.push(`  Weighted:     ${formatDelta(d.avgWeightedScore)}`);
 
   const improved = comparison.taskDeltas.filter((t) => t.significantChange === 'improved');
   const regressed = comparison.taskDeltas.filter((t) => t.significantChange === 'regressed');
@@ -300,12 +310,9 @@ export function formatComparisonConsole(comparison: ComparisonResult): string {
 }
 
 function summaryRow(label: string, prev: string, curr: string, delta: string, value: number): string {
-  const arrow = value > 0.001 ? ':arrow_up:' : value < -0.001 ? ':arrow_down:' : '';
+  const arrow = value > ARROW_DIRECTION_EPSILON ? ':arrow_up:' : value < -ARROW_DIRECTION_EPSILON ? ':arrow_down:' : '';
   return `| **${label}** | ${prev} | ${curr} | ${delta} | ${arrow} |`;
 }
-
-// formatSignedDelta is just formatDelta with no suffix
-const formatSignedDelta = formatDelta;
 
 function formatTransition(prev: number, curr: number): string {
   const delta = curr - prev;

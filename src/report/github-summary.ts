@@ -13,6 +13,7 @@ import type {
   CombinedScore,
 } from '../types.js';
 import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
+import { ARROW_DIRECTION_EPSILON } from './format-utils.js';
 
 /**
  * Generate a condensed summary for GitHub Actions.
@@ -64,7 +65,7 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   if (report.crossIterationComparison) {
     const c = report.crossIterationComparison;
     const sd = c.summaryDelta.delta;
-    const arrow = (v: number) => v > 0.001 ? ':arrow_up:' : v < -0.001 ? ':arrow_down:' : '';
+    const arrow = (v: number) => v > ARROW_DIRECTION_EPSILON ? ':arrow_up:' : v < -ARROW_DIRECTION_EPSILON ? ':arrow_down:' : '';
     lines.push('### Comparison vs. Previous');
     lines.push('');
     lines.push('| Metric | Delta | |');

@@ -17,6 +17,14 @@ import type {
   CombinedScore,
 } from '../types.js';
 
+// Minimal valid summary object for tests that need to pass summary validation
+const validSummary = {
+  discoveryAccuracy: 0.8,
+  avgAdherence: 4.0,
+  avgOutputQuality: 4.0,
+  avgWeightedScore: 0.75,
+};
+
 // Helper to build a minimal valid EvaluationReport
 function makeReport(overrides: Partial<EvaluationReport> = {}): EvaluationReport {
   return {
@@ -132,8 +140,14 @@ describe('loadPreviousReport', () => {
       .rejects.toThrow('missing "summary"');
   });
 
+  it('throws for summary missing required numeric fields', async () => {
+    const filePath = await writeTmpJson({ skillName: 'test', summary: {}, tasks: [] });
+    await expect(loadPreviousReport(filePath))
+      .rejects.toThrow('summary is missing required numeric fields');
+  });
+
   it('throws for missing tasks array', async () => {
-    const filePath = await writeTmpJson({ skillName: 'test', summary: {} });
+    const filePath = await writeTmpJson({ skillName: 'test', summary: validSummary });
     await expect(loadPreviousReport(filePath))
       .rejects.toThrow('missing "tasks" array');
   });
@@ -141,7 +155,7 @@ describe('loadPreviousReport', () => {
   it('throws for task without score.taskId', async () => {
     const filePath = await writeTmpJson({
       skillName: 'test',
-      summary: {},
+      summary: validSummary,
       tasks: [{ task: {}, result: {}, score: {} }],
     });
     await expect(loadPreviousReport(filePath))
@@ -158,7 +172,7 @@ describe('loadPreviousReport', () => {
   it('throws for task with non-numeric weightedScore', async () => {
     const filePath = await writeTmpJson({
       skillName: 'test',
-      summary: {},
+      summary: validSummary,
       tasks: [{ task: {}, result: {}, score: { taskId: 'task-1', weightedScore: 'bad' } }],
     });
     await expect(loadPreviousReport(filePath))
@@ -168,7 +182,7 @@ describe('loadPreviousReport', () => {
   it('throws for task with missing weightedScore', async () => {
     const filePath = await writeTmpJson({
       skillName: 'test',
-      summary: {},
+      summary: validSummary,
       tasks: [{ task: {}, result: {}, score: { taskId: 'task-1' } }],
     });
     await expect(loadPreviousReport(filePath))
@@ -547,7 +561,7 @@ describe('loadPreviousReport - score field validation', () => {
   it('throws for task with missing discovery field', async () => {
     const filePath = await writeTmpJson({
       skillName: 'test',
-      summary: {},
+      summary: validSummary,
       tasks: [{ task: {}, result: {}, score: { taskId: 'task-1', weightedScore: 0.8, adherence: 4, outputQuality: 4 } }],
     });
     await expect(loadPreviousReport(filePath))
@@ -557,7 +571,7 @@ describe('loadPreviousReport - score field validation', () => {
   it('throws for task with missing adherence field', async () => {
     const filePath = await writeTmpJson({
       skillName: 'test',
-      summary: {},
+      summary: validSummary,
       tasks: [{ task: {}, result: {}, score: { taskId: 'task-1', weightedScore: 0.8, discovery: 1, outputQuality: 4 } }],
     });
     await expect(loadPreviousReport(filePath))
@@ -567,7 +581,7 @@ describe('loadPreviousReport - score field validation', () => {
   it('throws for task with missing outputQuality field', async () => {
     const filePath = await writeTmpJson({
       skillName: 'test',
-      summary: {},
+      summary: validSummary,
       tasks: [{ task: {}, result: {}, score: { taskId: 'task-1', weightedScore: 0.8, discovery: 1, adherence: 4 } }],
     });
     await expect(loadPreviousReport(filePath))
@@ -577,7 +591,7 @@ describe('loadPreviousReport - score field validation', () => {
   it('accepts task with all numeric score fields', async () => {
     const filePath = await writeTmpJson({
       skillName: 'test',
-      summary: {},
+      summary: validSummary,
       tasks: [{ task: {}, result: {}, score: { taskId: 'task-1', weightedScore: 0.8, discovery: 1, adherence: 4, outputQuality: 4 } }],
     });
     const loaded = await loadPreviousReport(filePath);
