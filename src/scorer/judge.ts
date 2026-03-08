@@ -592,6 +592,7 @@ export async function blindCompareAll(
     withoutSkillPreferred: blindTasks.filter(t => t.preferredCondition === 'without-skill').length,
     ties: blindTasks.filter(t => t.preferredCondition === 'tie').length,
     biasSignalCount: blindTasks.filter(t => t.biasSignal).length,
+    failedCount: blindTasks.filter(t => t.reasoning === 'Blind judge call failed').length,
   };
 
   return { tasks: blindTasks, aggregate };

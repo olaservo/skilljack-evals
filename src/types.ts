@@ -371,6 +371,7 @@ export interface BlindComparisonData {
     withoutSkillPreferred: number;
     ties: number;
     biasSignalCount: number;
+    failedCount: number;
   };
 }
 

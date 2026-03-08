@@ -103,6 +103,7 @@ function computeAggregate(tasks: BlindTaskComparison[]): BlindComparisonData['ag
     withoutSkillPreferred: tasks.filter(t => t.preferredCondition === 'without-skill').length,
     ties: tasks.filter(t => t.preferredCondition === 'tie').length,
     biasSignalCount: tasks.filter(t => t.biasSignal).length,
+    failedCount: tasks.filter(t => t.reasoning === 'Blind judge call failed').length,
   };
 }
 

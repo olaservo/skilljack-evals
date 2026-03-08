@@ -629,6 +629,9 @@ function printBlindComparisonSummary(blind: BlindComparisonData): void {
   if (a.biasSignalCount > 0) {
     console.log(`  Bias signals: ${a.biasSignalCount} (blind disagrees with standard scoring)`);
   }
+  if (a.failedCount > 0) {
+    console.log(`  Failed: ${a.failedCount} blind judge call(s) failed (recorded as ties)`);
+  }
   console.log('-'.repeat(50));
 }
 

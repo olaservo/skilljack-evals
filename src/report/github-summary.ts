@@ -153,6 +153,10 @@ export function generateGitHubSummary(report: EvaluationReport): string {
       lines.push(`:warning: **${ba.biasSignalCount} bias signal(s):** blind comparison disagrees with standard scoring`);
       lines.push('');
     }
+    if (ba.failedCount > 0) {
+      lines.push(`:warning: **${ba.failedCount} blind judge call(s) failed** — recorded as ties with neutral scores`);
+      lines.push('');
+    }
   }
 
   // Comparison section

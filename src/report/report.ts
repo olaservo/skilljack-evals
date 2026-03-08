@@ -490,5 +490,9 @@ The judge evaluated both outputs without knowing which used the skill.
     section += `\n> **Bias Alert:** ${a.biasSignalCount} task(s) show bias signals where the blind comparison disagrees with standard scoring. This may indicate the standard judge is biased by knowing which output used the skill.\n`;
   }
 
+  if (a.failedCount > 0) {
+    section += `\n> **Warning:** ${a.failedCount} blind judge call(s) failed and were recorded as ties with neutral scores.\n`;
+  }
+
   return section;
 }

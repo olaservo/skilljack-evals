@@ -107,6 +107,7 @@ describe('generateGitHubSummary', () => {
           withoutSkillPreferred: 0,
           ties: 1,
           biasSignalCount: 0,
+          failedCount: 0,
         },
       },
     });
@@ -130,6 +131,7 @@ describe('generateGitHubSummary', () => {
           withoutSkillPreferred: 1,
           ties: 0,
           biasSignalCount: 1,
+          failedCount: 0,
         },
       },
     });

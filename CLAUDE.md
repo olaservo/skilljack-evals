@@ -53,6 +53,7 @@ Two methods, run independently or together:
 - **Deterministic** (free): skill activation, marker strings, tool call checks
 - **LLM Judge** (~$0.001/task): discovery (0/1), adherence (1-5), output quality (1-5)
 - **Weighted Score** (0-1): `w_d * discovery + w_a * ((adherence-1)/4) + w_o * ((output-1)/4)`
+- **Blind A/B Comparison** (`--blind-compare`, requires `--compare`): anonymized judge evaluation to detect scoring bias
 
 ## Failure Categories
 
