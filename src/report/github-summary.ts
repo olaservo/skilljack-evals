@@ -76,6 +76,26 @@ export function generateGitHubSummary(report: EvaluationReport): string {
       lines.push(`| ${t.task.id} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
     }
   }
+  // Per-task checklist summaries
+  const tasksWithChecklist = tasks.filter(
+    (t) => (t.score.checklistResults ?? []).length > 0
+  );
+  if (tasksWithChecklist.length > 0) {
+    lines.push('');
+    for (const t of tasksWithChecklist) {
+      const results = t.score.checklistResults ?? [];
+      const passed = results.filter((cr) => cr.passed).length;
+      lines.push(`**${t.task.id} checklist:** ${passed}/${results.length}`);
+      for (const cr of results) {
+        const safeItem = cr.item.replace(/\|/g, '\\|');
+        const line = `- ${cr.passed ? 'PASS' : 'FAIL'}: ${safeItem}`;
+        const safeEvidence = cr.evidence?.trim().replace(/[|_*`]/g, '\\$&');
+        lines.push(!cr.passed && safeEvidence ? `${line} — ${safeEvidence}` : line);
+      }
+      lines.push('');
+    }
+  }
+
   lines.push('');
   lines.push('</details>');
   lines.push('');

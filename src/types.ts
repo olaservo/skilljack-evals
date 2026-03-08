@@ -97,6 +97,12 @@ export type FailureCategory =
   | 'agent_error'
   | 'none';
 
+export interface ChecklistItemResult {
+  item: string;
+  passed: boolean;
+  evidence?: string;
+}
+
 export interface JudgeScore {
   taskId: string;
   discovery: number; // 0 or 1
@@ -105,6 +111,7 @@ export interface JudgeScore {
   weightedScore: number; // 0-1 (normalized)
   failureCategory: FailureCategory;
   reasoning: string;
+  checklistResults: ChecklistItemResult[];
 }
 
 export interface JudgeOptions {
@@ -128,6 +135,7 @@ export interface CombinedScore {
   weightedScore: number; // 0-1 normalized
   failureCategory: FailureCategory;
   reasoning: string;
+  checklistResults?: ChecklistItemResult[];
   stddev?: ScoreStddev; // Only populated when N >= 2
 }
 

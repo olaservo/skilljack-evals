@@ -19,6 +19,7 @@ export type {
   ToolCallRecord,
   TaskResult,
   FailureCategory,
+  ChecklistItemResult,
   JudgeScore,
   JudgeOptions,
   CombinedScore,

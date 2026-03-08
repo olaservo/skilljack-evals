@@ -29,6 +29,23 @@ export function computeStddev(values: number[], mean?: number): number {
 }
 
 /**
+ * Find the index of the run closest to the mean weighted score.
+ */
+function findRepresentativeIndex(scores: CombinedScore[]): number {
+  const mean = scores.reduce((sum, s) => sum + s.weightedScore, 0) / scores.length;
+  let repIdx = 0;
+  let minDist = Infinity;
+  for (let r = 0; r < scores.length; r++) {
+    const dist = Math.abs(scores[r].weightedScore - mean);
+    if (dist < minDist) {
+      minDist = dist;
+      repIdx = r;
+    }
+  }
+  return repIdx;
+}
+
+/**
  * Aggregate multiple runs of TaskResult[] into a single TaskResult per task.
  *
  * For each task position, picks the "representative" run (closest to median
@@ -49,18 +66,7 @@ export function aggregateResults(
     const runs = allResults.map((r) => r[t]);
     const scores = allScores.map((s) => s[t]);
 
-    // Find the representative run (closest to mean weighted score)
-    const meanWeighted = scores.reduce((sum, s) => sum + s.weightedScore, 0) / numRuns;
-    let repIdx = 0;
-    let minDist = Infinity;
-    for (let r = 0; r < numRuns; r++) {
-      const dist = Math.abs(scores[r].weightedScore - meanWeighted);
-      if (dist < minDist) {
-        minDist = dist;
-        repIdx = r;
-      }
-    }
-
+    const repIdx = findRepresentativeIndex(scores);
     const rep = runs[repIdx];
     aggregated.push({
       taskId: rep.taskId,
@@ -124,6 +130,8 @@ export function aggregateScores(allScores: CombinedScore[][]): CombinedScore[] {
 
     const discoveryCount = scores.filter((s) => s.discovery >= 1).length;
 
+    const repIdx = findRepresentativeIndex(scores);
+
     aggregated.push({
       taskId: scores[0].taskId,
       deterministic: null,
@@ -134,6 +142,7 @@ export function aggregateScores(allScores: CombinedScore[][]): CombinedScore[] {
       weightedScore: avgWeighted,
       failureCategory: modeCategory,
       reasoning: `Aggregated over ${numRuns} runs: discovery ${discoveryCount}/${numRuns}, mean adherence ${avgAdherence.toFixed(1)}, mean output ${avgOutput.toFixed(1)}`,
+      checklistResults: scores[repIdx].checklistResults ?? [],
       stddev,
     });
   }

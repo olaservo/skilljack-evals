@@ -126,6 +126,20 @@ ${score.stddev && (score.stddev.adherence > FLAKY_STDDEV_THRESHOLD || score.stdd
       }
     }
 
+    // Show checklist results if available
+    if ((score.checklistResults ?? []).length > 0) {
+      const checklistPassed = (score.checklistResults ?? []).filter((cr) => cr.passed).length;
+      report += `\n**Checklist:** ${checklistPassed}/${(score.checklistResults ?? []).length} passed\n\n`;
+      for (const cr of score.checklistResults ?? []) {
+        const safeItem = cr.item.replace(/[|_*`]/g, '\\$&');
+        report += `- ${cr.passed ? 'PASS' : 'FAIL'}: **${safeItem}**\n`;
+        if (cr.evidence?.trim()) {
+          const safeEvidence = cr.evidence.trim().replace(/[|_*`]/g, '\\$&');
+          report += `  - _${safeEvidence}_\n`;
+        }
+      }
+    }
+
     report += `\n**Reasoning:** ${score.reasoning || 'No reasoning provided'}
 
 <details>
