@@ -380,6 +380,7 @@ export function computeFailureBreakdown(scores: CombinedScore[]): FailureBreakdo
 }
 
 
+
 /**
  * Generate the comparison section for the markdown report.
  */

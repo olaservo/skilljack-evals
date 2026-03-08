@@ -71,6 +71,7 @@ export { generateReport, generateJsonResults, computeSummary, computeFailureBrea
 export type { ReportOptions } from './report/report.js';
 export { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
 export { loadPreviousReport, compareResults, formatComparisonMarkdown, formatComparisonConsole } from './report/comparison.js';
+export { formatDelta, formatCategory } from './utils/format.js';
 
 // Feedback
 export { generateFeedbackTemplate, writeFeedbackTemplate, loadFeedback, validateFeedback, getFeedbackForTask } from './feedback.js';

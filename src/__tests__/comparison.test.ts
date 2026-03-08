@@ -10,6 +10,7 @@ import {
   SIGNIFICANCE_THRESHOLD_ADHERENCE,
   SIGNIFICANCE_THRESHOLD_WEIGHTED,
 } from '../report/comparison.js';
+import { formatDelta, formatCategory } from '../report/format-utils.js';
 import type {
   EvaluationReport,
   EvaluationSummary,
@@ -455,5 +456,131 @@ describe('formatComparisonConsole', () => {
 
     expect(output).toContain('Improved (1): task-1');
     expect(output).toContain('Regressed (1): task-2');
+  });
+
+  it('shows new and removed task labels', () => {
+    const previous = makeReport();
+    const currentScores = [
+      makeScore({ taskId: 'task-1' }),
+      makeScore({ taskId: 'task-3' }),
+    ];
+    const comparison = compareResults(currentScores, makeSummary(), previous);
+    const output = formatComparisonConsole(comparison);
+
+    expect(output).toContain('New tasks: task-3');
+    expect(output).toContain('Removed tasks: task-2');
+  });
+
+  it('omits new/removed labels when all tasks match', () => {
+    const previous = makeReport();
+    const currentScores = [
+      makeScore({ taskId: 'task-1' }),
+      makeScore({ taskId: 'task-2' }),
+    ];
+    const comparison = compareResults(currentScores, makeSummary(), previous);
+    const output = formatComparisonConsole(comparison);
+
+    expect(output).not.toContain('New tasks');
+    expect(output).not.toContain('Removed tasks');
+  });
+});
+
+describe('formatDelta', () => {
+  it('adds + prefix for positive values', () => {
+    expect(formatDelta(1.5)).toBe('+1.50');
+  });
+
+  it('shows no prefix for negative values (minus is implicit)', () => {
+    expect(formatDelta(-0.75)).toBe('-0.75');
+  });
+
+  it('shows no prefix for zero', () => {
+    expect(formatDelta(0)).toBe('0.00');
+  });
+
+  it('appends suffix when provided', () => {
+    expect(formatDelta(2.5, '%')).toBe('+2.50%');
+    expect(formatDelta(-1.0, '%')).toBe('-1.00%');
+  });
+
+  it('rounds to 2 decimal places', () => {
+    expect(formatDelta(1.999)).toBe('+2.00');
+    expect(formatDelta(0.005)).toBe('+0.01');
+    expect(formatDelta(0.004)).toBe('+0.00');
+  });
+});
+
+describe('formatCategory', () => {
+  it('converts "none" to "No Failure"', () => {
+    expect(formatCategory('none')).toBe('No Failure');
+  });
+
+  it('converts snake_case to Title Case', () => {
+    expect(formatCategory('discovery_failure')).toBe('Discovery Failure');
+    expect(formatCategory('false_positive')).toBe('False Positive');
+    expect(formatCategory('instruction_ambiguity')).toBe('Instruction Ambiguity');
+  });
+
+  it('capitalizes single words', () => {
+    expect(formatCategory('error')).toBe('Error');
+  });
+});
+
+describe('loadPreviousReport - score field validation', () => {
+  const tmpDirs: string[] = [];
+
+  afterEach(async () => {
+    for (const dir of tmpDirs) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    tmpDirs.length = 0;
+  });
+
+  async function writeTmpJson(data: unknown): Promise<string> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'comparison-test-'));
+    tmpDirs.push(dir);
+    const filePath = path.join(dir, 'results.json');
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+    return filePath;
+  }
+
+  it('throws for task with missing discovery field', async () => {
+    const filePath = await writeTmpJson({
+      skillName: 'test',
+      summary: {},
+      tasks: [{ task: {}, result: {}, score: { taskId: 'task-1', weightedScore: 0.8, adherence: 4, outputQuality: 4 } }],
+    });
+    await expect(loadPreviousReport(filePath))
+      .rejects.toThrow('missing numeric score fields');
+  });
+
+  it('throws for task with missing adherence field', async () => {
+    const filePath = await writeTmpJson({
+      skillName: 'test',
+      summary: {},
+      tasks: [{ task: {}, result: {}, score: { taskId: 'task-1', weightedScore: 0.8, discovery: 1, outputQuality: 4 } }],
+    });
+    await expect(loadPreviousReport(filePath))
+      .rejects.toThrow('missing numeric score fields');
+  });
+
+  it('throws for task with missing outputQuality field', async () => {
+    const filePath = await writeTmpJson({
+      skillName: 'test',
+      summary: {},
+      tasks: [{ task: {}, result: {}, score: { taskId: 'task-1', weightedScore: 0.8, discovery: 1, adherence: 4 } }],
+    });
+    await expect(loadPreviousReport(filePath))
+      .rejects.toThrow('missing numeric score fields');
+  });
+
+  it('accepts task with all numeric score fields', async () => {
+    const filePath = await writeTmpJson({
+      skillName: 'test',
+      summary: {},
+      tasks: [{ task: {}, result: {}, score: { taskId: 'task-1', weightedScore: 0.8, discovery: 1, adherence: 4, outputQuality: 4 } }],
+    });
+    const loaded = await loadPreviousReport(filePath);
+    expect(loaded.tasks).toHaveLength(1);
   });
 });

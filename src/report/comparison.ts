@@ -16,6 +16,7 @@ import type {
   ScoreSnapshot,
   SummarySnapshot,
 } from '../types.js';
+import { formatDelta } from './format-utils.js';
 
 export const SIGNIFICANCE_THRESHOLD_ADHERENCE = 1;
 export const SIGNIFICANCE_THRESHOLD_WEIGHTED = 0.15;
@@ -57,7 +58,12 @@ export async function loadPreviousReport(filePath: string): Promise<EvaluationRe
     if (!task.score || typeof task.score.taskId !== 'string') {
       throw new Error('Comparison file has task entries without score.taskId');
     }
-    if (typeof task.score.weightedScore !== 'number') {
+    if (
+      typeof task.score.weightedScore !== 'number' ||
+      typeof task.score.discovery !== 'number' ||
+      typeof task.score.adherence !== 'number' ||
+      typeof task.score.outputQuality !== 'number'
+    ) {
       throw new Error(`Comparison file task "${task.score.taskId}" is missing numeric score fields`);
     }
   }
@@ -298,15 +304,8 @@ function summaryRow(label: string, prev: string, curr: string, delta: string, va
   return `| **${label}** | ${prev} | ${curr} | ${delta} | ${arrow} |`;
 }
 
-function formatDelta(value: number, suffix = ''): string {
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(2)}${suffix}`;
-}
-
-function formatSignedDelta(value: number): string {
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(2)}`;
-}
+// formatSignedDelta is just formatDelta with no suffix
+const formatSignedDelta = formatDelta;
 
 function formatTransition(prev: number, curr: number): string {
   const delta = curr - prev;
