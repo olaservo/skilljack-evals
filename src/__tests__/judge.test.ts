@@ -198,6 +198,13 @@ describe('parseJudgeResponseJson', () => {
     expect(score.reasoning).toContain('Invalid JSON');
   });
 
+  it('returns error score for single-quoted JSON', () => {
+    const score = parseJudgeResponseJson("{'discovery': 1}", 'task-sq', defaultWeights);
+
+    expect(score.failureCategory).toBe('agent_error');
+    expect(score.reasoning).toContain('Invalid JSON');
+  });
+
   it('computes weighted score correctly', () => {
     const response = JSON.stringify({
       discovery: 1,

@@ -88,7 +88,8 @@ export function generateGitHubSummary(report: EvaluationReport): string {
       lines.push(`**${t.task.id} checklist:** ${passed}/${results.length}`);
       for (const cr of results) {
         const safeItem = cr.item.replace(/\|/g, '\\|');
-        lines.push(`- ${cr.passed ? 'PASS' : 'FAIL'}: ${safeItem}`);
+        const line = `- ${cr.passed ? 'PASS' : 'FAIL'}: ${safeItem}`;
+        lines.push(!cr.passed && cr.evidence?.trim() ? `${line} — ${cr.evidence.trim()}` : line);
       }
       lines.push('');
     }
