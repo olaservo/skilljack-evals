@@ -132,8 +132,8 @@ ${score.stddev && (score.stddev.adherence > FLAKY_STDDEV_THRESHOLD || score.stdd
       report += `\n**Checklist:** ${passed}/${score.checklistResults.length} passed\n\n`;
       for (const cr of score.checklistResults) {
         report += `- ${cr.passed ? 'PASS' : 'FAIL'}: **${cr.item}**\n`;
-        if (cr.evidence) {
-          report += `  - _${cr.evidence}_\n`;
+        if (cr.evidence?.trim()) {
+          report += `  - _${cr.evidence.trim()}_\n`;
         }
       }
     }

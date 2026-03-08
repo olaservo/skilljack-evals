@@ -86,6 +86,49 @@ Respond with a JSON object:
 `;
 
 /**
+ * Extract the first complete JSON object from text, handling nested braces.
+ */
+export function extractJsonObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (escape) {
+      escape = false;
+      continue;
+    }
+
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return text.substring(start, i + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * LLM-as-judge for scoring skill evaluation results.
  */
 export class SkillJudge {
@@ -147,49 +190,6 @@ export class SkillJudge {
   }
 
   /**
-   * Extract the first complete JSON object from text, handling nested braces.
-   */
-  private extractJsonObject(text: string): string | null {
-    const start = text.indexOf('{');
-    if (start === -1) return null;
-
-    let depth = 0;
-    let inString = false;
-    let escape = false;
-
-    for (let i = start; i < text.length; i++) {
-      const ch = text[i];
-
-      if (escape) {
-        escape = false;
-        continue;
-      }
-
-      if (ch === '\\' && inString) {
-        escape = true;
-        continue;
-      }
-
-      if (ch === '"') {
-        inString = !inString;
-        continue;
-      }
-
-      if (inString) continue;
-
-      if (ch === '{') depth++;
-      else if (ch === '}') {
-        depth--;
-        if (depth === 0) {
-          return text.substring(start, i + 1);
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /**
    * Parse the judge's JSON response into a JudgeScore.
    */
   private parseJudgeResponse(
@@ -197,7 +197,7 @@ export class SkillJudge {
     taskId: string,
     weights: Map<string, number>
   ): JudgeScore {
-    const jsonStr = this.extractJsonObject(response);
+    const jsonStr = extractJsonObject(response);
     if (!jsonStr) {
       return this.createErrorScore(taskId, 'Failed to parse judge response');
     }
