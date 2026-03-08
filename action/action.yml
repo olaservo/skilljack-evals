@@ -82,6 +82,9 @@ inputs:
   compare-skill:
     description: 'Path to baseline skill directory (e.g., previous version) for A/B comparison'
     required: false
+  compare-results:
+    description: 'Path to previous JSON results file for cross-iteration comparison'
+    required: false
 
 outputs:
   passed:
@@ -102,6 +105,8 @@ outputs:
     description: 'Output quality delta (with minus without skill), only set in compare mode'
   score-delta:
     description: 'Weighted score delta (with minus without skill), only set in compare mode'
+  has-regressions:
+    description: 'Whether any tasks regressed significantly vs. previous results (true/false)'
 
 runs:
   using: 'node20'
