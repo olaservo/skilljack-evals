@@ -199,6 +199,7 @@ function createErrorScore(taskId: string, reason: string): JudgeScore {
     weightedScore: 0,
     failureCategory: 'agent_error',
     reasoning: reason,
+    checklistResults: [],
   };
 }
 
