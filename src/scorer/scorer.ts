@@ -134,6 +134,7 @@ function mergeScores(
       weightedScore,
       failureCategory,
       reasoning: reasons.join(' | '),
+      checklistResults: judge.checklistResults,
     };
   }
 
@@ -168,6 +169,7 @@ function mergeScores(
       weightedScore,
       failureCategory,
       reasoning: `Deterministic only: ${det.details.join('; ')}`,
+      checklistResults: [],
     };
   }
 
@@ -183,6 +185,7 @@ function mergeScores(
       weightedScore: judge.weightedScore,
       failureCategory: judge.failureCategory,
       reasoning: judge.reasoning,
+      checklistResults: judge.checklistResults,
     };
   }
 
@@ -197,5 +200,6 @@ function mergeScores(
     weightedScore: 0,
     failureCategory: 'agent_error',
     reasoning: 'No scoring method available (no deterministic check or LLM judge criteria defined)',
+    checklistResults: [],
   };
 }

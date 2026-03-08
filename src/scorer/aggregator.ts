@@ -124,6 +124,17 @@ export function aggregateScores(allScores: CombinedScore[][]): CombinedScore[] {
 
     const discoveryCount = scores.filter((s) => s.discovery >= 1).length;
 
+    // Find representative run's checklist results (closest to mean weighted score)
+    let repIdx = 0;
+    let minDist = Infinity;
+    for (let r = 0; r < numRuns; r++) {
+      const dist = Math.abs(scores[r].weightedScore - avgWeighted);
+      if (dist < minDist) {
+        minDist = dist;
+        repIdx = r;
+      }
+    }
+
     aggregated.push({
       taskId: scores[0].taskId,
       deterministic: null,
@@ -134,6 +145,7 @@ export function aggregateScores(allScores: CombinedScore[][]): CombinedScore[] {
       weightedScore: avgWeighted,
       failureCategory: modeCategory,
       reasoning: `Aggregated over ${numRuns} runs: discovery ${discoveryCount}/${numRuns}, mean adherence ${avgAdherence.toFixed(1)}, mean output ${avgOutput.toFixed(1)}`,
+      checklistResults: scores[repIdx].checklistResults,
       stddev,
     });
   }
