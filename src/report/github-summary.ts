@@ -73,7 +73,7 @@ export function generateGitHubSummary(report: EvaluationReport): string {
         : 'N/A';
       lines.push(`| ${t.task.id} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
     } else {
-      lines.push(`| ${t.task.id} | ${s.discovery} | ${s.adherence}/5 | ${s.outputQuality}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
+      lines.push(`| ${t.task.id} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
     }
   }
   lines.push('');
