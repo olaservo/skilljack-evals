@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractJsonObject, parseJudgeResponseJson } from '../scorer/judge.js';
+import { extractJsonObject, parseJudgeResponseJson, parseBlindJudgeResponse } from '../scorer/judge.js';
 
 describe('extractJsonObject', () => {
   it('extracts a simple JSON object', () => {
@@ -293,5 +293,109 @@ describe('parseJudgeResponseJson', () => {
     expect(score.discovery).toBe(0);
     expect(score.adherence).toBe(2);
     expect(score.failureCategory).toBe('discovery_failure');
+  });
+});
+
+describe('parseBlindJudgeResponse', () => {
+  it('parses a valid response', () => {
+    const response = JSON.stringify({
+      output_a: { instruction_following: 4, output_quality: 5 },
+      output_b: { instruction_following: 3, output_quality: 2 },
+      preferred: 'A',
+      reasoning: 'Output A is better',
+    });
+    const result = parseBlindJudgeResponse(response);
+
+    expect(result).not.toBeNull();
+    expect(result!.outputA.instructionFollowing).toBe(4);
+    expect(result!.outputA.outputQuality).toBe(5);
+    expect(result!.outputB.instructionFollowing).toBe(3);
+    expect(result!.outputB.outputQuality).toBe(2);
+    expect(result!.preferred).toBe('A');
+    expect(result!.reasoning).toBe('Output A is better');
+  });
+
+  it('parses response wrapped in markdown code block', () => {
+    const json = JSON.stringify({
+      output_a: { instruction_following: 5, output_quality: 5 },
+      output_b: { instruction_following: 4, output_quality: 4 },
+      preferred: 'A',
+      reasoning: 'Better quality',
+    });
+    const response = `\`\`\`json\n${json}\n\`\`\``;
+    const result = parseBlindJudgeResponse(response);
+
+    expect(result).not.toBeNull();
+    expect(result!.outputA.instructionFollowing).toBe(5);
+    expect(result!.preferred).toBe('A');
+  });
+
+  it('returns null on unparseable input', () => {
+    expect(parseBlindJudgeResponse('no json here')).toBeNull();
+    expect(parseBlindJudgeResponse('')).toBeNull();
+  });
+
+  it('clamps scores to 1-5', () => {
+    const response = JSON.stringify({
+      output_a: { instruction_following: 0, output_quality: 7 },
+      output_b: { instruction_following: -1, output_quality: 10 },
+      preferred: 'B',
+      reasoning: 'Test clamping',
+    });
+    const result = parseBlindJudgeResponse(response);
+
+    expect(result).not.toBeNull();
+    expect(result!.outputA.instructionFollowing).toBe(1);
+    expect(result!.outputA.outputQuality).toBe(5);
+    expect(result!.outputB.instructionFollowing).toBe(1);
+    expect(result!.outputB.outputQuality).toBe(5);
+  });
+
+  it('normalizes preferred to uppercase, fallback to tie', () => {
+    const makeResponse = (pref: string) => JSON.stringify({
+      output_a: { instruction_following: 3, output_quality: 3 },
+      output_b: { instruction_following: 3, output_quality: 3 },
+      preferred: pref,
+      reasoning: 'test',
+    });
+
+    expect(parseBlindJudgeResponse(makeResponse('a'))!.preferred).toBe('A');
+    expect(parseBlindJudgeResponse(makeResponse('b'))!.preferred).toBe('B');
+    expect(parseBlindJudgeResponse(makeResponse('TIE'))!.preferred).toBe('tie');
+    expect(parseBlindJudgeResponse(makeResponse('neither'))!.preferred).toBe('tie');
+    expect(parseBlindJudgeResponse(makeResponse(''))!.preferred).toBe('tie');
+  });
+
+  it('returns null when output_a or output_b is missing', () => {
+    const noA = JSON.stringify({
+      output_b: { instruction_following: 3, output_quality: 3 },
+      preferred: 'B',
+      reasoning: 'missing a',
+    });
+    expect(parseBlindJudgeResponse(noA)).toBeNull();
+
+    const noB = JSON.stringify({
+      output_a: { instruction_following: 3, output_quality: 3 },
+      preferred: 'A',
+      reasoning: 'missing b',
+    });
+    expect(parseBlindJudgeResponse(noB)).toBeNull();
+  });
+
+  it('defaults missing fields gracefully', () => {
+    const response = JSON.stringify({
+      output_a: { instruction_following: 4 },
+      output_b: { output_quality: 3 },
+      preferred: 'A',
+    });
+    const result = parseBlindJudgeResponse(response);
+
+    expect(result).not.toBeNull();
+    // Missing output_quality defaults to 1 (NaN clamp)
+    expect(result!.outputA.outputQuality).toBe(1);
+    // Missing instruction_following defaults to 1 (NaN clamp)
+    expect(result!.outputB.instructionFollowing).toBe(1);
+    // Missing reasoning defaults to empty string
+    expect(result!.reasoning).toBe('');
   });
 });

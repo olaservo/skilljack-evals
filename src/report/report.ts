@@ -6,7 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { formatDelta, formatCategory } from '../utils/format.js';
+import { formatDelta, formatCategory, pct } from '../utils/format.js';
 import type {
   SkillEvaluation,
   TaskResult,
@@ -19,6 +19,7 @@ import type {
   ReportMetadata,
   HumanFeedback,
   ComparisonData,
+  BlindComparisonData,
 } from '../types.js';
 import { loadConfigSync } from '../config.js';
 import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
@@ -34,6 +35,7 @@ export interface ReportOptions {
   runDetails?: Array<{ result: TaskResult; score: CombinedScore }>[];
   humanFeedback?: HumanFeedback;
   comparison?: ComparisonData;
+  blindComparison?: BlindComparisonData;
   crossIterationComparison?: ComparisonResult;
 }
 
@@ -41,7 +43,7 @@ export interface ReportOptions {
  * Generate a markdown report from evaluation results.
  */
 export async function generateReport(options: ReportOptions): Promise<string> {
-  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, crossIterationComparison } = options;
+  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, blindComparison, crossIterationComparison } = options;
   const numRuns = options.numRuns ?? 1;
   const config = loadConfigSync();
   const totalTasks = evaluation.tasks.length;
@@ -124,6 +126,10 @@ ${metaSection}
 
   if (comparison) {
     report += generateComparisonSection(comparison);
+  }
+
+  if (blindComparison) {
+    report += generateBlindComparisonSection(blindComparison);
   }
 
   if (crossIterationComparison) {
@@ -239,7 +245,7 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
  * Generate JSON report for programmatic analysis.
  */
 export async function generateJsonResults(options: ReportOptions): Promise<EvaluationReport> {
-  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, crossIterationComparison } = options;
+  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, blindComparison, crossIterationComparison } = options;
   const numRuns = options.numRuns ?? 1;
   const config = loadConfigSync();
   const summary = computeSummary(results, scores, numRuns);
@@ -292,6 +298,7 @@ export async function generateJsonResults(options: ReportOptions): Promise<Evalu
       ? humanFeedback
       : undefined,
     comparison,
+    blindComparison,
     crossIterationComparison,
   };
 
@@ -446,4 +453,51 @@ function costImpact(delta: number): string {
   if (delta > COST_IMPACT_THRESHOLD_USD) return 'Higher';
   if (delta < -COST_IMPACT_THRESHOLD_USD) return 'Lower';
   return 'Similar';
+}
+
+/**
+ * Generate the blind comparison section for the markdown report.
+ */
+function generateBlindComparisonSection(blind: BlindComparisonData): string {
+  const a = blind.aggregate;
+  const evaluated = blind.tasks.length - a.failedCount;
+
+  let section = `
+---
+
+## Blind A/B Comparison
+
+The judge evaluated both outputs without knowing which used the skill.
+Assignment shows the label order: with-skill / without-skill (e.g. A/B means A = with-skill, B = without-skill).
+
+| Preference | Count | Percentage |
+|------------|-------|------------|
+| With-skill preferred | ${a.withSkillPreferred} | ${pct(a.withSkillPreferred, evaluated)}% |
+| Without-skill preferred | ${a.withoutSkillPreferred} | ${pct(a.withoutSkillPreferred, evaluated)}% |
+| Tie | ${a.ties} | ${pct(a.ties, evaluated)}% |
+
+### Per-Task Blind Results
+
+| Task | Assignment | A Instr. Following | A Output | B Instr. Following | B Output | Preferred | Condition | Bias? |
+|------|------------|---------------------|----------|---------------------|----------|-----------|-----------|-------|
+`;
+
+  for (const t of blind.tasks) {
+    const labels = t.withSkillLabel === 'A' ? 'A/B' : 'B/A';
+    const aInstr = t.failed ? 'N/A' : `${t.outputA.instructionFollowing}/5`;
+    const aOut = t.failed ? 'N/A' : `${t.outputA.outputQuality}/5`;
+    const bInstr = t.failed ? 'N/A' : `${t.outputB.instructionFollowing}/5`;
+    const bOut = t.failed ? 'N/A' : `${t.outputB.outputQuality}/5`;
+    section += `| ${t.taskId} | ${labels} | ${aInstr} | ${aOut} | ${bInstr} | ${bOut} | ${t.preferred} | ${t.preferredCondition} | ${t.biasSignal ? 'Yes' : 'No'} |\n`;
+  }
+
+  if (a.biasSignalCount > 0) {
+    section += `\n> **Bias Alert:** ${a.biasSignalCount} task(s) show bias signals where the blind comparison disagrees with standard scoring. This may indicate the standard judge is biased by knowing which output used the skill.\n`;
+  }
+
+  if (a.failedCount > 0) {
+    section += `\n> **Warning:** ${a.failedCount} blind judge call(s) failed and were excluded from preference counts.\n`;
+  }
+
+  return section;
 }

@@ -77,6 +77,72 @@ describe('generateGitHubSummary', () => {
     expect(summary).not.toContain('Looks good');
   });
 
+  it('includes blind comparison section when present', () => {
+    const report = makeReport({
+      blindComparison: {
+        tasks: [
+          {
+            taskId: 'task-1',
+            withSkillLabel: 'A',
+            outputA: { instructionFollowing: 5, outputQuality: 5 },
+            outputB: { instructionFollowing: 3, outputQuality: 3 },
+            preferred: 'A',
+            reasoning: 'A is better',
+            preferredCondition: 'with-skill',
+            biasSignal: false,
+            failed: false,
+          },
+          {
+            taskId: 'task-2',
+            withSkillLabel: 'B',
+            outputA: { instructionFollowing: 4, outputQuality: 4 },
+            outputB: { instructionFollowing: 4, outputQuality: 4 },
+            preferred: 'tie',
+            reasoning: 'Equal',
+            preferredCondition: 'tie',
+            biasSignal: false,
+            failed: false,
+          },
+        ],
+        aggregate: {
+          withSkillPreferred: 1,
+          withoutSkillPreferred: 0,
+          ties: 1,
+          biasSignalCount: 0,
+          failedCount: 0,
+        },
+      },
+    });
+
+    const summary = generateGitHubSummary(report);
+
+    expect(summary).toContain('### Blind A/B Comparison');
+    expect(summary).toContain('| With-skill | 1 | 50% |');
+    expect(summary).toContain('| Without-skill | 0 | 0% |');
+    expect(summary).toContain('| Tie | 1 | 50% |');
+    // No bias signals, so no warning
+    expect(summary).not.toContain('bias signal');
+  });
+
+  it('shows bias warning in blind comparison when bias signals exist', () => {
+    const report = makeReport({
+      blindComparison: {
+        tasks: [],
+        aggregate: {
+          withSkillPreferred: 0,
+          withoutSkillPreferred: 1,
+          ties: 0,
+          biasSignalCount: 1,
+          failedCount: 0,
+        },
+      },
+    });
+
+    const summary = generateGitHubSummary(report);
+
+    expect(summary).toContain(':warning: **1 bias signal(s):**');
+  });
+
   it('handles checklist items with no evidence', () => {
     const report = makeReport({
       tasks: [

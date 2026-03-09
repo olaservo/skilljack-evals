@@ -5,7 +5,7 @@
  */
 
 import * as fs from 'fs/promises';
-import { formatDelta, formatCategory } from '../utils/format.js';
+import { formatDelta, formatCategory, pct } from '../utils/format.js';
 import type {
   EvaluationReport,
   EvaluationSummary,
@@ -137,7 +137,7 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   lines.push('</details>');
   lines.push('');
 
-  // Comparison section
+  // Comparison section (primary data first)
   if (report.comparison) {
     const d = report.comparison.summary.delta;
     const ws = report.comparison.summary.withSkill;
@@ -151,6 +151,28 @@ export function generateGitHubSummary(report: EvaluationReport): string {
     lines.push(`| Output Quality | ${ws.avgOutputQuality.toFixed(1)}/5 | ${bs.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
     lines.push(`| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
     lines.push('');
+  }
+
+  // Blind comparison section (cross-validation, shown after primary comparison)
+  if (report.blindComparison) {
+    const ba = report.blindComparison.aggregate;
+    const evaluated = report.blindComparison.tasks.length - ba.failedCount;
+    lines.push('### Blind A/B Comparison');
+    lines.push('');
+    lines.push('| Preference | Count | % |');
+    lines.push('|------------|-------|---|');
+    lines.push(`| With-skill | ${ba.withSkillPreferred} | ${pct(ba.withSkillPreferred, evaluated)}% |`);
+    lines.push(`| Without-skill | ${ba.withoutSkillPreferred} | ${pct(ba.withoutSkillPreferred, evaluated)}% |`);
+    lines.push(`| Tie | ${ba.ties} | ${pct(ba.ties, evaluated)}% |`);
+    lines.push('');
+    if (ba.biasSignalCount > 0) {
+      lines.push(`:warning: **${ba.biasSignalCount} bias signal(s):** blind comparison disagrees with standard scoring`);
+      lines.push('');
+    }
+    if (ba.failedCount > 0) {
+      lines.push(`:warning: **${ba.failedCount} blind judge call(s) failed** — excluded from preference counts`);
+      lines.push('');
+    }
   }
 
   if (!report.passed && report.failureReasons.length > 0) {

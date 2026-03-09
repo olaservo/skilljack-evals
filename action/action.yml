@@ -85,6 +85,10 @@ inputs:
   compare-results:
     description: 'Path to previous JSON results file for cross-iteration comparison'
     required: false
+  blind-compare:
+    description: 'Run blind A/B comparison alongside --compare (true/false)'
+    required: false
+    default: 'false'
 
 outputs:
   passed:
@@ -107,6 +111,12 @@ outputs:
     description: 'Weighted score delta (with minus without skill), only set in compare mode'
   has-regressions:
     description: 'Whether any tasks regressed significantly vs. previous results (true/false)'
+  blind-with-skill-preferred:
+    description: 'Number of tasks where blind comparison preferred the with-skill output'
+  blind-without-skill-preferred:
+    description: 'Number of tasks where blind comparison preferred the without-skill output'
+  blind-bias-signals:
+    description: 'Number of tasks where blind comparison disagrees with standard scoring'
 
 runs:
   using: 'node20'
