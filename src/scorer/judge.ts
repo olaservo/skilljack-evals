@@ -435,6 +435,8 @@ export class SkillJudge {
     outputB: string,
   ): Promise<{ outputA: BlindOutputScore; outputB: BlindOutputScore; preferred: 'A' | 'B' | 'tie'; reasoning: string } | null> {
     // Single-pass replacement avoids one substitution injecting a marker consumed by the next.
+    // Reuse outputTruncation for prompt too — prompts are typically short,
+    // but this prevents pathological cases from bloating the judge call.
     const replacements: Record<string, string> = {
       '__PROMPT__': prompt.slice(0, this.options.outputTruncation) || '(no prompt)',
       '__OUTPUT_A__': outputA.slice(0, this.options.outputTruncation) || '(no output)',
@@ -593,8 +595,8 @@ export async function blindCompareAll(
       return {
         taskId: task.taskId,
         withSkillLabel,
-        outputA: { instructionFollowing: 0, outputQuality: 0 },
-        outputB: { instructionFollowing: 0, outputQuality: 0 },
+        outputA: { instructionFollowing: 1, outputQuality: 1 },
+        outputB: { instructionFollowing: 1, outputQuality: 1 },
         preferred: 'tie',
         reasoning: 'Blind judge call failed',
         preferredCondition: 'tie',
@@ -658,6 +660,7 @@ async function withConcurrencyLimit<T>(
 
   async function worker(): Promise<void> {
     while (next < factories.length) {
+      // Safe: JS is single-threaded; `next++` is atomic relative to the event loop.
       const idx = next++;
       results[idx] = await factories[idx]();
     }

@@ -477,8 +477,8 @@ describe('generateBlindComparisonSection in markdown report', () => {
         {
           taskId: 'task-2',
           withSkillLabel: 'A',
-          outputA: { instructionFollowing: 0, outputQuality: 0 },
-          outputB: { instructionFollowing: 0, outputQuality: 0 },
+          outputA: { instructionFollowing: 1, outputQuality: 1 },
+          outputB: { instructionFollowing: 1, outputQuality: 1 },
           preferred: 'tie',
           reasoning: 'Blind judge call failed',
           preferredCondition: 'tie',
