@@ -7,6 +7,7 @@ import type {
   CombinedScore,
 } from '../types.js';
 import { blindCompareAll, BLIND_BIAS_THRESHOLD, SkillJudge } from '../scorer/judge.js';
+import { generateReport } from '../report/report.js';
 
 /** Helper to create a minimal TaskResult */
 function makeResult(taskId: string, output = 'test output'): TaskResult {
@@ -103,7 +104,7 @@ function computeAggregate(tasks: BlindTaskComparison[]): BlindComparisonData['ag
   return {
     withSkillPreferred: tasks.filter(t => t.preferredCondition === 'with-skill').length,
     withoutSkillPreferred: tasks.filter(t => t.preferredCondition === 'without-skill').length,
-    ties: tasks.filter(t => t.preferredCondition === 'tie').length,
+    ties: tasks.filter(t => t.preferredCondition === 'tie' && !t.failed).length,
     biasSignalCount: tasks.filter(t => t.biasSignal).length,
     failedCount: tasks.filter(t => t.failed).length,
   };
@@ -293,7 +294,7 @@ describe('blindCompareAll integration', () => {
     expect(result.tasks[0].preferredCondition).toBe('tie');
     expect(result.tasks[0].biasSignal).toBe(false);
     expect(result.aggregate.failedCount).toBe(1);
-    expect(result.aggregate.ties).toBe(1);
+    expect(result.aggregate.ties).toBe(0); // failed tasks excluded from ties
   });
 
   it('respects randomFn for deterministic label assignment', async () => {
@@ -348,5 +349,216 @@ describe('blindCompareAll integration', () => {
     expect(starts.length).toBe(3);
     // With Promise.all, all starts happen before the first end
     expect(callOrder.slice(0, 3)).toEqual(['start', 'start', 'start']);
+  });
+
+  it('excludes failed tasks from ties count in aggregate', async () => {
+    let callCount = 0;
+    const mockJudge = {
+      blindCompare: vi.fn().mockImplementation(async () => {
+        callCount++;
+        // First call succeeds with tie, second fails
+        if (callCount === 1) {
+          return {
+            outputA: { instructionFollowing: 3, outputQuality: 3 },
+            outputB: { instructionFollowing: 3, outputQuality: 3 },
+            preferred: 'tie' as const,
+            reasoning: 'Equal',
+          };
+        }
+        return null; // failure
+      }),
+    } as unknown as SkillJudge;
+
+    const tasks = [
+      makeTaskComparison('task-1', 0.5, 0.5),
+      makeTaskComparison('task-2', 0.5, 0.5),
+    ];
+
+    const result = await blindCompareAll(tasks, mockJudge, { randomFn: () => 0.1 });
+
+    expect(result.aggregate.ties).toBe(1); // only successful tie
+    expect(result.aggregate.failedCount).toBe(1); // failed task not in ties
+    expect(result.tasks[1].failed).toBe(true);
+    expect(result.tasks[1].preferredCondition).toBe('tie'); // still tie internally
+  });
+});
+
+describe('--blind-compare validation', () => {
+  it('throws when --blind-compare is used without --compare', async () => {
+    // We import runPipeline dynamically to avoid triggering side effects
+    const { runPipeline } = await import('../pipeline.js');
+
+    await expect(
+      runPipeline({
+        tasksFile: 'nonexistent.yaml',
+        blindCompare: true,
+        // compare is not set
+      })
+    ).rejects.toThrow('--blind-compare requires --compare mode');
+  });
+});
+
+describe('generateBlindComparisonSection in markdown report', () => {
+  it('includes blind comparison table in generated report', async () => {
+    const blindComparison: BlindComparisonData = {
+      tasks: [
+        {
+          taskId: 'task-1',
+          withSkillLabel: 'A',
+          outputA: { instructionFollowing: 5, outputQuality: 5 },
+          outputB: { instructionFollowing: 2, outputQuality: 2 },
+          preferred: 'A',
+          reasoning: 'A is better',
+          preferredCondition: 'with-skill',
+          biasSignal: false,
+          failed: false,
+        },
+        {
+          taskId: 'task-2',
+          withSkillLabel: 'B',
+          outputA: { instructionFollowing: 3, outputQuality: 3 },
+          outputB: { instructionFollowing: 4, outputQuality: 4 },
+          preferred: 'B',
+          reasoning: 'B is better',
+          preferredCondition: 'with-skill',
+          biasSignal: true,
+          failed: false,
+        },
+      ],
+      aggregate: {
+        withSkillPreferred: 2,
+        withoutSkillPreferred: 0,
+        ties: 0,
+        biasSignalCount: 1,
+        failedCount: 0,
+      },
+    };
+
+    const markdown = await generateReport({
+      evaluation: {
+        skillName: 'test-skill',
+        tasks: [{
+          id: 'task-1',
+          prompt: 'Do something',
+          expectedSkillLoad: 'test-skill',
+          criteria: [],
+          goldenChecklist: [],
+        }],
+      },
+      results: [{
+        taskId: 'task-1',
+        prompt: 'Do something',
+        output: 'done',
+        durationMs: 500,
+        numTurns: 1,
+        costUsd: 0.001,
+        skillLoads: ['test-skill'],
+        toolCalls: [],
+        isError: false,
+        errorMessage: '',
+      }],
+      scores: [{
+        taskId: 'task-1',
+        deterministic: null,
+        judge: null,
+        discovery: 1,
+        adherence: 5,
+        outputQuality: 5,
+        weightedScore: 1,
+        failureCategory: 'none',
+        reasoning: 'Good',
+      }],
+      blindComparison,
+    });
+
+    // Check section header
+    expect(markdown).toContain('## Blind A/B Comparison');
+    // Check preference table
+    expect(markdown).toContain('| With-skill preferred | 2 | 100% |');
+    expect(markdown).toContain('| Without-skill preferred | 0 | 0% |');
+    // Check per-task table
+    expect(markdown).toContain('| Task | Assignment |');
+    expect(markdown).toContain('| task-1 | A/B |');
+    expect(markdown).toContain('| task-2 | B/A |');
+    // Check bias alert
+    expect(markdown).toContain('**Bias Alert:** 1 task(s) show bias signals');
+  });
+
+  it('shows failure warning and excludes failures from percentages', async () => {
+    const blindComparison: BlindComparisonData = {
+      tasks: [
+        {
+          taskId: 'task-1',
+          withSkillLabel: 'A',
+          outputA: { instructionFollowing: 4, outputQuality: 4 },
+          outputB: { instructionFollowing: 3, outputQuality: 3 },
+          preferred: 'A',
+          reasoning: 'A is better',
+          preferredCondition: 'with-skill',
+          biasSignal: false,
+          failed: false,
+        },
+        {
+          taskId: 'task-2',
+          withSkillLabel: 'A',
+          outputA: { instructionFollowing: 3, outputQuality: 3 },
+          outputB: { instructionFollowing: 3, outputQuality: 3 },
+          preferred: 'tie',
+          reasoning: 'Blind judge call failed',
+          preferredCondition: 'tie',
+          biasSignal: false,
+          failed: true,
+        },
+      ],
+      aggregate: {
+        withSkillPreferred: 1,
+        withoutSkillPreferred: 0,
+        ties: 0, // failed task excluded from ties
+        biasSignalCount: 0,
+        failedCount: 1,
+      },
+    };
+
+    const markdown = await generateReport({
+      evaluation: {
+        skillName: 'test-skill',
+        tasks: [{
+          id: 'task-1',
+          prompt: 'Do something',
+          expectedSkillLoad: 'test-skill',
+          criteria: [],
+          goldenChecklist: [],
+        }],
+      },
+      results: [{
+        taskId: 'task-1',
+        prompt: 'Do something',
+        output: 'done',
+        durationMs: 500,
+        numTurns: 1,
+        costUsd: 0.001,
+        skillLoads: ['test-skill'],
+        toolCalls: [],
+        isError: false,
+        errorMessage: '',
+      }],
+      scores: [{
+        taskId: 'task-1',
+        deterministic: null,
+        judge: null,
+        discovery: 1,
+        adherence: 5,
+        outputQuality: 5,
+        weightedScore: 1,
+        failureCategory: 'none',
+        reasoning: 'Good',
+      }],
+      blindComparison,
+    });
+
+    // Percentages should be based on evaluated count (1), not total (2)
+    expect(markdown).toContain('| With-skill preferred | 1 | 100% |');
+    // Warning about failed calls
+    expect(markdown).toContain('1 blind judge call(s) failed and were excluded from preference counts');
   });
 });

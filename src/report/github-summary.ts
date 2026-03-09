@@ -156,21 +156,21 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   // Blind comparison section (cross-validation, shown after primary comparison)
   if (report.blindComparison) {
     const ba = report.blindComparison.aggregate;
-    const total = report.blindComparison.tasks.length;
+    const evaluated = report.blindComparison.tasks.length - ba.failedCount;
     lines.push('### Blind A/B Comparison');
     lines.push('');
     lines.push('| Preference | Count | % |');
     lines.push('|------------|-------|---|');
-    lines.push(`| With-skill | ${ba.withSkillPreferred} | ${pct(ba.withSkillPreferred, total)}% |`);
-    lines.push(`| Without-skill | ${ba.withoutSkillPreferred} | ${pct(ba.withoutSkillPreferred, total)}% |`);
-    lines.push(`| Tie | ${ba.ties} | ${pct(ba.ties, total)}% |`);
+    lines.push(`| With-skill | ${ba.withSkillPreferred} | ${pct(ba.withSkillPreferred, evaluated)}% |`);
+    lines.push(`| Without-skill | ${ba.withoutSkillPreferred} | ${pct(ba.withoutSkillPreferred, evaluated)}% |`);
+    lines.push(`| Tie | ${ba.ties} | ${pct(ba.ties, evaluated)}% |`);
     lines.push('');
     if (ba.biasSignalCount > 0) {
       lines.push(`:warning: **${ba.biasSignalCount} bias signal(s):** blind comparison disagrees with standard scoring`);
       lines.push('');
     }
     if (ba.failedCount > 0) {
-      lines.push(`:warning: **${ba.failedCount} blind judge call(s) failed** — recorded as ties with neutral scores`);
+      lines.push(`:warning: **${ba.failedCount} blind judge call(s) failed** — excluded from preference counts`);
       lines.push('');
     }
   }

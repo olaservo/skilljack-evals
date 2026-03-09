@@ -105,7 +105,7 @@ Respond with a JSON object:
  * The template uses indexed placeholders (__PROMPT__, __OUTPUT_A__, __OUTPUT_B__)
  * to avoid conflicts if agent output contains curly-brace template markers.
  */
-const BLIND_COMPARE_PROMPT_TEMPLATE = `You are an expert evaluator comparing two AI agent outputs for the same task. You do NOT know which output used a skill and which did not. Evaluate both fairly.
+const BLIND_COMPARE_PROMPT_TEMPLATE = `You are an expert evaluator comparing two AI agent outputs for the same task. You do NOT know which output used a skill and which did not. Evaluate each output on its own merits. The order of presentation (A vs. B) should not influence your scoring.
 
 ## Task Prompt
 __PROMPT__
@@ -416,9 +416,11 @@ export class SkillJudge {
    */
   async judgeAll(tasks: EvalTask[], results: TaskResult[], feedback?: HumanFeedback): Promise<JudgeScore[]> {
     // TODO: Add concurrency cap (e.g. p-limit) if used with large task sets to avoid API rate limits.
+    for (const task of tasks) {
+      console.log(`Judging task ${task.id}...`);
+    }
     return Promise.all(
       tasks.map((task, i) => {
-        console.log(`Judging task ${task.id}...`);
         const taskFeedback = getFeedbackForTask(feedback, task.id);
         return this.judgeResult(task, results[i], taskFeedback);
       })
@@ -563,7 +565,6 @@ export async function blindCompareAll(
       ? task.withoutSkill.result.output
       : task.withSkill.result.output;
 
-    console.log(`Blind comparing task ${task.taskId}...`);
     const result = await judge.blindCompare(task.withSkill.result.prompt, outputA, outputB);
 
     if (!result) {
@@ -618,12 +619,15 @@ export async function blindCompareAll(
   }
 
   // TODO: Add concurrency cap (e.g. p-limit) if used with large task sets to avoid API rate limits.
+  for (const task of tasks) {
+    console.log(`Blind comparing task ${task.taskId}...`);
+  }
   const blindTasks = await Promise.all(tasks.map(processTask));
 
   const aggregate = {
     withSkillPreferred: blindTasks.filter(t => t.preferredCondition === 'with-skill').length,
     withoutSkillPreferred: blindTasks.filter(t => t.preferredCondition === 'without-skill').length,
-    ties: blindTasks.filter(t => t.preferredCondition === 'tie').length,
+    ties: blindTasks.filter(t => t.preferredCondition === 'tie' && !t.failed).length,
     biasSignalCount: blindTasks.filter(t => t.biasSignal).length,
     failedCount: blindTasks.filter(t => t.failed).length,
   };

@@ -461,6 +461,7 @@ function costImpact(delta: number): string {
 function generateBlindComparisonSection(blind: BlindComparisonData): string {
   const a = blind.aggregate;
   const total = blind.tasks.length;
+  const evaluated = total - a.failedCount;
 
   let section = `
 ---
@@ -472,9 +473,9 @@ Assignment shows the label order: with-skill / without-skill (e.g. A/B means A =
 
 | Preference | Count | Percentage |
 |------------|-------|------------|
-| With-skill preferred | ${a.withSkillPreferred} | ${pct(a.withSkillPreferred, total)}% |
-| Without-skill preferred | ${a.withoutSkillPreferred} | ${pct(a.withoutSkillPreferred, total)}% |
-| Tie | ${a.ties} | ${pct(a.ties, total)}% |
+| With-skill preferred | ${a.withSkillPreferred} | ${pct(a.withSkillPreferred, evaluated)}% |
+| Without-skill preferred | ${a.withoutSkillPreferred} | ${pct(a.withoutSkillPreferred, evaluated)}% |
+| Tie | ${a.ties} | ${pct(a.ties, evaluated)}% |
 
 ### Per-Task Blind Results
 
@@ -492,7 +493,7 @@ Assignment shows the label order: with-skill / without-skill (e.g. A/B means A =
   }
 
   if (a.failedCount > 0) {
-    section += `\n> **Warning:** ${a.failedCount} blind judge call(s) failed and were recorded as ties with neutral scores.\n`;
+    section += `\n> **Warning:** ${a.failedCount} blind judge call(s) failed and were excluded from preference counts.\n`;
   }
 
   return section;

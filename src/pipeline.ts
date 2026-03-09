@@ -619,18 +619,18 @@ function printComparisonSummary(comparison: ComparisonData): void {
 
 function printBlindComparisonSummary(blind: BlindComparisonData): void {
   const a = blind.aggregate;
-  const total = blind.tasks.length;
+  const evaluated = blind.tasks.length - a.failedCount;
   console.log('\n' + '-'.repeat(50));
   console.log('  Blind A/B Comparison');
   console.log('-'.repeat(50));
-  console.log(`  With-skill preferred: ${a.withSkillPreferred}/${total} (${pct(a.withSkillPreferred, total)}%)`);
-  console.log(`  Without-skill preferred: ${a.withoutSkillPreferred}/${total} (${pct(a.withoutSkillPreferred, total)}%)`);
-  console.log(`  Ties: ${a.ties}/${total}`);
+  console.log(`  With-skill preferred: ${a.withSkillPreferred}/${evaluated} (${pct(a.withSkillPreferred, evaluated)}%)`);
+  console.log(`  Without-skill preferred: ${a.withoutSkillPreferred}/${evaluated} (${pct(a.withoutSkillPreferred, evaluated)}%)`);
+  console.log(`  Ties: ${a.ties}/${evaluated}`);
   if (a.biasSignalCount > 0) {
     console.log(`  Bias signals: ${a.biasSignalCount} (blind disagrees with standard scoring)`);
   }
   if (a.failedCount > 0) {
-    console.log(`  Failed: ${a.failedCount} blind judge call(s) failed (recorded as ties)`);
+    console.log(`  Failed: ${a.failedCount} blind judge call(s) failed (excluded from counts)`);
   }
   console.log('-'.repeat(50));
 }
