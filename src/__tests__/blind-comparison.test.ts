@@ -6,7 +6,7 @@ import type {
   TaskResult,
   CombinedScore,
 } from '../types.js';
-import { blindCompareAll, BLIND_BIAS_THRESHOLD, SkillJudge } from '../scorer/judge.js';
+import { blindCompareAll, BLIND_BIAS_THRESHOLD, SkillJudge, mapPreferredToCondition } from '../scorer/judge.js';
 import { generateReport } from '../report/report.js';
 
 /** Helper to create a minimal TaskResult */
@@ -148,49 +148,25 @@ describe('Blind comparison bias detection', () => {
 });
 
 describe('Blind comparison label mapping', () => {
-  it('maps A preference to with-skill when withSkillLabel is A', () => {
-    const task: BlindTaskComparison = {
-      taskId: 'task-1',
-      withSkillLabel: 'A',
-      outputA: { instructionFollowing: 5, outputQuality: 5 },
-      outputB: { instructionFollowing: 3, outputQuality: 3 },
-      preferred: 'A',
-      reasoning: 'A is better',
-      preferredCondition: 'with-skill',
-      biasSignal: false,
-      failed: false,
-    };
-    expect(task.preferredCondition).toBe('with-skill');
+  it('maps A preference to with-skill when withSkillIsA is true', () => {
+    expect(mapPreferredToCondition('A', true)).toBe('with-skill');
   });
 
-  it('maps B preference to with-skill when withSkillLabel is B', () => {
-    const task: BlindTaskComparison = {
-      taskId: 'task-1',
-      withSkillLabel: 'B',
-      outputA: { instructionFollowing: 3, outputQuality: 3 },
-      outputB: { instructionFollowing: 5, outputQuality: 5 },
-      preferred: 'B',
-      reasoning: 'B is better',
-      preferredCondition: 'with-skill',
-      biasSignal: false,
-      failed: false,
-    };
-    expect(task.preferredCondition).toBe('with-skill');
+  it('maps B preference to with-skill when withSkillIsA is false', () => {
+    expect(mapPreferredToCondition('B', false)).toBe('with-skill');
   });
 
-  it('maps A preference to without-skill when withSkillLabel is B', () => {
-    const task: BlindTaskComparison = {
-      taskId: 'task-1',
-      withSkillLabel: 'B',
-      outputA: { instructionFollowing: 5, outputQuality: 5 },
-      outputB: { instructionFollowing: 3, outputQuality: 3 },
-      preferred: 'A',
-      reasoning: 'A is better',
-      preferredCondition: 'without-skill',
-      biasSignal: false,
-      failed: false,
-    };
-    expect(task.preferredCondition).toBe('without-skill');
+  it('maps A preference to without-skill when withSkillIsA is false', () => {
+    expect(mapPreferredToCondition('A', false)).toBe('without-skill');
+  });
+
+  it('maps B preference to without-skill when withSkillIsA is true', () => {
+    expect(mapPreferredToCondition('B', true)).toBe('without-skill');
+  });
+
+  it('maps tie regardless of label assignment', () => {
+    expect(mapPreferredToCondition('tie', true)).toBe('tie');
+    expect(mapPreferredToCondition('tie', false)).toBe('tie');
   });
 });
 
@@ -501,8 +477,8 @@ describe('generateBlindComparisonSection in markdown report', () => {
         {
           taskId: 'task-2',
           withSkillLabel: 'A',
-          outputA: { instructionFollowing: 3, outputQuality: 3 },
-          outputB: { instructionFollowing: 3, outputQuality: 3 },
+          outputA: { instructionFollowing: 0, outputQuality: 0 },
+          outputB: { instructionFollowing: 0, outputQuality: 0 },
           preferred: 'tie',
           reasoning: 'Blind judge call failed',
           preferredCondition: 'tie',
@@ -558,6 +534,8 @@ describe('generateBlindComparisonSection in markdown report', () => {
 
     // Percentages should be based on evaluated count (1), not total (2)
     expect(markdown).toContain('| With-skill preferred | 1 | 100% |');
+    // Failed tasks show N/A instead of fabricated scores
+    expect(markdown).toContain('| task-2 | A/B | N/A | N/A | N/A | N/A |');
     // Warning about failed calls
     expect(markdown).toContain('1 blind judge call(s) failed and were excluded from preference counts');
   });

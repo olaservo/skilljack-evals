@@ -460,8 +460,7 @@ function costImpact(delta: number): string {
  */
 function generateBlindComparisonSection(blind: BlindComparisonData): string {
   const a = blind.aggregate;
-  const total = blind.tasks.length;
-  const evaluated = total - a.failedCount;
+  const evaluated = blind.tasks.length - a.failedCount;
 
   let section = `
 ---
@@ -485,7 +484,11 @@ Assignment shows the label order: with-skill / without-skill (e.g. A/B means A =
 
   for (const t of blind.tasks) {
     const labels = t.withSkillLabel === 'A' ? 'A/B' : 'B/A';
-    section += `| ${t.taskId} | ${labels} | ${t.outputA.instructionFollowing}/5 | ${t.outputA.outputQuality}/5 | ${t.outputB.instructionFollowing}/5 | ${t.outputB.outputQuality}/5 | ${t.preferred} | ${t.preferredCondition} | ${t.biasSignal ? 'Yes' : 'No'} |\n`;
+    const aInstr = t.failed ? 'N/A' : `${t.outputA.instructionFollowing}/5`;
+    const aOut = t.failed ? 'N/A' : `${t.outputA.outputQuality}/5`;
+    const bInstr = t.failed ? 'N/A' : `${t.outputB.instructionFollowing}/5`;
+    const bOut = t.failed ? 'N/A' : `${t.outputB.outputQuality}/5`;
+    section += `| ${t.taskId} | ${labels} | ${aInstr} | ${aOut} | ${bInstr} | ${bOut} | ${t.preferred} | ${t.preferredCondition} | ${t.biasSignal ? 'Yes' : 'No'} |\n`;
   }
 
   if (a.biasSignalCount > 0) {
