@@ -120,4 +120,4 @@ outputs:
 
 runs:
   using: 'node20'
-  main: 'action/dist/index.cjs'
+  main: 'dist/index.cjs'
