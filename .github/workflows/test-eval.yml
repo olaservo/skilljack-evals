@@ -17,6 +17,21 @@ on:
         required: false
         type: number
         default: 3
+      compare:
+        description: 'Run with and without skill to measure skill impact'
+        required: false
+        type: boolean
+        default: false
+      blind-compare:
+        description: 'Run blind A/B comparison alongside --compare'
+        required: false
+        type: boolean
+        default: false
+      generate-feedback:
+        description: 'Generate feedback template JSON for human review'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   eval:
@@ -84,6 +99,15 @@ jobs:
           if [ "$NO_JUDGE" = "true" ]; then
             ARGS="$ARGS --no-judge"
           fi
+          if [ "$COMPARE" = "true" ]; then
+            ARGS="$ARGS --compare"
+          fi
+          if [ "$BLIND_COMPARE" = "true" ]; then
+            ARGS="$ARGS --blind-compare"
+          fi
+          if [ "$GENERATE_FEEDBACK" = "true" ]; then
+            ARGS="$ARGS --generate-feedback results/feedback-template.json"
+          fi
           node dist/src/cli.js run "$EVAL_FILE" $ARGS
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -93,6 +117,9 @@ jobs:
           EVAL_FILE: ${{ inputs.eval-file }}
           NO_JUDGE: ${{ inputs.no-judge }}
           RUNS_NUMBER: ${{ inputs.runs-number }}
+          COMPARE: ${{ inputs.compare }}
+          BLIND_COMPARE: ${{ inputs.blind-compare }}
+          GENERATE_FEEDBACK: ${{ inputs.generate-feedback }}
           RUNNER: ${{ matrix.runner }}
           MODEL: ${{ matrix.model }}
 
@@ -101,4 +128,35 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: eval-results-${{ matrix.name }}
+          path: results/
+
+  action-test:
+    runs-on: ubuntu-latest
+    name: action-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Test bundled action
+        uses: ./
+        with:
+          tasks: evals/example-greeting/tasks.yaml
+          runner: claude-sdk
+          model: sonnet
+          no-judge: 'true'
+          runs: '1'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-action-test
           path: results/
