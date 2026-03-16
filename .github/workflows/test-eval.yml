@@ -80,7 +80,7 @@ jobs:
 
       - name: Run evaluation
         run: |
-          ARGS="--verbose --runs $RUNS_NUMBER --runner $RUNNER --model $MODEL"
+          ARGS="--verbose --runs $RUNS_NUMBER --runner $RUNNER --model $MODEL --github-summary"
           if [ "$NO_JUDGE" = "true" ]; then
             ARGS="$ARGS --no-judge"
           fi
