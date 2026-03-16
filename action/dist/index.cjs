@@ -46579,7 +46579,7 @@ function formatTransitionDecimal(prev, curr) {
 async function generateReport(options) {
   const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, blindComparison, crossIterationComparison } = options;
   const numRuns = options.numRuns ?? 1;
-  const config2 = loadConfigSync();
+  const config2 = options.config ?? loadConfigSync();
   const totalTasks = evaluation.tasks.length;
   const summary2 = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
@@ -46775,7 +46775,7 @@ ${result.output.slice(0, config2.reportOutputTruncation) || "(no output)"}
 async function generateJsonResults(options) {
   const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, blindComparison, crossIterationComparison } = options;
   const numRuns = options.numRuns ?? 1;
-  const config2 = loadConfigSync();
+  const config2 = options.config ?? loadConfigSync();
   const summary2 = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
   const discoveryPassed = summary2.discoveryAccuracy >= config2.discoveryThreshold;
@@ -47389,7 +47389,8 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
     runDetails: primaryPhase.runDetails,
     comparison,
     blindComparison,
-    crossIterationComparison
+    crossIterationComparison,
+    config: config2
   };
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });

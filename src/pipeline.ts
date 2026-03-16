@@ -470,6 +470,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     comparison,
     blindComparison,
     crossIterationComparison,
+    config,
   };
 
   await generateReport({ ...reportOptions, outputPath: reportPath });
@@ -559,7 +560,7 @@ export async function scorePipeline(
   };
 
   const reportOptions = {
-    evaluation, results, scores, metadata, humanFeedback,
+    evaluation, results, scores, metadata, humanFeedback, config,
   };
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });

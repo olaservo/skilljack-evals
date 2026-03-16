@@ -21,7 +21,7 @@ import type {
   ComparisonData,
   BlindComparisonData,
 } from '../types.js';
-import { loadConfigSync } from '../config.js';
+import { loadConfigSync, type EvalConfig } from '../config.js';
 import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
 import { formatComparisonMarkdown } from './comparison.js';
 
@@ -37,6 +37,8 @@ export interface ReportOptions {
   comparison?: ComparisonData;
   blindComparison?: BlindComparisonData;
   crossIterationComparison?: ComparisonResult;
+  /** Pre-loaded config with overrides applied. Falls back to loadConfigSync() if omitted. */
+  config?: EvalConfig;
 }
 
 /**
@@ -45,7 +47,7 @@ export interface ReportOptions {
 export async function generateReport(options: ReportOptions): Promise<string> {
   const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, blindComparison, crossIterationComparison } = options;
   const numRuns = options.numRuns ?? 1;
-  const config = loadConfigSync();
+  const config = options.config ?? loadConfigSync();
   const totalTasks = evaluation.tasks.length;
   const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
@@ -247,7 +249,7 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
 export async function generateJsonResults(options: ReportOptions): Promise<EvaluationReport> {
   const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, blindComparison, crossIterationComparison } = options;
   const numRuns = options.numRuns ?? 1;
-  const config = loadConfigSync();
+  const config = options.config ?? loadConfigSync();
   const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
 
