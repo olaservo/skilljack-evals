@@ -151,6 +151,8 @@ jobs:
           model: sonnet
           no-judge: 'true'
           runs: '1'
+          threshold-discovery: '0'
+          threshold-score: '0'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
