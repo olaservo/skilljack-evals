@@ -70,13 +70,17 @@ jobs:
           - runner: vercel-ai
             model: 'openrouter:openai/gpt-oss-120b'
             name: vercel-ai-openrouter-gpt-oss
+          - runner: copilot-sdk
+            model: gpt-5
+            name: copilot-sdk-gpt
+            node-version: '23'
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node-version || '20' }}
 
       - name: Install dependencies
         run: npm install
@@ -88,6 +92,8 @@ jobs:
             npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @openrouter/ai-sdk-provider
           elif [ "${{ matrix.runner }}" = "openai-agents" ]; then
             npm install @openai/agents openai
+          elif [ "${{ matrix.runner }}" = "copilot-sdk" ]; then
+            npm install @github/copilot-sdk
           fi
 
       - name: Build
@@ -114,6 +120,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVAL_FILE: ${{ inputs.eval-file }}
           NO_JUDGE: ${{ inputs.no-judge }}
           RUNS_NUMBER: ${{ inputs.runs-number }}

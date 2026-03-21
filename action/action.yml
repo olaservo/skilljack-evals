@@ -9,7 +9,7 @@ inputs:
     description: 'Path to tasks YAML file'
     required: true
   runner:
-    description: 'Runner type: claude-sdk, vercel-ai, or openai-agents'
+    description: 'Runner type: claude-sdk, vercel-ai, openai-agents, or copilot-sdk'
     required: false
     default: 'claude-sdk'
   model:
@@ -68,6 +68,9 @@ inputs:
     required: false
   openrouter-api-key:
     description: 'OpenRouter API key for vercel-ai (openrouter:) runner (or use OPENROUTER_API_KEY env var)'
+    required: false
+  github-token:
+    description: 'GitHub token for copilot-sdk runner auth (or use GITHUB_TOKEN env var)'
     required: false
   generate-feedback:
     description: 'Path to write feedback template JSON after run'

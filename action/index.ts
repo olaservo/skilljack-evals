@@ -64,6 +64,12 @@ async function run(): Promise<void> {
       core.setSecret(openrouterKey);
     }
 
+    const githubToken = core.getInput('github-token') || process.env.GITHUB_TOKEN;
+    if (githubToken) {
+      process.env.GITHUB_TOKEN = githubToken;
+      // Don't mask GITHUB_TOKEN — it's already managed by Actions
+    }
+
     // Build config overrides
     const configOverrides: Partial<EvalConfig> = {
       runnerType: runner,
