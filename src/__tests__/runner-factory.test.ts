@@ -21,6 +21,12 @@ describe('createRunner', () => {
     expect(runner.providerName).toBe('openai-agents');
   });
 
+  it('creates a copilot-sdk runner', async () => {
+    const runner = await createRunner('copilot-sdk', {});
+    expect(runner).toBeDefined();
+    expect(runner.providerName).toBe('copilot-sdk');
+  });
+
   it('throws for unknown runner type', async () => {
     await expect(
       createRunner('invalid-runner' as RunnerType, {}),

@@ -198,7 +198,7 @@ async function setupSkills(
   cwd: string,
 ): Promise<boolean> {
   if (!skillsDir) return false;
-  if (config.runnerType === 'claude-sdk') {
+  if (config.runnerType === 'claude-sdk' || config.runnerType === 'copilot-sdk') {
     console.log(`Setting up local skills from: ${skillsDir}`);
     const skillNames = await setupLocalSkills(skillsDir, cwd);
     console.log(`Skills configured: ${skillNames.join(', ')}`);

@@ -13,7 +13,7 @@ import type { RunnerType, EvalConfig } from '../config.js';
 /**
  * Create the appropriate AgentRunner based on runner type.
  *
- * @param type - Runner type ('claude-sdk', 'vercel-ai', or 'openai-agents')
+ * @param type - Runner type ('claude-sdk', 'vercel-ai', 'openai-agents', or 'copilot-sdk')
  * @param options - Runner options (cwd, model, timeout, etc.)
  * @param config - Optional pre-loaded EvalConfig. Passed through to BaseRunner
  *   so YAML file config values are respected. When omitted, BaseRunner falls
@@ -46,6 +46,16 @@ export async function createRunner(
         );
       });
       return new OpenAiAgentsRunner(options, config);
+    }
+
+    case 'copilot-sdk': {
+      const { CopilotSdkRunner } = await import('./copilot-sdk-runner.js').catch(() => {
+        throw new Error(
+          'Copilot SDK runner requires "@github/copilot-sdk". ' +
+          'Install it with: npm install @github/copilot-sdk',
+        );
+      });
+      return new CopilotSdkRunner(options, config);
     }
 
     default:
