@@ -85,8 +85,8 @@ Requires API key for selected runner in environment or `.env` file:
 - Vercel AI (openai:) / OpenAI Agents: `OPENAI_API_KEY`
 - Vercel AI (google:): `GOOGLE_GENERATIVE_AI_API_KEY`
 - Vercel AI (openrouter:): `OPENROUTER_API_KEY`
-- Copilot SDK (GitHub auth): `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN`
-- Copilot SDK (BYOK): Set provider config in `eval.config.yaml`
+- Copilot SDK (GitHub auth): `COPILOT_GITHUB_TOKEN` (must have Copilot permissions)
+- Copilot SDK (BYOK): Auto-detects `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` when no Copilot token
 
 For Bedrock: set `CLAUDE_CODE_USE_BEDROCK=1` + AWS env vars.
 

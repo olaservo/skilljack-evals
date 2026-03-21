@@ -46,6 +46,7 @@ export class CopilotSdkRunner extends BaseRunner {
   readonly providerName = 'copilot-sdk';
   private sdkOptions: CopilotSdkRunnerOptions;
   private client: any = null;
+  private hasCopilotToken = false;
 
   constructor(options: CopilotSdkRunnerOptions = {}, config?: EvalConfig) {
     super(options, config);
@@ -101,16 +102,16 @@ export class CopilotSdkRunner extends BaseRunner {
       env: isolatedEnv,
     };
 
-    // Auth: explicit token > env vars > logged-in user
+    // Auth: explicit Copilot token > env vars > logged-in user.
+    // Skip the generic GITHUB_TOKEN — it typically lacks Copilot permissions
+    // (e.g., the auto-generated token in GitHub Actions).
     const token = this.sdkOptions.githubToken
-      ?? process.env.COPILOT_GITHUB_TOKEN
-      ?? process.env.GH_TOKEN
-      ?? process.env.GITHUB_TOKEN;
+      ?? process.env.COPILOT_GITHUB_TOKEN;
 
     if (token) {
       clientOptions.githubToken = token;
+      this.hasCopilotToken = true;
     } else if (!this.sdkOptions.provider) {
-      // No token and no BYOK — fall back to logged-in user
       clientOptions.useLoggedInUser = true;
     }
 
@@ -201,9 +202,26 @@ export class CopilotSdkRunner extends BaseRunner {
         sessionConfig.skillDirectories = [absSkillsDir];
       }
 
-      // BYOK provider config
+      // BYOK provider config: explicit > auto-detect from API keys.
+      // Auto-detect enables CI usage without a Copilot-enabled token.
       if (this.sdkOptions.provider) {
         sessionConfig.provider = this.sdkOptions.provider;
+      } else if (!this.hasCopilotToken) {
+        const openaiKey = process.env.OPENAI_API_KEY;
+        const anthropicKey = process.env.ANTHROPIC_API_KEY;
+        if (openaiKey) {
+          sessionConfig.provider = {
+            type: 'openai',
+            baseUrl: 'https://api.openai.com/v1',
+            apiKey: openaiKey,
+          };
+        } else if (anthropicKey) {
+          sessionConfig.provider = {
+            type: 'anthropic',
+            baseUrl: 'https://api.anthropic.com',
+            apiKey: anthropicKey,
+          };
+        }
       }
 
       const session = await client.createSession(sessionConfig);
