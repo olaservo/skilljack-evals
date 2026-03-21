@@ -16,6 +16,9 @@ import type { AgentRunnerOptions } from './agent-runner.js';
 import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
 import { isWriteAllowed } from './security.js';
+import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
 
 /**
  * BYOK provider config for using your own API key.
@@ -78,8 +81,24 @@ export class CopilotSdkRunner extends BaseRunner {
       '@github/copilot-sdk',
     );
 
+    // Isolated config directory prevents user-level commands/skills from
+    // interfering with evaluation. Override all platform-specific paths
+    // (XDG on Linux/macOS, APPDATA/HOME/USERPROFILE on Windows).
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skilljack-copilot-'));
+    const isolatedEnv: Record<string, string> = {};
+    for (const [k, v] of Object.entries(process.env)) {
+      if (v) isolatedEnv[k] = v;
+    }
+    isolatedEnv.XDG_CONFIG_HOME = configDir;
+    isolatedEnv.XDG_STATE_HOME = configDir;
+    isolatedEnv.APPDATA = configDir;
+    isolatedEnv.LOCALAPPDATA = configDir;
+    isolatedEnv.HOME = configDir;
+    isolatedEnv.USERPROFILE = configDir;
+
     const clientOptions: Record<string, any> = {
       cwd: this.options.cwd,
+      env: isolatedEnv,
     };
 
     // Auth: explicit token > env vars > logged-in user
@@ -142,6 +161,19 @@ export class CopilotSdkRunner extends BaseRunner {
               input: toolArgs,
             });
             logger?.addToolUse(toolName, toolArgs);
+
+            // Detect skill loads from read/view tool calls to SKILL.md.
+            // Always enabled for copilot-sdk since the CLI uses view/read
+            // tools to access skills (no dedicated Skill tool like Claude SDK).
+            {
+              const filePath: string = toolArgs.path ?? toolArgs.file_path ?? '';
+              if (filePath.includes('SKILL.md') || filePath.includes('/skills/')) {
+                const match = filePath.replace(/\\/g, '/').match(/skills\/([^/]+)/);
+                if (match && !skillLoads.includes(match[1])) {
+                  skillLoads.push(match[1]);
+                }
+              }
+            }
           },
         },
 
@@ -161,9 +193,12 @@ export class CopilotSdkRunner extends BaseRunner {
         },
       };
 
-      // Skill directories for native skill loading
+      // Skill directories for native skill loading (must be absolute)
       if (this.options.skillsDir) {
-        sessionConfig.skillDirectories = [this.options.skillsDir];
+        const absSkillsDir = path.isAbsolute(this.options.skillsDir)
+          ? this.options.skillsDir
+          : path.resolve(cwd, this.options.skillsDir);
+        sessionConfig.skillDirectories = [absSkillsDir];
       }
 
       // BYOK provider config
