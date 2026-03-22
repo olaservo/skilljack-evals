@@ -71,7 +71,7 @@ jobs:
             model: 'openrouter:openai/gpt-oss-120b'
             name: vercel-ai-openrouter-gpt-oss
           - runner: copilot-sdk
-            model: gpt-5
+            model: gpt-5.2
             name: copilot-sdk-gpt
             # skillDirectories doesn't work in @github/copilot v1.0.10 (github/copilot-sdk#629).
             # Agent discovers skills by file browsing, which is inconsistent.

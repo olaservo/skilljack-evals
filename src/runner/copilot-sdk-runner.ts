@@ -221,14 +221,29 @@ export class CopilotSdkRunner extends BaseRunner {
         sessionConfig.skillDirectories = [absSkillsDir];
       }
 
-      // BYOK provider config: explicit > auto-detect from API keys.
+      // BYOK provider config: explicit > auto-detect from model + API keys.
       // Auto-detect enables CI usage without a Copilot-enabled token.
       if (this.sdkOptions.provider) {
         sessionConfig.provider = this.sdkOptions.provider;
       } else if (!this.hasCopilotToken) {
+        const model = sessionConfig.model ?? '';
+        const isAnthropicModel = model.startsWith('claude');
         const openaiKey = process.env.OPENAI_API_KEY;
         const anthropicKey = process.env.ANTHROPIC_API_KEY;
-        if (openaiKey) {
+
+        if (isAnthropicModel && anthropicKey) {
+          sessionConfig.provider = {
+            type: 'anthropic',
+            baseUrl: 'https://api.anthropic.com',
+            apiKey: anthropicKey,
+          };
+        } else if (!isAnthropicModel && openaiKey) {
+          sessionConfig.provider = {
+            type: 'openai',
+            baseUrl: 'https://api.openai.com/v1',
+            apiKey: openaiKey,
+          };
+        } else if (openaiKey) {
           sessionConfig.provider = {
             type: 'openai',
             baseUrl: 'https://api.openai.com/v1',
