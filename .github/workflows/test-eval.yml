@@ -74,6 +74,11 @@ jobs:
             model: gpt-5
             name: copilot-sdk-gpt
             node-version: '23'
+            # skillDirectories doesn't work in @github/copilot v1.0.10 (github/copilot-sdk#629).
+            # Agent discovers skills by file browsing, which is inconsistent.
+            # Thresholds set to 0 as smoke test until SDK bug is fixed.
+            threshold-discovery: '0'
+            threshold-score: '0'
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
@@ -114,6 +119,12 @@ jobs:
           if [ "$GENERATE_FEEDBACK" = "true" ]; then
             ARGS="$ARGS --generate-feedback results/feedback-template.json"
           fi
+          if [ -n "$THRESHOLD_DISCOVERY" ]; then
+            ARGS="$ARGS --threshold-discovery $THRESHOLD_DISCOVERY"
+          fi
+          if [ -n "$THRESHOLD_SCORE" ]; then
+            ARGS="$ARGS --threshold-score $THRESHOLD_SCORE"
+          fi
           node dist/src/cli.js run "$EVAL_FILE" $ARGS
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -129,6 +140,8 @@ jobs:
           GENERATE_FEEDBACK: ${{ inputs.generate-feedback }}
           RUNNER: ${{ matrix.runner }}
           MODEL: ${{ matrix.model }}
+          THRESHOLD_DISCOVERY: ${{ matrix.threshold-discovery || '' }}
+          THRESHOLD_SCORE: ${{ matrix.threshold-score || '' }}
 
       - name: Upload results
         if: always()

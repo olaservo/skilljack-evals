@@ -163,15 +163,28 @@ export class CopilotSdkRunner extends BaseRunner {
             });
             logger?.addToolUse(toolName, toolArgs);
 
-            // Detect skill loads from read/view tool calls to SKILL.md.
-            // Always enabled for copilot-sdk since the CLI uses view/read
-            // tools to access skills (no dedicated Skill tool like Claude SDK).
+            // Detect skill loads from tool calls that access SKILL.md.
+            // Check both tool args (view/read path) and tool result text
+            // (grep/glob results that reference skill files).
             {
               const filePath: string = toolArgs.path ?? toolArgs.file_path ?? '';
-              if (filePath.includes('SKILL.md') || filePath.includes('/skills/')) {
-                const match = filePath.replace(/\\/g, '/').match(/skills\/([^/]+)/);
-                if (match && !skillLoads.includes(match[1])) {
-                  skillLoads.push(match[1]);
+              const resultText: string = input.toolResult?.textResultForLlm ?? '';
+              const combined = filePath + '\n' + resultText;
+              const normalized = combined.replace(/\\/g, '/');
+
+              // Match all occurrences of skills/<name> in args or results
+              const skillPattern = /[/.]claude\/skills\/([^/\s]+)/g;
+              let m;
+              while ((m = skillPattern.exec(normalized)) !== null) {
+                if (!skillLoads.includes(m[1])) {
+                  skillLoads.push(m[1]);
+                }
+              }
+              // Also match standalone skills/<name>/SKILL.md paths
+              const skillMdPattern = /skills\/([^/\s]+)\/SKILL\.md/g;
+              while ((m = skillMdPattern.exec(normalized)) !== null) {
+                if (!skillLoads.includes(m[1])) {
+                  skillLoads.push(m[1]);
                 }
               }
             }
