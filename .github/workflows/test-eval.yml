@@ -79,6 +79,12 @@ jobs:
             # Thresholds set to 0 as smoke test until SDK bug is fixed.
             threshold-discovery: '0'
             threshold-score: '0'
+          - runner: copilot-sdk
+            model: claude-sonnet-4-6
+            name: copilot-sdk-sonnet
+            node-version: '23'
+            threshold-discovery: '0'
+            threshold-score: '0'
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4

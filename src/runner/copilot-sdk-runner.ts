@@ -191,7 +191,11 @@ export class CopilotSdkRunner extends BaseRunner {
           },
         },
 
-        // Event handler for tracking assistant messages + skill invocations
+        // Event handler for tracking assistant messages + skill invocations.
+        // Primary skill detection: skill.invoked events (fires when CLI
+        // natively loads skills via skillDirectories — currently broken in
+        // @github/copilot v1.0.10, see github/copilot-sdk#629).
+        // Fallback: file-browsing detection in onPostToolUse above.
         onEvent: (event: any) => {
           if (event.type === 'assistant.message') {
             const content = event.data?.content ?? '';
@@ -207,7 +211,9 @@ export class CopilotSdkRunner extends BaseRunner {
         },
       };
 
-      // Skill directories for native skill loading (must be absolute)
+      // Skill directories for native skill loading (must be absolute).
+      // When the SDK bug (github/copilot-sdk#629) is fixed, this will
+      // inject skills into the session context and fire skill.invoked events.
       if (this.options.skillsDir) {
         const absSkillsDir = path.isAbsolute(this.options.skillsDir)
           ? this.options.skillsDir
