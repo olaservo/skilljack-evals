@@ -73,7 +73,6 @@ jobs:
           - runner: copilot-sdk
             model: gpt-5
             name: copilot-sdk-gpt
-            node-version: '23'
             # skillDirectories doesn't work in @github/copilot v1.0.10 (github/copilot-sdk#629).
             # Agent discovers skills by file browsing, which is inconsistent.
             # Thresholds set to 0 as smoke test until SDK bug is fixed.
@@ -82,7 +81,6 @@ jobs:
           - runner: copilot-sdk
             model: claude-sonnet-4-6
             name: copilot-sdk-sonnet
-            node-version: '23'
             threshold-discovery: '0'
             threshold-score: '0'
     name: ${{ matrix.name }}
@@ -91,7 +89,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version || '20' }}
+          node-version: '23'
 
       - name: Install dependencies
         run: npm install
