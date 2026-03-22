@@ -47,6 +47,7 @@ export class CopilotSdkRunner extends BaseRunner {
   private sdkOptions: CopilotSdkRunnerOptions;
   private client: any = null;
   private hasCopilotToken = false;
+  private configDir: string | null = null;
 
   constructor(options: CopilotSdkRunnerOptions = {}, config?: EvalConfig) {
     super(options, config);
@@ -85,7 +86,8 @@ export class CopilotSdkRunner extends BaseRunner {
     // Isolated config directory prevents user-level commands/skills from
     // interfering with evaluation. Override all platform-specific paths
     // (XDG on Linux/macOS, APPDATA/HOME/USERPROFILE on Windows).
-    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skilljack-copilot-'));
+    this.configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skilljack-copilot-'));
+    const configDir = this.configDir;
     const isolatedEnv: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
       if (v) isolatedEnv[k] = v;
@@ -231,29 +233,17 @@ export class CopilotSdkRunner extends BaseRunner {
         const openaiKey = process.env.OPENAI_API_KEY;
         const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
-        if (isAnthropicModel && anthropicKey) {
+        // Prefer the provider matching the model, fall back to whatever key is available
+        const preferredKey = isAnthropicModel ? anthropicKey : openaiKey;
+        const fallbackKey = isAnthropicModel ? openaiKey : anthropicKey;
+        const apiKey = preferredKey ?? fallbackKey;
+
+        if (apiKey) {
+          const useAnthropic = apiKey === anthropicKey;
           sessionConfig.provider = {
-            type: 'anthropic',
-            baseUrl: 'https://api.anthropic.com',
-            apiKey: anthropicKey,
-          };
-        } else if (!isAnthropicModel && openaiKey) {
-          sessionConfig.provider = {
-            type: 'openai',
-            baseUrl: 'https://api.openai.com/v1',
-            apiKey: openaiKey,
-          };
-        } else if (openaiKey) {
-          sessionConfig.provider = {
-            type: 'openai',
-            baseUrl: 'https://api.openai.com/v1',
-            apiKey: openaiKey,
-          };
-        } else if (anthropicKey) {
-          sessionConfig.provider = {
-            type: 'anthropic',
-            baseUrl: 'https://api.anthropic.com',
-            apiKey: anthropicKey,
+            type: useAnthropic ? 'anthropic' : 'openai',
+            baseUrl: useAnthropic ? 'https://api.anthropic.com' : 'https://api.openai.com/v1',
+            apiKey,
           };
         }
       }
@@ -296,7 +286,8 @@ export class CopilotSdkRunner extends BaseRunner {
   }
 
   /**
-   * Stop the shared client. Call after runAll() completes.
+   * Stop the shared client and clean up temp config directory.
+   * Called after runAll() completes.
    */
   async dispose(): Promise<void> {
     if (this.client) {
@@ -306,6 +297,14 @@ export class CopilotSdkRunner extends BaseRunner {
         // Ignore shutdown errors
       }
       this.client = null;
+    }
+    if (this.configDir) {
+      try {
+        fs.rmSync(this.configDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+      this.configDir = null;
     }
   }
 }

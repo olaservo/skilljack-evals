@@ -159,6 +159,9 @@ async function runPhase(
     );
     allResults.push(results);
 
+    // Dispose runner resources (e.g., child processes) between runs
+    await runner.dispose?.();
+
     if (numRuns > 1) {
       console.log(`\n--- ${phaseLabel}: Scoring Run ${run + 1}/${numRuns} ---\n`);
     } else {
@@ -189,7 +192,7 @@ async function runPhase(
 }
 
 /**
- * Setup local skills for Claude SDK runner.
+ * Setup local skills for Claude SDK and Copilot SDK runners.
  * Returns true if skills were set up and need cleanup.
  */
 async function setupSkills(

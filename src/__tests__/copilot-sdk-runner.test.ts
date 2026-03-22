@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CopilotSdkRunner } from '../runner/copilot-sdk-runner.js';
 import type { EvalTask } from '../types.js';
 
@@ -252,6 +252,19 @@ describe('CopilotSdkRunner', () => {
     expect(mocks.stop).toHaveBeenCalledOnce();
   });
 
+  it('dispose cleans up temp config directory', async () => {
+    await runner.runTask(mockTask);
+
+    // Verify configDir was created
+    const configDir = (runner as any).configDir;
+    expect(configDir).toBeTruthy();
+
+    await runner.dispose();
+
+    // Verify configDir was cleaned up
+    expect((runner as any).configDir).toBeNull();
+  });
+
   it('falls back to textChunks when sendAndWait returns no content', async () => {
     mocks.createSession.mockImplementation(async (config: any) => {
       const session = {
@@ -269,6 +282,127 @@ describe('CopilotSdkRunner', () => {
 
     const result = await runner.runTask(mockTask);
     expect(result.output).toBe('Streamed response');
+  });
+
+  describe('BYOK auto-detection from environment variables', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = { ...originalEnv };
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.COPILOT_GITHUB_TOKEN;
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it('auto-detects OpenAI provider for non-claude model with OPENAI_API_KEY', async () => {
+      process.env.OPENAI_API_KEY = 'sk-test-openai';
+      const autoMocks = createMocks();
+      const autoRunner = new TestableCopilotSdkRunner({
+        cwd: '/tmp/test',
+        model: 'gpt-5',
+      });
+      autoRunner.mockModules = { '@github/copilot-sdk': autoMocks.sdkModule };
+
+      await autoRunner.runTask(mockTask);
+
+      const sessionConfig = autoMocks.createSession.mock.calls[0][0];
+      expect(sessionConfig.provider).toEqual({
+        type: 'openai',
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: 'sk-test-openai',
+      });
+    });
+
+    it('auto-detects Anthropic provider for claude model with ANTHROPIC_API_KEY', async () => {
+      process.env.ANTHROPIC_API_KEY = 'sk-test-anthropic';
+      const autoMocks = createMocks();
+      const autoRunner = new TestableCopilotSdkRunner({
+        cwd: '/tmp/test',
+        model: 'claude-sonnet-4-6',
+      });
+      autoRunner.mockModules = { '@github/copilot-sdk': autoMocks.sdkModule };
+
+      await autoRunner.runTask(mockTask);
+
+      const sessionConfig = autoMocks.createSession.mock.calls[0][0];
+      expect(sessionConfig.provider).toEqual({
+        type: 'anthropic',
+        baseUrl: 'https://api.anthropic.com',
+        apiKey: 'sk-test-anthropic',
+      });
+    });
+
+    it('falls back to OpenAI key for claude model when no Anthropic key', async () => {
+      process.env.OPENAI_API_KEY = 'sk-test-openai';
+      const autoMocks = createMocks();
+      const autoRunner = new TestableCopilotSdkRunner({
+        cwd: '/tmp/test',
+        model: 'claude-sonnet-4-6',
+      });
+      autoRunner.mockModules = { '@github/copilot-sdk': autoMocks.sdkModule };
+
+      await autoRunner.runTask(mockTask);
+
+      const sessionConfig = autoMocks.createSession.mock.calls[0][0];
+      expect(sessionConfig.provider).toEqual({
+        type: 'openai',
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: 'sk-test-openai',
+      });
+    });
+
+    it('falls back to Anthropic key for non-claude model when no OpenAI key', async () => {
+      process.env.ANTHROPIC_API_KEY = 'sk-test-anthropic';
+      const autoMocks = createMocks();
+      const autoRunner = new TestableCopilotSdkRunner({
+        cwd: '/tmp/test',
+        model: 'gpt-5',
+      });
+      autoRunner.mockModules = { '@github/copilot-sdk': autoMocks.sdkModule };
+
+      await autoRunner.runTask(mockTask);
+
+      const sessionConfig = autoMocks.createSession.mock.calls[0][0];
+      expect(sessionConfig.provider).toEqual({
+        type: 'anthropic',
+        baseUrl: 'https://api.anthropic.com',
+        apiKey: 'sk-test-anthropic',
+      });
+    });
+
+    it('does not set provider when no API keys are available', async () => {
+      const autoMocks = createMocks();
+      const autoRunner = new TestableCopilotSdkRunner({
+        cwd: '/tmp/test',
+        model: 'gpt-5',
+      });
+      autoRunner.mockModules = { '@github/copilot-sdk': autoMocks.sdkModule };
+
+      await autoRunner.runTask(mockTask);
+
+      const sessionConfig = autoMocks.createSession.mock.calls[0][0];
+      expect(sessionConfig.provider).toBeUndefined();
+    });
+
+    it('skips auto-detection when Copilot token is set', async () => {
+      process.env.COPILOT_GITHUB_TOKEN = 'ghp-test-token';
+      process.env.OPENAI_API_KEY = 'sk-test-openai';
+      const autoMocks = createMocks();
+      const autoRunner = new TestableCopilotSdkRunner({
+        cwd: '/tmp/test',
+        model: 'gpt-5',
+      });
+      autoRunner.mockModules = { '@github/copilot-sdk': autoMocks.sdkModule };
+
+      await autoRunner.runTask(mockTask);
+
+      const sessionConfig = autoMocks.createSession.mock.calls[0][0];
+      expect(sessionConfig.provider).toBeUndefined();
+    });
   });
 
   it('does not set skillDirectories when skillsDir is not provided', async () => {
