@@ -46,7 +46,6 @@ export class CopilotSdkRunner extends BaseRunner {
   readonly providerName = 'copilot-sdk';
   private sdkOptions: CopilotSdkRunnerOptions;
   private client: any = null;
-  private hasCopilotToken = false;
   private configDir: string | null = null;
 
   constructor(options: CopilotSdkRunnerOptions = {}, config?: EvalConfig) {
@@ -56,11 +55,11 @@ export class CopilotSdkRunner extends BaseRunner {
       githubToken: options.githubToken,
       provider: options.provider,
     };
-    // Resolve Copilot token eagerly so hasCopilotToken is available
-    // for both client auth (getClient) and BYOK logic (runTask).
-    this.hasCopilotToken = !!(
-      this.sdkOptions.githubToken ?? process.env.COPILOT_GITHUB_TOKEN
-    );
+  }
+
+  /** Check for Copilot token at call time to avoid stale reads. */
+  private get hasCopilotToken(): boolean {
+    return !!(this.sdkOptions.githubToken ?? process.env.COPILOT_GITHUB_TOKEN);
   }
 
   /**
@@ -203,8 +202,10 @@ export class CopilotSdkRunner extends BaseRunner {
                 }
               }
               // Also match standalone skills/<name>/SKILL.md paths that lack
-              // the .claude/ prefix (e.g., the skillsDir path passed directly)
-              const skillMdPattern = /skills\/([^/\s]+)\/SKILL\.md/g;
+              // the .claude/ prefix (e.g., the skillsDir path passed directly).
+              // Require a word boundary or path separator before "skills/" to
+              // avoid matching unrelated directories like "other-skills/".
+              const skillMdPattern = /(?:^|[\s/])skills\/([^/\s]+)\/SKILL\.md/g;
               while ((m = skillMdPattern.exec(normalized)) !== null) {
                 if (!skillLoads.includes(m[1])) {
                   skillLoads.push(m[1]);

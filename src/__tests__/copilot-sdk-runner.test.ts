@@ -58,7 +58,6 @@ function createMocks(overrides: {
 
   const sdkModule = {
     CopilotClient: CopilotClientClass,
-    approveAll: () => ({ kind: 'approved' as const }),
   };
 
   return { session, start, stop, createSession, sdkModule };
@@ -201,6 +200,8 @@ describe('CopilotSdkRunner', () => {
     expect(result.errorMessage).toContain('Connection lost');
     expect(result.taskId).toBe('test-1');
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    // Verify session cleanup on error path
+    expect(mocks.session.disconnect).toHaveBeenCalledOnce();
   });
 
   it('returns error result when dynamic import fails', async () => {
@@ -256,13 +257,19 @@ describe('CopilotSdkRunner', () => {
   it('dispose cleans up temp config directory', async () => {
     await runner.runTask(mockTask);
 
-    // Verify configDir was created
+    // Verify configDir was created (a real temp directory via mkdtempSync)
     const configDir = (runner as any).configDir;
     expect(configDir).toBeTruthy();
 
+    // Verify the temp directory actually exists on disk
+    const { existsSync } = await import('fs');
+    expect(existsSync(configDir)).toBe(true);
+
     await runner.dispose();
 
-    // Verify configDir was cleaned up
+    // Verify the temp directory was removed from disk
+    expect(existsSync(configDir)).toBe(false);
+    // Verify configDir was nulled
     expect((runner as any).configDir).toBeNull();
   });
 
