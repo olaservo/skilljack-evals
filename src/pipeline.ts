@@ -159,9 +159,6 @@ async function runPhase(
     );
     allResults.push(results);
 
-    // Dispose runner resources (e.g., child processes) between runs
-    await runner.dispose?.();
-
     if (numRuns > 1) {
       console.log(`\n--- ${phaseLabel}: Scoring Run ${run + 1}/${numRuns} ---\n`);
     } else {
@@ -170,6 +167,9 @@ async function runPhase(
     const scores = await scoreAll(evaluation.tasks, results, scorerOptions);
     allScores.push(scores);
   }
+
+  // Dispose runner resources (e.g., child processes) after all runs complete
+  await runner.dispose?.();
 
   const results = aggregateResults(allResults, allScores);
   const scores = aggregateScores(allScores);

@@ -56,6 +56,11 @@ export class CopilotSdkRunner extends BaseRunner {
       githubToken: options.githubToken,
       provider: options.provider,
     };
+    // Resolve Copilot token eagerly so hasCopilotToken is available
+    // for both client auth (getClient) and BYOK logic (runTask).
+    this.hasCopilotToken = !!(
+      this.sdkOptions.githubToken ?? process.env.COPILOT_GITHUB_TOKEN
+    );
   }
 
   /**
@@ -112,13 +117,28 @@ export class CopilotSdkRunner extends BaseRunner {
 
     if (token) {
       clientOptions.githubToken = token;
-      this.hasCopilotToken = true;
     } else if (!this.sdkOptions.provider) {
-      clientOptions.useLoggedInUser = true;
+      // Only use logged-in user when no BYOK API keys are in the environment.
+      // BYOK auto-detection in runTask() sets a session-level provider that
+      // takes precedence over client auth, but avoiding conflicting configs
+      // is cleaner than relying on that override behavior.
+      const hasApiKeys = !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
+      if (!hasApiKeys) {
+        clientOptions.useLoggedInUser = true;
+      }
     }
 
-    this.client = new sdk.CopilotClient(clientOptions);
-    await this.client.start();
+    try {
+      this.client = new sdk.CopilotClient(clientOptions);
+      await this.client.start();
+    } catch (err) {
+      // Clean up temp dir if client creation fails to prevent orphaned directories
+      try {
+        fs.rmSync(this.configDir, { recursive: true, force: true });
+      } catch { /* ignore cleanup errors */ }
+      this.configDir = null;
+      throw err;
+    }
     return this.client;
   }
 
@@ -182,7 +202,8 @@ export class CopilotSdkRunner extends BaseRunner {
                   skillLoads.push(m[1]);
                 }
               }
-              // Also match standalone skills/<name>/SKILL.md paths
+              // Also match standalone skills/<name>/SKILL.md paths that lack
+              // the .claude/ prefix (e.g., the skillsDir path passed directly)
               const skillMdPattern = /skills\/([^/\s]+)\/SKILL\.md/g;
               while ((m = skillMdPattern.exec(normalized)) !== null) {
                 if (!skillLoads.includes(m[1])) {

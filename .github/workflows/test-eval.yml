@@ -124,7 +124,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVAL_FILE: ${{ inputs.eval-file }}
           NO_JUDGE: ${{ inputs.no-judge }}
           RUNS_NUMBER: ${{ inputs.runs-number }}

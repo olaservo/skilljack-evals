@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as path from 'path';
 import { CopilotSdkRunner } from '../runner/copilot-sdk-runner.js';
 import type { EvalTask } from '../types.js';
 
@@ -403,6 +404,36 @@ describe('CopilotSdkRunner', () => {
       const sessionConfig = autoMocks.createSession.mock.calls[0][0];
       expect(sessionConfig.provider).toBeUndefined();
     });
+  });
+
+  it('denies write permission outside allowed directories', async () => {
+    const cwd = path.resolve('/tmp/test');
+    const restrictedMocks = createMocks();
+    const restrictedRunner = new TestableCopilotSdkRunner({
+      cwd,
+      model: 'gpt-5',
+      allowedWriteDirs: ['./results/'],
+    });
+    restrictedRunner.mockModules = { '@github/copilot-sdk': restrictedMocks.sdkModule };
+
+    await restrictedRunner.runTask(mockTask);
+
+    const sessionConfig = restrictedMocks.createSession.mock.calls[0][0];
+    const handler = sessionConfig.onPermissionRequest;
+
+    // Write inside allowed dir should be approved
+    const allowedPath = path.resolve(cwd, 'results', 'output.json');
+    expect(handler({ kind: 'write', path: allowedPath }))
+      .toEqual({ kind: 'approved' });
+
+    // Write outside allowed dir should be denied
+    const deniedPath = path.resolve('/etc/passwd');
+    expect(handler({ kind: 'write', path: deniedPath }))
+      .toEqual({ kind: 'denied' });
+
+    // Non-write requests should always be approved
+    expect(handler({ kind: 'read', path: deniedPath }))
+      .toEqual({ kind: 'approved' });
   });
 
   it('does not set skillDirectories when skillsDir is not provided', async () => {

@@ -70,7 +70,7 @@ inputs:
     description: 'OpenRouter API key for vercel-ai (openrouter:) runner (or use OPENROUTER_API_KEY env var)'
     required: false
   github-token:
-    description: 'GitHub token for copilot-sdk runner auth (or use GITHUB_TOKEN env var)'
+    description: 'GitHub token for copilot-sdk runner auth (set as COPILOT_GITHUB_TOKEN; must have Copilot permissions)'
     required: false
   generate-feedback:
     description: 'Path to write feedback template JSON after run'

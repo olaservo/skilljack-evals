@@ -66,7 +66,9 @@ async function run(): Promise<void> {
 
     const githubToken = core.getInput('github-token') || process.env.GITHUB_TOKEN;
     if (githubToken) {
-      process.env.GITHUB_TOKEN = githubToken;
+      // Set COPILOT_GITHUB_TOKEN for the copilot-sdk runner (which ignores
+      // the generic GITHUB_TOKEN since it typically lacks Copilot permissions)
+      process.env.COPILOT_GITHUB_TOKEN = githubToken;
       // Don't mask GITHUB_TOKEN — it's already managed by Actions
     }
 
