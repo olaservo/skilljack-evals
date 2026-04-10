@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractJsonObject, parseJudgeResponseJson, parseBlindJudgeResponse } from '../scorer/judge.js';
+import { extractJsonObject, parseJudgeResponseJson, parseBlindJudgeResponse, BASELINE_JUDGE_PROMPT_TEMPLATE } from '../scorer/judge.js';
 
 describe('extractJsonObject', () => {
   it('extracts a simple JSON object', () => {
@@ -397,5 +397,85 @@ describe('parseBlindJudgeResponse', () => {
     expect(result!.outputB.instructionFollowing).toBe(1);
     // Missing reasoning defaults to empty string
     expect(result!.reasoning).toBe('');
+  });
+});
+
+describe('BASELINE_JUDGE_PROMPT_TEMPLATE', () => {
+  it('does not reference expectedSkill or goldenChecklist placeholders', () => {
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).not.toContain('{expectedSkill}');
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).not.toContain('{checklistText}');
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).not.toContain('{checklistScoringInstructions}');
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).not.toContain('{checklistJsonField}');
+  });
+
+  it('identifies itself as a no-skill baseline evaluation', () => {
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('NO-SKILL BASELINE');
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('baseline');
+  });
+
+  it('instructs discovery to always be 0', () => {
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('Discovery (always 0)');
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('"discovery": 0');
+  });
+
+  it('scores adherence against task prompt, not skill instructions', () => {
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain("task prompt's instructions");
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).not.toContain("skill's instructions");
+  });
+
+  it('contains required substitution placeholders', () => {
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('{prompt}');
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('{criteriaText}');
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('{skillLoads}');
+    expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('{output}');
+  });
+});
+
+describe('parseJudgeResponseJson with baseline-style response', () => {
+  const defaultWeights = new Map([
+    ['discovery', 0.3],
+    ['adherence', 0.4],
+    ['output', 0.3],
+  ]);
+
+  it('handles baseline response with discovery=0 and no checklist', () => {
+    const response = JSON.stringify({
+      discovery: 0,
+      adherence: 4,
+      output_quality: 4,
+      failure_category: 'none',
+      reasoning: 'Agent followed prompt well without any skill',
+    });
+    const score = parseJudgeResponseJson(response, 'baseline-1', defaultWeights);
+
+    expect(score.taskId).toBe('baseline-1');
+    expect(score.discovery).toBe(0);
+    expect(score.adherence).toBe(4);
+    expect(score.outputQuality).toBe(4);
+    expect(score.failureCategory).toBe('none');
+    expect(score.checklistResults).toEqual([]);
+
+    // discovery=0: 0.3*0 = 0
+    // adherence=4: 0.4*((4-1)/4) = 0.4*0.75 = 0.3
+    // output=4: 0.3*((4-1)/4) = 0.3*0.75 = 0.225
+    // total = 0.525
+    expect(score.weightedScore).toBeCloseTo(0.525);
+  });
+
+  it('computes correct weighted score for high-quality baseline', () => {
+    const response = JSON.stringify({
+      discovery: 0,
+      adherence: 5,
+      output_quality: 5,
+      failure_category: 'none',
+      reasoning: 'Excellent output without skill',
+    });
+    const score = parseJudgeResponseJson(response, 'baseline-2', defaultWeights);
+
+    // discovery=0: 0.3*0 = 0
+    // adherence=5: 0.4*1 = 0.4
+    // output=5: 0.3*1 = 0.3
+    // total = 0.7
+    expect(score.weightedScore).toBeCloseTo(0.7);
   });
 });

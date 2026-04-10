@@ -29,6 +29,8 @@ export interface ScorerOptions {
   judgeOptions?: JudgeOptions;
   /** Human review feedback keyed by task ID */
   humanFeedback?: HumanFeedback;
+  /** True for no-skill baseline evaluation — adjusts judge prompt */
+  isBaseline?: boolean;
 }
 
 /**
@@ -51,7 +53,8 @@ export async function scoreTask(
   // Run LLM judge scoring
   let judgeResult: JudgeScore | null = null;
   if (!options.noJudge && task.criteria.length > 0) {
-    const judge = new SkillJudge(options.judgeOptions);
+    const judgeOpts = { ...options.judgeOptions, isBaseline: options.isBaseline };
+    const judge = new SkillJudge(judgeOpts);
     const taskFeedback = getFeedbackForTask(options.humanFeedback, task.id);
     judgeResult = await judge.judgeResult(task, result, taskFeedback);
   }

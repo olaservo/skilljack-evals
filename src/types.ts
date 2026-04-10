@@ -129,6 +129,8 @@ export interface JudgeScore {
 export interface JudgeOptions {
   model?: string;
   outputTruncation?: number;
+  /** True for no-skill baseline evaluation — uses baseline judge prompt */
+  isBaseline?: boolean;
 }
 
 // ============================================
