@@ -595,8 +595,8 @@ export async function blindCompareAll(
       return {
         taskId: task.taskId,
         withSkillLabel,
-        outputA: { instructionFollowing: 1, outputQuality: 1 },
-        outputB: { instructionFollowing: 1, outputQuality: 1 },
+        outputA: null,
+        outputB: null,
         preferred: 'tie',
         reasoning: 'Blind judge call failed',
         preferredCondition: 'tie',

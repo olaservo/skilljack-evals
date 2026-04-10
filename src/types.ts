@@ -356,8 +356,8 @@ export interface BlindOutputScore {
 export interface BlindTaskComparison {
   taskId: string;
   withSkillLabel: 'A' | 'B';           // which label the with-skill output got
-  outputA: BlindOutputScore;
-  outputB: BlindOutputScore;
+  outputA: BlindOutputScore | null;
+  outputB: BlindOutputScore | null;
   preferred: 'A' | 'B' | 'tie';
   reasoning: string;
   preferredCondition: 'with-skill' | 'without-skill' | 'tie';
