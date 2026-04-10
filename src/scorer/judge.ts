@@ -585,8 +585,8 @@ export async function blindCompareAll(
       ? task.withoutSkill.result.output
       : task.withSkill.result.output;
 
-    // Both sides use the same prompt; use withSkill's copy.
-    const taskPrompt = task.withSkill.result.prompt;
+    // Use the original task prompt from the evaluation definition.
+    const taskPrompt = task.originalPrompt;
     const result = await judge.blindCompare(taskPrompt, outputA, outputB);
 
     if (!result) {
