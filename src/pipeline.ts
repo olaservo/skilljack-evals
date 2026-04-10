@@ -480,13 +480,13 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
 
   if (config.githubSummary) {
-    const wrote = await writeGitHubSummary(report);
+    const wrote = await writeGitHubSummary(report, config);
     if (wrote) {
       console.log('GitHub step summary written');
     }
   }
 
-  const markdownSummary = generateGitHubSummary(report);
+  const markdownSummary = generateGitHubSummary(report, config);
   printSummary(report);
 
   if (comparison) {
@@ -568,7 +568,7 @@ export async function scorePipeline(
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
 
-  const markdownSummary = generateGitHubSummary(report);
+  const markdownSummary = generateGitHubSummary(report, config);
   printSummary(report);
 
   return {

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateGitHubSummary } from '../report/github-summary.js';
+import { DEFAULT_CONFIG } from '../config.js';
+import type { EvalConfig } from '../config.js';
 import type { EvaluationReport } from '../types.js';
 
 function makeReport(overrides: Partial<EvaluationReport> = {}): EvaluationReport {
@@ -188,5 +190,67 @@ describe('generateGitHubSummary', () => {
     expect(summary).toContain('- FAIL: No evidence item');
     // Should not have a trailing dash for missing evidence
     expect(summary).not.toContain('— ');
+  });
+
+  it('uses custom thresholds from config', () => {
+    const customConfig: EvalConfig = { ...DEFAULT_CONFIG, discoveryThreshold: 0.5, scoreThreshold: 3.0 };
+    const report = makeReport({
+      passed: true,
+      summary: {
+        totalTasks: 2,
+        numRuns: 1,
+        discoveryAccuracy: 0.6,
+        avgAdherence: 3.5,
+        avgOutputQuality: 3.5,
+        avgWeightedScore: 0.6,
+        totalDurationMs: 2000,
+        totalCostUsd: 0.02,
+      },
+    });
+
+    const summary = generateGitHubSummary(report, customConfig);
+
+    // These would be FAIL with default thresholds (0.8 / 4.0) but PASS with custom (0.5 / 3.0)
+    expect(summary).toContain('| Discovery Rate | 60%');
+    expect(summary).toContain('PASS');
+    expect(summary).not.toMatch(/Discovery Rate.*FAIL/);
+    expect(summary).not.toMatch(/Avg Adherence.*FAIL/);
+    expect(summary).not.toMatch(/Avg Output Quality.*FAIL/);
+  });
+
+  it('displays threshold column with configured values', () => {
+    const customConfig: EvalConfig = { ...DEFAULT_CONFIG, discoveryThreshold: 0.7, scoreThreshold: 3.5 };
+    const report = makeReport();
+
+    const summary = generateGitHubSummary(report, customConfig);
+
+    expect(summary).toContain('| Metric | Value | Threshold | Status |');
+    expect(summary).toMatch(/Discovery Rate.*70%/);
+    expect(summary).toMatch(/Avg Adherence.*3\.5/);
+    expect(summary).toMatch(/Avg Output Quality.*3\.5/);
+  });
+
+  it('passes at exact threshold boundary (>=)', () => {
+    const customConfig: EvalConfig = { ...DEFAULT_CONFIG, discoveryThreshold: 0.6, scoreThreshold: 3.0 };
+    const report = makeReport({
+      passed: true,
+      summary: {
+        totalTasks: 5,
+        numRuns: 1,
+        discoveryAccuracy: 0.6,
+        avgAdherence: 3.0,
+        avgOutputQuality: 3.0,
+        avgWeightedScore: 0.5,
+        totalDurationMs: 1000,
+        totalCostUsd: 0.01,
+      },
+    });
+
+    const summary = generateGitHubSummary(report, customConfig);
+
+    // Exactly at threshold should be PASS
+    expect(summary).not.toMatch(/Discovery Rate.*FAIL/);
+    expect(summary).not.toMatch(/Avg Adherence.*FAIL/);
+    expect(summary).not.toMatch(/Avg Output Quality.*FAIL/);
   });
 });
