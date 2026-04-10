@@ -36,6 +36,7 @@ async function run(): Promise<void> {
     const feedbackPath = core.getInput('feedback') || undefined;
     const compare = core.getInput('compare') === 'true';
     const compareSkillPath = core.getInput('compare-skill') || undefined;
+    const compareLabel = core.getInput('compare-label') || undefined;
     const compareResultsPath = core.getInput('compare-results') || undefined;
     const blindCompare = core.getInput('blind-compare') === 'true';
 
@@ -98,6 +99,7 @@ async function run(): Promise<void> {
       feedbackPath,
       compare: compare || !!compareSkillPath,
       compareSkillPath,
+      compareLabel,
       compareResultsPath,
       blindCompare,
     });

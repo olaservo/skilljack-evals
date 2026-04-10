@@ -85,6 +85,9 @@ inputs:
   compare-skill:
     description: 'Path to baseline skill directory (e.g., previous version) for A/B comparison'
     required: false
+  compare-label:
+    description: 'Custom label for the baseline in comparison reports'
+    required: false
   compare-results:
     description: 'Path to previous JSON results file for cross-iteration comparison'
     required: false
