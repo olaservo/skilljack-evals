@@ -1,7 +1,7 @@
 /**
  * Agent Runner interface and shared options.
  *
- * All runner implementations (Claude SDK, Vercel AI SDK, OpenAI Agents SDK)
+ * All runner implementations (Claude SDK, Vercel AI SDK, OpenAI Agents SDK, Copilot SDK)
  * implement this interface to produce TaskResult objects consumed by the scorer.
  */
 
@@ -51,7 +51,7 @@ export interface AgentRunnerOptions {
  * 3. Handling skill discovery via the framework's native mechanism
  */
 export interface AgentRunner {
-  /** Human-readable provider name (e.g., 'claude-sdk', 'vercel-ai', 'openai-agents') */
+  /** Human-readable provider name (e.g., 'claude-sdk', 'vercel-ai', 'openai-agents', 'copilot-sdk') */
   readonly providerName: string;
 
   /** Run a single task and produce a TaskResult */
@@ -69,4 +69,7 @@ export interface AgentRunner {
     evaluation: SkillEvaluation,
     createLogger?: (task: EvalTask) => SessionLogger,
   ): Promise<TaskResult[]>;
+
+  /** Release runner resources (e.g., child processes). Called after runAll() completes. */
+  dispose?(): Promise<void>;
 }

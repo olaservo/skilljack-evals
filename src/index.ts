@@ -55,6 +55,7 @@ export { parseEvalFile, createEvalTemplate, validateEvalFile } from './parser.js
 
 // Runner
 export { ClaudeSdkRunner } from './runner/claude-sdk-runner.js';
+export { CopilotSdkRunner } from './runner/copilot-sdk-runner.js';
 export type { AgentRunner, AgentRunnerOptions } from './runner/agent-runner.js';
 export { createRunner } from './runner/runner-factory.js';
 export { setupLocalSkills, cleanupLocalSkills } from './runner/skill-setup.js';

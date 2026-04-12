@@ -70,13 +70,21 @@ jobs:
           - runner: vercel-ai
             model: 'openrouter:openai/gpt-oss-120b'
             name: vercel-ai-openrouter-gpt-oss
+          # copilot-sdk entries disabled until github/copilot-sdk#629 is fixed
+          # (skillDirectories not working — agent relies on inconsistent file browsing)
+          # - runner: copilot-sdk
+          #   model: gpt-5.2
+          #   name: copilot-sdk-gpt
+          # - runner: copilot-sdk
+          #   model: claude-sonnet-4-6
+          #   name: copilot-sdk-sonnet
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
         run: npm install
@@ -88,6 +96,8 @@ jobs:
             npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @openrouter/ai-sdk-provider
           elif [ "${{ matrix.runner }}" = "openai-agents" ]; then
             npm install @openai/agents openai
+          elif [ "${{ matrix.runner }}" = "copilot-sdk" ]; then
+            npm install @github/copilot-sdk
           fi
 
       - name: Build

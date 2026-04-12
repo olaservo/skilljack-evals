@@ -16,9 +16,9 @@ import yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents';
+export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents' | 'copilot-sdk';
 
-export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'vercel-ai', 'openai-agents'];
+export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'vercel-ai', 'openai-agents', 'copilot-sdk'];
 
 export interface EvalConfig {
   // Runner

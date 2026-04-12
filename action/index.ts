@@ -64,6 +64,14 @@ async function run(): Promise<void> {
       core.setSecret(openrouterKey);
     }
 
+    const githubToken = core.getInput('github-token') || process.env.GITHUB_TOKEN;
+    if (githubToken) {
+      // Set COPILOT_GITHUB_TOKEN for the copilot-sdk runner (which ignores
+      // the generic GITHUB_TOKEN since it typically lacks Copilot permissions)
+      process.env.COPILOT_GITHUB_TOKEN = githubToken;
+      // Don't mask GITHUB_TOKEN — it's already managed by Actions
+    }
+
     // Build config overrides
     const configOverrides: Partial<EvalConfig> = {
       runnerType: runner,

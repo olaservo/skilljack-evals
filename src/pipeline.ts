@@ -168,6 +168,9 @@ async function runPhase(
     allScores.push(scores);
   }
 
+  // Dispose runner resources (e.g., child processes) after all runs complete
+  await runner.dispose?.();
+
   const results = aggregateResults(allResults, allScores);
   const scores = aggregateScores(allScores);
 
@@ -189,7 +192,7 @@ async function runPhase(
 }
 
 /**
- * Setup local skills for Claude SDK runner.
+ * Setup local skills for Claude SDK and Copilot SDK runners.
  * Returns true if skills were set up and need cleanup.
  */
 async function setupSkills(
@@ -198,7 +201,7 @@ async function setupSkills(
   cwd: string,
 ): Promise<boolean> {
   if (!skillsDir) return false;
-  if (config.runnerType === 'claude-sdk') {
+  if (config.runnerType === 'claude-sdk' || config.runnerType === 'copilot-sdk') {
     console.log(`Setting up local skills from: ${skillsDir}`);
     const skillNames = await setupLocalSkills(skillsDir, cwd);
     console.log(`Skills configured: ${skillNames.join(', ')}`);

@@ -12,6 +12,7 @@ CLI for evaluating [Agent Skills](https://agentskills.io/home) - a format for ex
 - `src/runner/runner.ts` - Claude Agent SDK runner (SkillEvalRunner)
 - `src/runner/vercel-ai-runner.ts` - Vercel AI SDK runner
 - `src/runner/openai-agents-runner.ts` - OpenAI Agents SDK runner
+- `src/runner/copilot-sdk-runner.ts` - GitHub Copilot SDK runner
 - `src/runner/base-runner.ts` - Shared runner base class
 - `src/runner/runner-factory.ts` - Runner selection factory
 - `src/runner/skill-setup.ts` - Copy/cleanup skills in .claude/skills/
@@ -37,15 +38,16 @@ npm run start      # Run compiled CLI
 ## Architecture
 
 ```
-YAML tasks → Config → Runner (Claude SDK | Vercel AI | OpenAI Agents) → Scorer (deterministic + LLM judge) → Report
+YAML tasks → Config → Runner (Claude SDK | Vercel AI | OpenAI Agents | Copilot SDK) → Scorer (deterministic + LLM judge) → Report
 ```
 
 ## Runners
 
-Three runners selected via `--runner` flag:
+Four runners selected via `--runner` flag:
 - `claude-sdk` (default) — uses Claude Agent SDK, model aliases like `sonnet`, `haiku`
 - `vercel-ai` — uses Vercel AI SDK, model format `"provider:model"` (e.g., `anthropic:claude-sonnet-4-6`, `google:gemini-2.5-pro`, `openai:gpt-5.2`, `openrouter:deepseek/deepseek-v3.2`)
 - `openai-agents` — uses OpenAI Agents SDK, plain model names (e.g., `gpt-5.2`)
+- `copilot-sdk` — uses GitHub Copilot SDK, model names like `gpt-5`, `claude-sonnet-4-6`
 
 ## Scoring
 
@@ -74,6 +76,7 @@ Two methods, run independently or together:
 Peer dependencies (install as needed for non-Claude runners):
 - `ai`, `zod`, `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`, `@openrouter/ai-sdk-provider` - Vercel AI SDK
 - `@openai/agents`, `openai` - OpenAI Agents SDK
+- `@github/copilot-sdk` - GitHub Copilot SDK
 
 ## Environment
 
@@ -82,6 +85,8 @@ Requires API key for selected runner in environment or `.env` file:
 - Vercel AI (openai:) / OpenAI Agents: `OPENAI_API_KEY`
 - Vercel AI (google:): `GOOGLE_GENERATIVE_AI_API_KEY`
 - Vercel AI (openrouter:): `OPENROUTER_API_KEY`
+- Copilot SDK (GitHub auth): `COPILOT_GITHUB_TOKEN` (must have Copilot permissions)
+- Copilot SDK (BYOK): Auto-detects `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` when no Copilot token
 
 For Bedrock: set `CLAUDE_CODE_USE_BEDROCK=1` + AWS env vars.
 
