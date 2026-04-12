@@ -267,6 +267,8 @@ describe('blindCompareAll integration', () => {
     const result = await blindCompareAll(tasks, mockJudge, { randomFn: () => 0.1 });
 
     expect(result.tasks[0].failed).toBe(true);
+    expect(result.tasks[0].outputA).toBeNull();
+    expect(result.tasks[0].outputB).toBeNull();
     expect(result.tasks[0].preferredCondition).toBe('tie');
     expect(result.tasks[0].biasSignal).toBe(false);
     expect(result.aggregate.failedCount).toBe(1);
@@ -355,6 +357,8 @@ describe('blindCompareAll integration', () => {
     expect(result.aggregate.ties).toBe(1); // only successful tie
     expect(result.aggregate.failedCount).toBe(1); // failed task not in ties
     expect(result.tasks[1].failed).toBe(true);
+    expect(result.tasks[1].outputA).toBeNull();
+    expect(result.tasks[1].outputB).toBeNull();
     expect(result.tasks[1].preferredCondition).toBe('tie'); // still tie internally
   });
 });
@@ -477,8 +481,8 @@ describe('generateBlindComparisonSection in markdown report', () => {
         {
           taskId: 'task-2',
           withSkillLabel: 'A',
-          outputA: { instructionFollowing: 1, outputQuality: 1 },
-          outputB: { instructionFollowing: 1, outputQuality: 1 },
+          outputA: null,
+          outputB: null,
           preferred: 'tie',
           reasoning: 'Blind judge call failed',
           preferredCondition: 'tie',

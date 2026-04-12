@@ -487,10 +487,10 @@ Assignment shows the label order: with-skill / without-skill (e.g. A/B means A =
 
   for (const t of blind.tasks) {
     const labels = t.withSkillLabel === 'A' ? 'A/B' : 'B/A';
-    const aInstr = t.failed ? 'N/A' : `${t.outputA.instructionFollowing}/5`;
-    const aOut = t.failed ? 'N/A' : `${t.outputA.outputQuality}/5`;
-    const bInstr = t.failed ? 'N/A' : `${t.outputB.instructionFollowing}/5`;
-    const bOut = t.failed ? 'N/A' : `${t.outputB.outputQuality}/5`;
+    const aInstr = t.failed || !t.outputA ? 'N/A' : `${t.outputA.instructionFollowing}/5`;
+    const aOut = t.failed || !t.outputA ? 'N/A' : `${t.outputA.outputQuality}/5`;
+    const bInstr = t.failed || !t.outputB ? 'N/A' : `${t.outputB.instructionFollowing}/5`;
+    const bOut = t.failed || !t.outputB ? 'N/A' : `${t.outputB.outputQuality}/5`;
     section += `| ${t.taskId} | ${labels} | ${aInstr} | ${aOut} | ${bInstr} | ${bOut} | ${t.preferred} | ${t.preferredCondition} | ${t.biasSignal ? 'Yes' : 'No'} |\n`;
   }
 
