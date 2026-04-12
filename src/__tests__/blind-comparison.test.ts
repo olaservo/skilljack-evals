@@ -308,8 +308,14 @@ describe('blindCompareAll integration', () => {
 
     await blindCompareAll([task], mockJudge, { randomFn: () => 0.1 });
 
+    expect(mockJudge.blindCompare).toHaveBeenCalledTimes(1);
     expect(mockJudge.blindCompare).toHaveBeenCalledWith(
       'original eval prompt',
+      expect.any(String),
+      expect.any(String),
+    );
+    expect(mockJudge.blindCompare).not.toHaveBeenCalledWith(
+      'modified by runner',
       expect.any(String),
       expect.any(String),
     );
