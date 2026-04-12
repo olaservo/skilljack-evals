@@ -441,6 +441,21 @@ describe('CopilotSdkRunner', () => {
     // Non-write requests should always be approved
     expect(handler({ kind: 'read', path: deniedPath }))
       .toEqual({ kind: 'approved' });
+
+    // Fail-closed: writes with unknown path shapes are denied
+    expect(handler({ kind: 'write' }))
+      .toEqual({ kind: 'denied' });
+    expect(handler({ kind: 'write', target: allowedPath }))
+      .toEqual({ kind: 'denied' });
+  });
+
+  it('defaults numTurns to 1 when sendAndWait returns content without events', async () => {
+    // sendAndWait returns output directly; no assistant.message events emitted.
+    const result = await runner.runTask(mockTask);
+
+    expect(result.isError).toBe(false);
+    expect(result.output).toBe('Hello!');
+    expect(result.numTurns).toBe(1);
   });
 
   it('does not set skillDirectories when skillsDir is not provided', async () => {

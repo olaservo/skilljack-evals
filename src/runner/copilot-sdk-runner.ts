@@ -159,11 +159,14 @@ export class CopilotSdkRunner extends BaseRunner {
         model: this.options.model ?? 'gpt-5',
         workingDirectory: cwd,
 
-        // Permission handler: approve reads/shell, restrict writes
+        // Permission handler: approve reads/shell, restrict writes.
+        // Fail-closed: writes with unknown path shapes are denied when
+        // allowedWriteDirs is configured, to avoid bypassing the boundary
+        // if the SDK request shape changes.
         onPermissionRequest: (request: any) => {
           if (request.kind === 'write') {
             const filePath = request.path ?? request.filePath ?? '';
-            if (filePath && !isWriteAllowed(filePath, allowedWriteDirs, cwd)) {
+            if (!filePath || !isWriteAllowed(filePath, allowedWriteDirs, cwd)) {
               return { kind: 'denied' };
             }
           }
@@ -285,12 +288,16 @@ export class CopilotSdkRunner extends BaseRunner {
           logger?.addTextMessage(output);
         }
 
+        // sendAndWait may return content directly without emitting
+        // assistant.message events, leaving numTurns at 0.
+        const effectiveTurns = numTurns === 0 && output ? 1 : numTurns;
+
         return {
           taskId: task.id,
           prompt: task.prompt,
           output,
           durationMs: Date.now() - startTime,
-          numTurns,
+          numTurns: effectiveTurns,
           costUsd: 0, // Copilot SDK doesn't expose per-token cost
           skillLoads: [...new Set(skillLoads)],
           toolCalls,
