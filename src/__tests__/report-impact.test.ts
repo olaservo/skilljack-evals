@@ -36,6 +36,10 @@ describe('qualityImpact', () => {
     expect(qualityImpact(-DISCOVERY_IMPACT_THRESHOLD, DISCOVERY_IMPACT_THRESHOLD)).toBe('Neutral');
     expect(qualityImpact(ADHERENCE_IMPACT_THRESHOLD, ADHERENCE_IMPACT_THRESHOLD)).toBe('Neutral');
     expect(qualityImpact(-ADHERENCE_IMPACT_THRESHOLD, ADHERENCE_IMPACT_THRESHOLD)).toBe('Neutral');
+    expect(qualityImpact(OUTPUT_QUALITY_IMPACT_THRESHOLD, OUTPUT_QUALITY_IMPACT_THRESHOLD)).toBe('Neutral');
+    expect(qualityImpact(-OUTPUT_QUALITY_IMPACT_THRESHOLD, OUTPUT_QUALITY_IMPACT_THRESHOLD)).toBe('Neutral');
+    expect(qualityImpact(WEIGHTED_SCORE_IMPACT_THRESHOLD, WEIGHTED_SCORE_IMPACT_THRESHOLD)).toBe('Neutral');
+    expect(qualityImpact(-WEIGHTED_SCORE_IMPACT_THRESHOLD, WEIGHTED_SCORE_IMPACT_THRESHOLD)).toBe('Neutral');
   });
 });
 
