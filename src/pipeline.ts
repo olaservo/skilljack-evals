@@ -58,6 +58,17 @@ async function loadHumanFeedback(
   return feedback;
 }
 
+/**
+ * Derive a readable label from a skill path using the last two path components.
+ * Avoids ambiguity when multiple paths share the same basename.
+ */
+export function smartLabel(skillPath: string): string {
+  const parts = path.normalize(skillPath).split(path.sep).filter(Boolean);
+  return parts.length >= 2
+    ? parts.slice(-2).join('/')
+    : parts[parts.length - 1] || skillPath;
+}
+
 export interface PipelineOptions {
   /** Path to tasks YAML file */
   tasksFile: string;
@@ -89,6 +100,8 @@ export interface PipelineOptions {
   compare?: boolean;
   /** Path to alternative skill for comparison (instead of no-skill baseline) */
   compareSkillPath?: string;
+  /** Custom label for the baseline in comparison reports */
+  compareLabel?: string;
   /** Run blind A/B comparison alongside --compare */
   blindCompare?: boolean;
 }
@@ -277,6 +290,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     throw new Error('--blind-compare requires --compare mode');
   }
 
+  if (options.compareLabel && !compareMode) {
+    console.warn('Warning: --compare-label has no effect without --compare or --compare-skill');
+  }
+
   // 1. Parse tasks
   console.log(`Parsing tasks from: ${options.tasksFile}`);
   let evaluation = await parseEvalFile(options.tasksFile);
@@ -369,9 +386,12 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   try {
     if (compareMode && skillsDir) {
       // --- Comparison mode: two phases ---
-      const baselineLabel = options.compareSkillPath
-        ? path.basename(options.compareSkillPath)
-        : 'No Skill';
+      const rawLabel = options.compareLabel?.trim();
+      const baselineLabel = (rawLabel && rawLabel.length > 0)
+        ? rawLabel
+        : (options.compareSkillPath
+          ? smartLabel(options.compareSkillPath)
+          : 'No Skill');
 
       console.log(`\nComparison mode: running each task with skill AND "${baselineLabel}"`);
       console.log(`Total runs per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)\n`);

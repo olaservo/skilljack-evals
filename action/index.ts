@@ -36,6 +36,7 @@ async function run(): Promise<void> {
     const feedbackPath = core.getInput('feedback') || undefined;
     const compare = core.getInput('compare') === 'true';
     const compareSkillPath = core.getInput('compare-skill') || undefined;
+    const compareLabel = core.getInput('compare-label') || undefined;
     const compareResultsPath = core.getInput('compare-results') || undefined;
     const blindCompare = core.getInput('blind-compare') === 'true';
 
@@ -64,12 +65,11 @@ async function run(): Promise<void> {
       core.setSecret(openrouterKey);
     }
 
-    const githubToken = core.getInput('github-token') || process.env.GITHUB_TOKEN;
-    if (githubToken) {
-      // Set COPILOT_GITHUB_TOKEN for the copilot-sdk runner (which ignores
-      // the generic GITHUB_TOKEN since it typically lacks Copilot permissions)
-      process.env.COPILOT_GITHUB_TOKEN = githubToken;
-      // Don't mask GITHUB_TOKEN — it's already managed by Actions
+    const githubTokenInput = core.getInput('github-token');
+    if (githubTokenInput) {
+      // Only set COPILOT_GITHUB_TOKEN from explicit github-token input, not
+      // the generic GITHUB_TOKEN which typically lacks Copilot permissions
+      process.env.COPILOT_GITHUB_TOKEN = githubTokenInput;
     }
 
     // Build config overrides
@@ -98,6 +98,7 @@ async function run(): Promise<void> {
       feedbackPath,
       compare: compare || !!compareSkillPath,
       compareSkillPath,
+      compareLabel,
       compareResultsPath,
       blindCompare,
     });
