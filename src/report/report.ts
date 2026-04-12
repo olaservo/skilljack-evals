@@ -440,7 +440,7 @@ const DURATION_IMPACT_THRESHOLD_MS = 1000;
 /** Minimum cost delta (USD) to classify as higher/lower. */
 const COST_IMPACT_THRESHOLD_USD = 0.0001;
 
-export function qualityImpact(delta: number, threshold: number): string {
+export function qualityImpact(delta: number, threshold: number): 'Positive' | 'Negative' | 'Neutral' {
   if (delta > threshold) return 'Positive';
   if (delta < -threshold) return 'Negative';
   return 'Neutral';
