@@ -290,6 +290,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     throw new Error('--blind-compare requires --compare mode');
   }
 
+  if (options.compareLabel && !compareMode) {
+    console.warn('Warning: --compare-label has no effect without --compare or --compare-skill');
+  }
+
   // 1. Parse tasks
   console.log(`Parsing tasks from: ${options.tasksFile}`);
   let evaluation = await parseEvalFile(options.tasksFile);
@@ -382,8 +386,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   try {
     if (compareMode && skillsDir) {
       // --- Comparison mode: two phases ---
-      const baselineLabel = options.compareLabel
-        ?? (options.compareSkillPath
+      const rawLabel = options.compareLabel?.trim();
+      const baselineLabel = (rawLabel && rawLabel.length > 0)
+        ? rawLabel
+        : (options.compareSkillPath
           ? smartLabel(options.compareSkillPath)
           : 'No Skill');
 

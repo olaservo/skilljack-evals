@@ -2619,7 +2619,7 @@ var require_parseParams = __commonJS({
 var require_basename = __commonJS({
   "node_modules/@fastify/busboy/lib/utils/basename.js"(exports2, module2) {
     "use strict";
-    module2.exports = function basename3(path11) {
+    module2.exports = function basename2(path11) {
       if (typeof path11 !== "string") {
         return "";
       }
@@ -2646,7 +2646,7 @@ var require_multipart = __commonJS({
     var Dicer = require_Dicer();
     var parseParams = require_parseParams();
     var decodeText = require_decodeText();
-    var basename3 = require_basename();
+    var basename2 = require_basename();
     var getLimit = require_getLimit();
     var RE_BOUNDARY = /^boundary$/i;
     var RE_FIELD = /^form-data$/i;
@@ -2763,7 +2763,7 @@ var require_multipart = __commonJS({
               } else if (RE_FILENAME.test(parsed[i][0])) {
                 filename = parsed[i][1];
                 if (!preservePath) {
-                  filename = basename3(filename);
+                  filename = basename2(filename);
                 }
               }
             }
@@ -25782,8 +25782,8 @@ var require_resolve = __commonJS2((exports2) => {
     }
     return count;
   }
-  function getFullPath(resolver, id = "", normalize) {
-    if (normalize !== false)
+  function getFullPath(resolver, id = "", normalize2) {
+    if (normalize2 !== false)
       id = normalizeId(id);
     const p = resolver.parse(id);
     return _getFullPath(resolver, p);
@@ -27026,7 +27026,7 @@ var require_schemes = __commonJS2((exports2, module2) => {
 var require_fast_uri = __commonJS2((exports2, module2) => {
   var { normalizeIPv6, normalizeIPv4, removeDotSegments, recomposeAuthority, normalizeComponentEncoding } = require_utils3();
   var SCHEMES = require_schemes();
-  function normalize(uri, options) {
+  function normalize2(uri, options) {
     if (typeof uri === "string") {
       uri = serialize(parse6(uri, options), options);
     } else if (typeof uri === "object") {
@@ -27266,7 +27266,7 @@ var require_fast_uri = __commonJS2((exports2, module2) => {
   }
   var fastUri = {
     SCHEMES,
-    normalize,
+    normalize: normalize2,
     resolve: resolve6,
     resolveComponents,
     equal,
@@ -31909,8 +31909,8 @@ var require_resolve2 = __commonJS2((exports2) => {
     }
     return count;
   }
-  function getFullPath(resolver, id = "", normalize) {
-    if (normalize !== false)
+  function getFullPath(resolver, id = "", normalize2) {
+    if (normalize2 !== false)
       id = normalizeId(id);
     const p = resolver.parse(id);
     return _getFullPath(resolver, p);
@@ -46162,7 +46162,7 @@ async function blindCompareAll(tasks, judge, options) {
     const withSkillLabel = withSkillIsA ? "A" : "B";
     const outputA = withSkillIsA ? task.withSkill.result.output : task.withoutSkill.result.output;
     const outputB = withSkillIsA ? task.withoutSkill.result.output : task.withSkill.result.output;
-    const taskPrompt = task.originalPrompt;
+    const taskPrompt = task.withSkill.result.prompt;
     const result = await judge.blindCompare(taskPrompt, outputA, outputB);
     if (!result) {
       console.warn(`Blind comparison failed for task ${task.taskId}, recording as tie`);
@@ -47387,6 +47387,10 @@ async function loadHumanFeedback(feedbackPath, tasks) {
   console.log(`Loaded human feedback for ${count} task(s) from: ${feedbackPath}`);
   return feedback;
 }
+function smartLabel(skillPath) {
+  const parts = path10.normalize(skillPath).split(path10.sep).filter(Boolean);
+  return parts.length >= 2 ? parts.slice(-2).join("/") : parts[parts.length - 1] || skillPath;
+}
 async function runPhase(phaseLabel, evaluation, config2, cwd2, skillsDir, numRuns, scorerOptions, logBaseDir) {
   const runner = await createRunner(config2.runnerType, {
     cwd: cwd2,
@@ -47449,14 +47453,13 @@ async function setupSkills(skillsDir, config2, cwd2) {
   console.log(`Skills directory: ${skillsDir} (${config2.runnerType} handles discovery natively)`);
   return false;
 }
-function computeComparison(withPhase, basePhase, baselineLabel, evalTasks, compareSkillPath) {
+function computeComparison(withPhase, basePhase, baselineLabel, compareSkillPath) {
   const tasks = [];
   for (let i = 0; i < withPhase.results.length; i++) {
     const w = { result: withPhase.results[i], score: withPhase.scores[i] };
     const b = { result: basePhase.results[i], score: basePhase.scores[i] };
     tasks.push({
       taskId: w.result.taskId,
-      originalPrompt: evalTasks[i].prompt,
       withSkill: w,
       withoutSkill: b,
       delta: {
@@ -47495,6 +47498,9 @@ async function runPipeline(options) {
   const compareMode = options.compare || !!options.compareSkillPath;
   if (options.blindCompare && !compareMode) {
     throw new Error("--blind-compare requires --compare mode");
+  }
+  if (options.compareLabel && !compareMode) {
+    console.warn("Warning: --compare-label has no effect without --compare or --compare-skill");
   }
   console.log(`Parsing tasks from: ${options.tasksFile}`);
   let evaluation = await parseEvalFile(options.tasksFile);
@@ -47567,7 +47573,8 @@ async function runPipeline(options) {
   let needsCleanup = false;
   try {
     if (compareMode && skillsDir) {
-      const baselineLabel = options.compareSkillPath ? path10.basename(options.compareSkillPath) : "No Skill";
+      const rawLabel = options.compareLabel?.trim();
+      const baselineLabel = rawLabel && rawLabel.length > 0 ? rawLabel : options.compareSkillPath ? smartLabel(options.compareSkillPath) : "No Skill";
       console.log(`
 Comparison mode: running each task with skill AND "${baselineLabel}"`);
       console.log(`Total runs per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)
@@ -47591,7 +47598,7 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
       };
       const basePhase = await runPhase(baselineLabel, evaluation, config2, cwd2, baseSkillsDir, numRuns, baselineScorerOptions, path10.join(logDir, "baseline"));
       console.log("\n=== Computing Comparison Deltas ===\n");
-      comparison = computeComparison(withPhase, basePhase, baselineLabel, evaluation.tasks, options.compareSkillPath);
+      comparison = computeComparison(withPhase, basePhase, baselineLabel, options.compareSkillPath);
       if (options.blindCompare) {
         console.log("\n=== Running Blind A/B Comparison ===\n");
         const blindJudge = new SkillJudge({ model: config2.defaultJudgeModel });
@@ -47763,6 +47770,7 @@ async function run() {
     const feedbackPath = core2.getInput("feedback") || void 0;
     const compare = core2.getInput("compare") === "true";
     const compareSkillPath = core2.getInput("compare-skill") || void 0;
+    const compareLabel = core2.getInput("compare-label") || void 0;
     const compareResultsPath = core2.getInput("compare-results") || void 0;
     const blindCompare = core2.getInput("blind-compare") === "true";
     const anthropicKey = core2.getInput("anthropic-api-key") || process.env.ANTHROPIC_API_KEY;
@@ -47785,9 +47793,9 @@ async function run() {
       process.env.OPENROUTER_API_KEY = openrouterKey;
       core2.setSecret(openrouterKey);
     }
-    const githubToken = core2.getInput("github-token") || process.env.GITHUB_TOKEN;
-    if (githubToken) {
-      process.env.COPILOT_GITHUB_TOKEN = githubToken;
+    const githubTokenInput = core2.getInput("github-token");
+    if (githubTokenInput) {
+      process.env.COPILOT_GITHUB_TOKEN = githubTokenInput;
     }
     const configOverrides = {
       runnerType: runner,
@@ -47812,6 +47820,7 @@ async function run() {
       feedbackPath,
       compare: compare || !!compareSkillPath,
       compareSkillPath,
+      compareLabel,
       compareResultsPath,
       blindCompare
     });

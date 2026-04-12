@@ -28,4 +28,8 @@ describe('smartLabel', () => {
     expect(smartLabel('./v1/skills')).toBe('v1/skills');
     expect(smartLabel('../other/v2/skills')).toBe('v2/skills');
   });
+
+  it('handles empty string gracefully', () => {
+    expect(smartLabel('')).toBe('.');
+  });
 });
