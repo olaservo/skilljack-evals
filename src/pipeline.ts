@@ -218,6 +218,7 @@ function computeComparison(
   withPhase: PhaseResult,
   basePhase: PhaseResult,
   baselineLabel: string,
+  evalTasks: EvalTask[],
   compareSkillPath?: string,
 ): ComparisonData {
   const tasks: TaskComparison[] = [];
@@ -228,6 +229,7 @@ function computeComparison(
 
     tasks.push({
       taskId: w.result.taskId,
+      originalPrompt: evalTasks[i].prompt,
       withSkill: w,
       withoutSkill: b,
       delta: {
@@ -408,7 +410,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       );
 
       console.log('\n=== Computing Comparison Deltas ===\n');
-      comparison = computeComparison(withPhase, basePhase, baselineLabel, options.compareSkillPath);
+      comparison = computeComparison(withPhase, basePhase, baselineLabel, evaluation.tasks, options.compareSkillPath);
 
       if (options.blindCompare) {
         console.log('\n=== Running Blind A/B Comparison ===\n');

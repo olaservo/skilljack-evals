@@ -52,6 +52,7 @@ function makeTaskComparison(
 ): TaskComparison {
   return {
     taskId,
+    originalPrompt: 'test prompt',
     withSkill: {
       result: makeResult(taskId, 'with-skill output'),
       score: makeScore(taskId, { weightedScore: withSkillWeighted }),
@@ -292,6 +293,34 @@ describe('blindCompareAll integration', () => {
     // randomFn returns 0.1 → with-skill should be A
     const result2 = await blindCompareAll(tasks, mockJudge, { randomFn: () => 0.1 });
     expect(result2.tasks[0].withSkillLabel).toBe('A');
+  });
+
+  it('passes originalPrompt to blind judge, not result.prompt', async () => {
+    const mockJudge = createMockJudge({
+      outputA: { instructionFollowing: 3, outputQuality: 3 },
+      outputB: { instructionFollowing: 3, outputQuality: 3 },
+      preferred: 'tie',
+      reasoning: 'Equal',
+    });
+
+    const task = makeTaskComparison('task-1', 0.5, 0.5);
+    task.originalPrompt = 'original eval prompt';
+    task.withSkill.result.prompt = 'modified by runner';
+    task.withoutSkill.result.prompt = 'modified by runner';
+
+    await blindCompareAll([task], mockJudge, { randomFn: () => 0.1 });
+
+    expect(mockJudge.blindCompare).toHaveBeenCalledTimes(1);
+    expect(mockJudge.blindCompare).toHaveBeenCalledWith(
+      'original eval prompt',
+      expect.any(String),
+      expect.any(String),
+    );
+    expect(mockJudge.blindCompare).not.toHaveBeenCalledWith(
+      'modified by runner',
+      expect.any(String),
+      expect.any(String),
+    );
   });
 
   it('runs multiple tasks concurrently', async () => {

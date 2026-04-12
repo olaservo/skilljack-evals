@@ -275,6 +275,7 @@ export interface TaskComparisonDelta {
 /** Per-task comparison data with both sides */
 export interface TaskComparison {
   taskId: string;
+  originalPrompt: string;
   withSkill: { result: TaskResult; score: CombinedScore };
   withoutSkill: { result: TaskResult; score: CombinedScore };
   delta: TaskComparisonDelta;
