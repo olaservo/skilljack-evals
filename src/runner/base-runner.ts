@@ -67,6 +67,19 @@ export abstract class BaseRunner implements AgentRunner {
     };
   }
 
+  /**
+   * Dynamically import a module, throwing a helpful error if missing.
+   * Protected to allow test subclasses to inject mocks.
+   */
+  protected async dynamicImport(pkg: string, installHint: string): Promise<any> {
+    try {
+      return await (Function('pkg', 'return import(pkg)')(pkg));
+    } catch (err) {
+      const detail = err instanceof Error ? `: ${err.message}` : '';
+      throw new Error(`${pkg} is required${detail}. Install with: npm install ${installHint}`);
+    }
+  }
+
   abstract runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult>;
 
   /**

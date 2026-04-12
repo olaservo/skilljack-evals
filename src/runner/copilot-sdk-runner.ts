@@ -63,19 +63,6 @@ export class CopilotSdkRunner extends BaseRunner {
   }
 
   /**
-   * Dynamically import a module, throwing a helpful error if missing.
-   * Protected to allow test subclasses to inject mocks.
-   */
-  protected async dynamicImport(pkg: string, installHint: string): Promise<any> {
-    try {
-      return await (Function('pkg', 'return import(pkg)')(pkg));
-    } catch (err) {
-      const detail = err instanceof Error ? `: ${err.message}` : '';
-      throw new Error(`${pkg} is required${detail}. Install with: npm install ${installHint}`);
-    }
-  }
-
-  /**
    * Get or create a lazy CopilotClient singleton.
    * Reused across tasks to avoid per-task server startup overhead.
    */

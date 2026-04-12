@@ -5,7 +5,7 @@
  */
 
 import * as fs from 'fs/promises';
-import { formatDelta, formatCategory, pct } from '../utils/format.js';
+import { formatDelta, formatCategory, pct, ARROW_DIRECTION_EPSILON } from '../utils/format.js';
 import type {
   EvaluationReport,
   EvaluationSummary,
@@ -14,7 +14,6 @@ import type {
 } from '../types.js';
 import { loadConfigSync, type EvalConfig } from '../config.js';
 import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
-import { ARROW_DIRECTION_EPSILON } from './format-utils.js';
 
 /**
  * Generate a condensed summary for GitHub Actions.

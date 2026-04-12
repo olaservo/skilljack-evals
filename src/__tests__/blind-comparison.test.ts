@@ -3,46 +3,10 @@ import type {
   BlindTaskComparison,
   BlindComparisonData,
   TaskComparison,
-  TaskResult,
-  CombinedScore,
 } from '../types.js';
 import { blindCompareAll, BLIND_BIAS_THRESHOLD, SkillJudge, mapPreferredToCondition } from '../scorer/judge.js';
 import { generateReport } from '../report/report.js';
-
-/** Helper to create a minimal TaskResult */
-function makeResult(taskId: string, output = 'test output'): TaskResult {
-  return {
-    taskId,
-    prompt: 'test prompt',
-    output,
-    durationMs: 1000,
-    numTurns: 1,
-    costUsd: 0.01,
-    skillLoads: [],
-    toolCalls: [],
-    isError: false,
-    errorMessage: '',
-  };
-}
-
-/** Helper to create a minimal CombinedScore */
-function makeScore(
-  taskId: string,
-  overrides: Partial<CombinedScore> = {},
-): CombinedScore {
-  return {
-    taskId,
-    deterministic: null,
-    judge: null,
-    discovery: 1,
-    adherence: 4,
-    outputQuality: 4,
-    weightedScore: 0.8,
-    failureCategory: 'none',
-    reasoning: 'test',
-    ...overrides,
-  };
-}
+import { makeScore, makeResult } from './fixtures/test-helpers.js';
 
 /** Helper to create a TaskComparison with a given weighted score delta */
 function makeTaskComparison(
@@ -54,12 +18,12 @@ function makeTaskComparison(
     taskId,
     originalPrompt: 'test prompt',
     withSkill: {
-      result: makeResult(taskId, 'with-skill output'),
-      score: makeScore(taskId, { weightedScore: withSkillWeighted }),
+      result: makeResult({ taskId, output: 'with-skill output' }),
+      score: makeScore({ taskId, weightedScore: withSkillWeighted }),
     },
     withoutSkill: {
-      result: makeResult(taskId, 'without-skill output'),
-      score: makeScore(taskId, { weightedScore: withoutSkillWeighted }),
+      result: makeResult({ taskId, output: 'without-skill output' }),
+      score: makeScore({ taskId, weightedScore: withoutSkillWeighted }),
     },
     delta: {
       taskId,

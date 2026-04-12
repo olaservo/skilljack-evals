@@ -9,6 +9,26 @@
 import * as path from 'path';
 
 /**
+ * Resolve allowed write directory patterns to absolute paths with trailing separators.
+ */
+function resolveWriteDirs(allowedWriteDirs: string[], cwd: string): string[] {
+  return allowedWriteDirs.map((dir) => {
+    const resolved = path.resolve(cwd, dir);
+    // Ensure trailing separator so "/app/results" won't match "/app/results-evil"
+    return resolved.endsWith(path.sep) ? resolved : resolved + path.sep;
+  });
+}
+
+/**
+ * Check whether a resolved path falls within any of the resolved allowed directories.
+ */
+function isPathInDirs(resolvedPath: string, resolvedDirs: string[]): boolean {
+  return resolvedDirs.some(
+    (dir) => resolvedPath.startsWith(dir) || resolvedPath === dir.slice(0, -1),
+  );
+}
+
+/**
  * Check whether a resolved file path falls within the allowed write directories.
  * Used by non-Claude runners that don't have canUseTool callbacks.
  */
@@ -22,14 +42,7 @@ export function isWriteAllowed(
   // Direct API users should set allowedWriteDirs explicitly.
   if (allowedWriteDirs.length === 0) return true;
 
-  const resolvedDirs = allowedWriteDirs.map((dir) => {
-    const resolved = path.resolve(cwd, dir);
-    // Ensure trailing separator so "/app/results" won't match "/app/results-evil"
-    return resolved.endsWith(path.sep) ? resolved : resolved + path.sep;
-  });
-  return resolvedDirs.some(
-    (dir) => resolvedPath.startsWith(dir) || resolvedPath === dir.slice(0, -1),
-  );
+  return isPathInDirs(resolvedPath, resolveWriteDirs(allowedWriteDirs, cwd));
 }
 
 /**
@@ -42,10 +55,7 @@ export function createToolPolicy(
   allowedWriteDirs: string[],
   cwd: string
 ) {
-  const resolvedDirs = allowedWriteDirs.map((dir) => {
-    const resolved = path.resolve(cwd, dir);
-    return resolved.endsWith(path.sep) ? resolved : resolved + path.sep;
-  });
+  const resolvedDirs = resolveWriteDirs(allowedWriteDirs, cwd);
 
   return async (
     toolName: string,
@@ -61,11 +71,7 @@ export function createToolPolicy(
     const filePath = (input.file_path as string) || '';
     const resolvedPath = path.resolve(cwd, filePath);
 
-    const isAllowed = resolvedDirs.some((dir) =>
-      resolvedPath.startsWith(dir) || resolvedPath === dir.slice(0, -1)
-    );
-
-    if (isAllowed) {
+    if (isPathInDirs(resolvedPath, resolvedDirs)) {
       return { behavior: 'allow' as const, updatedInput: input };
     }
 

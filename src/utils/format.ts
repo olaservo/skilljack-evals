@@ -1,3 +1,6 @@
+/** Threshold below which a delta is considered effectively zero for arrow display. */
+export const ARROW_DIRECTION_EPSILON = 0.001;
+
 /**
  * Format a numeric delta value with a sign prefix.
  */

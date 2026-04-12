@@ -10,12 +10,11 @@ import {
   SIGNIFICANCE_THRESHOLD_ADHERENCE,
   SIGNIFICANCE_THRESHOLD_WEIGHTED,
 } from '../report/comparison.js';
-import { formatDelta, formatCategory } from '../report/format-utils.js';
+import { formatDelta, formatCategory } from '../utils/format.js';
 import type {
-  EvaluationReport,
   EvaluationSummary,
-  CombinedScore,
 } from '../types.js';
+import { makeScore, makeReport } from './fixtures/test-helpers.js';
 
 // Minimal valid summary object for tests that need to pass summary validation
 const validSummary = {
@@ -24,55 +23,6 @@ const validSummary = {
   avgOutputQuality: 4.0,
   avgWeightedScore: 0.75,
 };
-
-// Helper to build a minimal valid EvaluationReport
-function makeReport(overrides: Partial<EvaluationReport> = {}): EvaluationReport {
-  return {
-    skillName: 'test-skill',
-    timestamp: '2026-03-07T10:00:00.000Z',
-    passed: true,
-    failureReasons: [],
-    summary: {
-      totalTasks: 2,
-      numRuns: 1,
-      discoveryAccuracy: 0.8,
-      avgAdherence: 4.0,
-      avgOutputQuality: 4.0,
-      avgWeightedScore: 0.75,
-      totalDurationMs: 5000,
-      totalCostUsd: 0.01,
-    },
-    failureBreakdown: [],
-    tasks: [
-      {
-        task: { id: 'task-1', prompt: 'p1', expectedSkillLoad: 'skill', criteria: [], goldenChecklist: [] },
-        result: { taskId: 'task-1', prompt: 'p1', output: 'out1', durationMs: 2500, numTurns: 1, costUsd: 0.005, skillLoads: ['skill'], toolCalls: [], isError: false, errorMessage: '' },
-        score: { taskId: 'task-1', deterministic: null, judge: null, discovery: 1, adherence: 4, outputQuality: 4, weightedScore: 0.8, failureCategory: 'none', reasoning: 'ok' },
-      },
-      {
-        task: { id: 'task-2', prompt: 'p2', expectedSkillLoad: 'skill', criteria: [], goldenChecklist: [] },
-        result: { taskId: 'task-2', prompt: 'p2', output: 'out2', durationMs: 2500, numTurns: 1, costUsd: 0.005, skillLoads: ['skill'], toolCalls: [], isError: false, errorMessage: '' },
-        score: { taskId: 'task-2', deterministic: null, judge: null, discovery: 0.6, adherence: 4, outputQuality: 4, weightedScore: 0.7, failureCategory: 'none', reasoning: 'ok' },
-      },
-    ],
-    ...overrides,
-  };
-}
-
-function makeScore(overrides: Partial<CombinedScore> = {}): CombinedScore {
-  return {
-    taskId: 'task-1',
-    deterministic: null,
-    judge: null,
-    discovery: 1,
-    adherence: 4,
-    outputQuality: 4,
-    weightedScore: 0.8,
-    failureCategory: 'none',
-    reasoning: 'ok',
-    ...overrides,
-  };
-}
 
 function makeSummary(overrides: Partial<EvaluationSummary> = {}): EvaluationSummary {
   return {
@@ -512,9 +462,9 @@ describe('formatDelta', () => {
     expect(formatDelta(0)).toBe('0.00');
   });
 
-  it('appends suffix when provided', () => {
-    expect(formatDelta(2.5, '%')).toBe('+2.50%');
-    expect(formatDelta(-1.0, '%')).toBe('-1.00%');
+  it('can be combined with a suffix by the caller', () => {
+    expect(formatDelta(2.5) + '%').toBe('+2.50%');
+    expect(formatDelta(-1.0) + '%').toBe('-1.00%');
   });
 
   it('rounds to 2 decimal places', () => {

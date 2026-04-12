@@ -2,29 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { generateGitHubSummary } from '../report/github-summary.js';
 import { DEFAULT_CONFIG } from '../config.js';
 import type { EvalConfig } from '../config.js';
-import type { EvaluationReport } from '../types.js';
-
-function makeReport(overrides: Partial<EvaluationReport> = {}): EvaluationReport {
-  return {
-    skillName: 'test-skill',
-    timestamp: '2026-01-01T00:00:00Z',
-    passed: true,
-    failureReasons: [],
-    summary: {
-      totalTasks: 1,
-      numRuns: 1,
-      discoveryAccuracy: 1,
-      avgAdherence: 5,
-      avgOutputQuality: 5,
-      avgWeightedScore: 1,
-      totalDurationMs: 1000,
-      totalCostUsd: 0.01,
-    },
-    failureBreakdown: [],
-    tasks: [],
-    ...overrides,
-  };
-}
+import { makeReport } from './fixtures/test-helpers.js';
 
 describe('generateGitHubSummary', () => {
   it('escapes markdown special characters in checklist evidence', () => {

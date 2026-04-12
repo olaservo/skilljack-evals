@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeStddev, aggregateScores, FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
 import { computeSummary } from '../report/report.js';
-import type { CombinedScore, TaskResult } from '../types.js';
+import { makeScore, makeResult } from './fixtures/test-helpers.js';
 
 describe('computeStddev', () => {
   it('returns 0 for empty array', () => {
@@ -43,21 +43,6 @@ describe('computeStddev', () => {
 });
 
 describe('aggregateScores', () => {
-  function makeScore(overrides: Partial<CombinedScore> = {}): CombinedScore {
-    return {
-      taskId: 'task-1',
-      deterministic: null,
-      judge: null,
-      discovery: 1,
-      adherence: 4,
-      outputQuality: 4,
-      weightedScore: 0.8,
-      failureCategory: 'none',
-      reasoning: 'test',
-      ...overrides,
-    };
-  }
-
   it('returns empty array for no runs', () => {
     expect(aggregateScores([])).toEqual([]);
   });
@@ -111,37 +96,6 @@ describe('FLAKY_STDDEV_THRESHOLD', () => {
 });
 
 describe('computeSummary', () => {
-  function makeResult(overrides: Partial<TaskResult> = {}): TaskResult {
-    return {
-      taskId: 'task-1',
-      prompt: 'test prompt',
-      output: 'test output',
-      durationMs: 1000,
-      numTurns: 1,
-      costUsd: 0.01,
-      skillLoads: [],
-      toolCalls: [],
-      isError: false,
-      errorMessage: '',
-      ...overrides,
-    };
-  }
-
-  function makeScore(overrides: Partial<CombinedScore> = {}): CombinedScore {
-    return {
-      taskId: 'task-1',
-      deterministic: null,
-      judge: null,
-      discovery: 1,
-      adherence: 4,
-      outputQuality: 4,
-      weightedScore: 0.8,
-      failureCategory: 'none',
-      reasoning: 'test',
-      ...overrides,
-    };
-  }
-
   it('produces no stddev for single-run', () => {
     const results = [makeResult()];
     const scores = [makeScore()];

@@ -16,7 +16,7 @@ import type {
   ScoreSnapshot,
   SummarySnapshot,
 } from '../types.js';
-import { formatDelta, ARROW_DIRECTION_EPSILON } from './format-utils.js';
+import { formatDelta, ARROW_DIRECTION_EPSILON } from '../utils/format.js';
 
 export const SIGNIFICANCE_THRESHOLD_ADHERENCE = 1;
 export const SIGNIFICANCE_THRESHOLD_WEIGHTED = 0.15;
@@ -218,7 +218,7 @@ export function formatComparisonMarkdown(comparison: ComparisonResult): string {
   lines.push(summaryRow('Discovery Accuracy',
     `${(d.previous.discoveryAccuracy * 100).toFixed(1)}%`,
     `${(d.current.discoveryAccuracy * 100).toFixed(1)}%`,
-    formatDelta(d.delta.discoveryAccuracy * 100, '%'),
+    formatDelta(d.delta.discoveryAccuracy * 100) + '%',
     d.delta.discoveryAccuracy
   ));
   lines.push(summaryRow('Avg Adherence',
