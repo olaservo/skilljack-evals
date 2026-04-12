@@ -408,9 +408,9 @@ function generateComparisonSection(comparison: ComparisonData): string {
 
 | Metric | With Skill | Baseline | Delta | Impact |
 |--------|-----------|----------|-------|--------|
-| Discovery | ${(ws.discoveryAccuracy * 100).toFixed(0)}% | ${(bs.discoveryAccuracy * 100).toFixed(0)}% | ${formatDelta(d.discoveryAccuracyDelta * 100, 0)}% | ${qualityImpact(d.discoveryAccuracyDelta)} |
-| Avg Adherence | ${ws.avgAdherence.toFixed(2)}/5 | ${bs.avgAdherence.toFixed(2)}/5 | ${formatDelta(d.avgAdherenceDelta)} | ${qualityImpact(d.avgAdherenceDelta)} |
-| Avg Output Quality | ${ws.avgOutputQuality.toFixed(2)}/5 | ${bs.avgOutputQuality.toFixed(2)}/5 | ${formatDelta(d.avgOutputQualityDelta)} | ${qualityImpact(d.avgOutputQualityDelta)} |
+| Discovery | ${(ws.discoveryAccuracy * 100).toFixed(0)}% | ${(bs.discoveryAccuracy * 100).toFixed(0)}% | ${formatDelta(d.discoveryAccuracyDelta * 100, 0)}% | ${qualityImpact(d.discoveryAccuracyDelta, DISCOVERY_IMPACT_THRESHOLD)} |
+| Avg Adherence | ${ws.avgAdherence.toFixed(2)}/5 | ${bs.avgAdherence.toFixed(2)}/5 | ${formatDelta(d.avgAdherenceDelta)} | ${qualityImpact(d.avgAdherenceDelta, ADHERENCE_IMPACT_THRESHOLD)} |
+| Avg Output Quality | ${ws.avgOutputQuality.toFixed(2)}/5 | ${bs.avgOutputQuality.toFixed(2)}/5 | ${formatDelta(d.avgOutputQualityDelta)} | ${qualityImpact(d.avgOutputQualityDelta, OUTPUT_QUALITY_IMPACT_THRESHOLD)} |
 | Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | ${formatDelta(d.avgWeightedScoreDelta)} | ${qualityImpact(d.avgWeightedScoreDelta, WEIGHTED_SCORE_IMPACT_THRESHOLD)} |
 | Duration | ${(ws.totalDurationMs / 1000).toFixed(1)}s | ${(bs.totalDurationMs / 1000).toFixed(1)}s | ${formatDelta(d.totalDurationDeltaMs / 1000, 1)}s | ${durationImpact(d.totalDurationDeltaMs)} |
 | Cost | $${ws.totalCostUsd.toFixed(4)} | $${bs.totalCostUsd.toFixed(4)} | $${formatDelta(d.totalCostDeltaUsd, 4)} | ${costImpact(d.totalCostDeltaUsd)} |
@@ -430,16 +430,17 @@ function generateComparisonSection(comparison: ComparisonData): string {
   return section;
 }
 
-/** Minimum score delta to classify as positive/negative impact (on 1-5 scale, ~2.5% of range). */
-const QUALITY_IMPACT_THRESHOLD = 0.1;
-/** Minimum weighted score delta (on 0-1 scale, ~2% of range). */
-const WEIGHTED_SCORE_IMPACT_THRESHOLD = 0.02;
+/** Minimum delta to classify as positive/negative impact, calibrated to ~5% of each metric's range. */
+export const DISCOVERY_IMPACT_THRESHOLD = 0.05;       // 5% of 0-1 range
+export const ADHERENCE_IMPACT_THRESHOLD = 0.20;       // 5% of 1-5 range (range = 4)
+export const OUTPUT_QUALITY_IMPACT_THRESHOLD = 0.20;  // 5% of 1-5 range (range = 4)
+export const WEIGHTED_SCORE_IMPACT_THRESHOLD = 0.05;  // 5% of 0-1 range
 /** Minimum duration delta (ms) to classify as slower/faster. */
 const DURATION_IMPACT_THRESHOLD_MS = 1000;
 /** Minimum cost delta (USD) to classify as higher/lower. */
 const COST_IMPACT_THRESHOLD_USD = 0.0001;
 
-function qualityImpact(delta: number, threshold = QUALITY_IMPACT_THRESHOLD): string {
+export function qualityImpact(delta: number, threshold: number): 'Positive' | 'Negative' | 'Neutral' {
   if (delta > threshold) return 'Positive';
   if (delta < -threshold) return 'Negative';
   return 'Neutral';
