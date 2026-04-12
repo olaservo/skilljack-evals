@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { extractJsonObject, parseJudgeResponseJson, parseBlindJudgeResponse, BASELINE_JUDGE_PROMPT_TEMPLATE } from '../scorer/judge.js';
+import { describe, it, expect, vi } from 'vitest';
+import { extractJsonObject, parseJudgeResponseJson, parseBlindJudgeResponse, BASELINE_JUDGE_PROMPT_TEMPLATE, SkillJudge } from '../scorer/judge.js';
 
 describe('extractJsonObject', () => {
   it('extracts a simple JSON object', () => {
@@ -428,6 +428,85 @@ describe('BASELINE_JUDGE_PROMPT_TEMPLATE', () => {
     expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('{criteriaText}');
     expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('{skillLoads}');
     expect(BASELINE_JUDGE_PROMPT_TEMPLATE).toContain('{output}');
+  });
+});
+
+describe('scoreTask passes isBaseline to SkillJudge', () => {
+  const task = {
+    id: 'test-1',
+    prompt: 'Do something',
+    expectedSkillLoad: 'some-skill',
+    criteria: [
+      { dimension: 'discovery' as const, weight: 0.3, description: 'Found skill' },
+      { dimension: 'adherence' as const, weight: 0.4, description: 'Followed instructions' },
+      { dimension: 'output' as const, weight: 0.3, description: 'Quality output' },
+    ],
+    goldenChecklist: [],
+  };
+
+  const result = {
+    taskId: 'test-1',
+    prompt: 'Do something',
+    output: 'some output',
+    durationMs: 1000,
+    numTurns: 1,
+    costUsd: 0.01,
+    skillLoads: [],
+    toolCalls: [],
+    isError: false,
+    errorMessage: '',
+  };
+
+  it('constructs SkillJudge with isBaseline=true when isBaseline option is set', async () => {
+    const mockScore = {
+      taskId: 'test-1',
+      discovery: 0,
+      adherence: 3,
+      outputQuality: 3,
+      weightedScore: 0.5,
+      failureCategory: 'none' as const,
+      reasoning: 'baseline',
+      checklistResults: [],
+    };
+    let capturedInstance: any;
+    const judgeResultSpy = vi.spyOn(SkillJudge.prototype, 'judgeResult').mockImplementation(
+      async function (this: SkillJudge) {
+        capturedInstance = this;
+        return mockScore;
+      }
+    );
+
+    const { scoreTask } = await import('../scorer/scorer.js');
+    await scoreTask(task, result, { isBaseline: true });
+
+    expect(capturedInstance.options.isBaseline).toBe(true);
+    judgeResultSpy.mockRestore();
+  });
+
+  it('constructs SkillJudge with isBaseline=false by default', async () => {
+    const mockScore = {
+      taskId: 'test-1',
+      discovery: 0,
+      adherence: 3,
+      outputQuality: 3,
+      weightedScore: 0.5,
+      failureCategory: 'none' as const,
+      reasoning: 'standard',
+      checklistResults: [],
+    };
+    let capturedInstance: any;
+    const judgeResultSpy = vi.spyOn(SkillJudge.prototype, 'judgeResult').mockImplementation(
+      async function (this: SkillJudge) {
+        capturedInstance = this;
+        return mockScore;
+      }
+    );
+
+    const { scoreTask } = await import('../scorer/scorer.js');
+    await scoreTask(task, result, {});
+
+    expect(capturedInstance.options.isBaseline).toBe(false);
+    judgeResultSpy.mockRestore();
   });
 });
 

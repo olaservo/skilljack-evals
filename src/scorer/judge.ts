@@ -419,6 +419,7 @@ export class SkillJudge {
    * Does not reference expectedSkillLoad or goldenChecklist.
    */
   private buildBaselineJudgePrompt(task: EvalTask, result: TaskResult, feedback?: string): string {
+    // Filter out discovery criteria — discovery is always 0 in baseline mode
     const criteriaLines = task.criteria
       .filter((c) => c.dimension !== 'discovery')
       .map((c) => `- **${capitalize(c.dimension)}** (weight ${c.weight}): ${c.description}`);
