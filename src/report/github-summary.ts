@@ -12,13 +12,15 @@ import type {
   FailureBreakdown,
   CombinedScore,
 } from '../types.js';
+import { loadConfigSync, type EvalConfig } from '../config.js';
 import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
 import { ARROW_DIRECTION_EPSILON } from './format-utils.js';
 
 /**
  * Generate a condensed summary for GitHub Actions.
  */
-export function generateGitHubSummary(report: EvaluationReport): string {
+export function generateGitHubSummary(report: EvaluationReport, config?: EvalConfig): string {
+  const resolvedConfig = config ?? loadConfigSync();
   const { summary, failureBreakdown, tasks } = report;
   const lines: string[] = [];
 
@@ -28,14 +30,14 @@ export function generateGitHubSummary(report: EvaluationReport): string {
   lines.push('');
 
   // Summary table
-  lines.push('| Metric | Value | Status |');
-  lines.push('|--------|-------|--------|');
-  lines.push(`| Discovery Rate | ${(summary.discoveryAccuracy * 100).toFixed(0)}%${summary.stddev ? ` \u00B1 ${(summary.stddev.discovery * 100).toFixed(0)}%` : ''} (${Math.round(summary.discoveryAccuracy * summary.totalTasks)}/${summary.totalTasks}) | ${summary.discoveryAccuracy >= 0.8 ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Avg Adherence | ${summary.avgAdherence.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.adherence.toFixed(1)}` : ''} | ${summary.avgAdherence >= 4.0 ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Avg Output Quality | ${summary.avgOutputQuality.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.outputQuality.toFixed(1)}` : ''} | ${summary.avgOutputQuality >= 4.0 ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Weighted Score | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | |`);
-  lines.push(`| Duration | ${(summary.totalDurationMs / 1000).toFixed(1)}s | |`);
-  lines.push(`| Cost | $${summary.totalCostUsd.toFixed(4)} | |`);
+  lines.push('| Metric | Value | Threshold | Status |');
+  lines.push('|--------|-------|-----------|--------|');
+  lines.push(`| Discovery Rate | ${(summary.discoveryAccuracy * 100).toFixed(0)}%${summary.stddev ? ` \u00B1 ${(summary.stddev.discovery * 100).toFixed(0)}%` : ''} (${Math.round(summary.discoveryAccuracy * summary.totalTasks)}/${summary.totalTasks}) | ${(resolvedConfig.discoveryThreshold * 100).toFixed(0)}% | ${summary.discoveryAccuracy >= resolvedConfig.discoveryThreshold ? 'PASS' : 'FAIL'} |`);
+  lines.push(`| Avg Adherence | ${summary.avgAdherence.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.adherence.toFixed(1)}` : ''} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${summary.avgAdherence >= resolvedConfig.scoreThreshold ? 'PASS' : 'FAIL'} |`);
+  lines.push(`| Avg Output Quality | ${summary.avgOutputQuality.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.outputQuality.toFixed(1)}` : ''} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${summary.avgOutputQuality >= resolvedConfig.scoreThreshold ? 'PASS' : 'FAIL'} |`);
+  lines.push(`| Weighted Score | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | | |`);
+  lines.push(`| Duration | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |`);
+  lines.push(`| Cost | $${summary.totalCostUsd.toFixed(4)} | | |`);
   lines.push('');
 
   // Failures
@@ -185,11 +187,11 @@ export function generateGitHubSummary(report: EvaluationReport): string {
 /**
  * Write summary to $GITHUB_STEP_SUMMARY if available.
  */
-export async function writeGitHubSummary(report: EvaluationReport): Promise<boolean> {
+export async function writeGitHubSummary(report: EvaluationReport, config?: EvalConfig): Promise<boolean> {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (!summaryPath) return false;
 
-  const summary = generateGitHubSummary(report);
+  const summary = generateGitHubSummary(report, config);
   await fs.appendFile(summaryPath, summary + '\n');
   return true;
 }
