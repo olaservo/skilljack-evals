@@ -398,10 +398,13 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
         needsCleanup = await setupSkills(baseSkillsDir, config, cwd);
       }
 
-      // Only skip deterministic for no-skill baseline; version comparison keeps it
+      // Only skip deterministic for no-skill baseline; version comparison keeps it.
+      // isBaseline tells the judge to use a prompt that doesn't penalize for missing skill.
+      const isNoSkillBaseline = !options.compareSkillPath;
       const baselineScorerOptions: ScorerOptions = {
         ...scorerOptions,
-        noDeterministic: options.compareSkillPath ? scorerOptions.noDeterministic : true,
+        noDeterministic: isNoSkillBaseline ? true : scorerOptions.noDeterministic,
+        isBaseline: isNoSkillBaseline,
       };
 
       const basePhase = await runPhase(
