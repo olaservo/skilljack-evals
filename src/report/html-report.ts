@@ -24,7 +24,7 @@ import type {
   TaskResult,
 } from '../types.js';
 import { loadConfigSync, type EvalConfig } from '../config.js';
-import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
+import { isFlaky } from '../scorer/aggregator.js';
 
 /** Escape HTML special characters to prevent XSS. */
 function escapeHtml(str: string): string {
@@ -80,7 +80,7 @@ export async function generateHtmlReport(options: ReportOptions): Promise<string
     outputQuality: t.score.outputQuality,
     weightedScore: t.score.weightedScore,
     failureCategory: t.score.failureCategory,
-    isFlaky: !!(t.score.stddev && (t.score.stddev.adherence > FLAKY_STDDEV_THRESHOLD || t.score.stddev.outputQuality > FLAKY_STDDEV_THRESHOLD)),
+    isFlaky: isFlaky(t.score.stddev),
   }));
 
   // Check if any cross-iteration regression data exists
@@ -252,9 +252,9 @@ function renderTaskTable(tasks: HtmlTaskData[], config: EvalConfig, humanFeedbac
   let rows = '';
   for (const t of tasks) {
     const isFailed = t.score.failureCategory !== 'none';
-    const isFlaky = !!(t.score.stddev && (t.score.stddev.adherence > FLAKY_STDDEV_THRESHOLD || t.score.stddev.outputQuality > FLAKY_STDDEV_THRESHOLD));
-    const statusClass = isFailed ? 'status-fail' : (isFlaky ? 'status-flaky' : 'status-pass');
-    const statusLabel = isFailed ? 'FAIL' : (isFlaky ? 'FLAKY' : 'PASS');
+    const flaky = isFlaky(t.score.stddev);
+    const statusClass = isFailed ? 'status-fail' : (flaky ? 'status-flaky' : 'status-pass');
+    const statusLabel = isFailed ? 'FAIL' : (flaky ? 'FLAKY' : 'PASS');
 
     rows += `
     <tr class="task-row" data-task-id="${escapeHtml(t.task.id)}" data-index="${t.index}">

@@ -369,6 +369,12 @@ describe('generateHtmlReport', () => {
 
   // --- Edge cases ---
 
+  it('throws when result/score arrays do not match task count', async () => {
+    const opts = makeReportOptions();
+    opts.results = [opts.results[0]]; // 1 result for 2 tasks
+    await expect(generateHtmlReport(opts)).rejects.toThrow('Mismatched array lengths');
+  });
+
   it('handles zero tasks gracefully', async () => {
     const opts = makeReportOptions({
       evaluation: { skillName: 'empty-skill', tasks: [] },

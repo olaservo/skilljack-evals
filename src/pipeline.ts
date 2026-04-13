@@ -16,7 +16,7 @@ import { setupLocalSkills, cleanupLocalSkills } from './runner/skill-setup.js';
 import { createRunner } from './runner/runner-factory.js';
 import { scoreAll, type ScorerOptions } from './scorer/scorer.js';
 import { SessionLogger } from './session/session-logger.js';
-import { generateReport, generateJsonResults, computeSummary } from './report/report.js';
+import { generateReport, generateJsonResults, computeSummary, type ReportOptions } from './report/report.js';
 import { generateHtmlReport } from './report/html-report.js';
 import { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
 import { loadConfig, type EvalConfig } from './config.js';
@@ -506,16 +506,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
 
-  let htmlPath: string | undefined;
-  if (config.htmlReport) {
-    try {
-      htmlPath = path.join(config.outputDir, `${reportBaseName}.html`);
-      await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
-    } catch (err) {
-      console.warn(`Warning: HTML report generation failed: ${err instanceof Error ? err.message : String(err)}`);
-      htmlPath = undefined;
-    }
-  }
+  const htmlPath = await maybeGenerateHtmlReport(config, reportBaseName, reportOptions);
 
   if (config.githubSummary) {
     const wrote = await writeGitHubSummary(report, config);
@@ -607,16 +598,7 @@ export async function scorePipeline(
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
 
-  let htmlPath: string | undefined;
-  if (config.htmlReport) {
-    try {
-      htmlPath = path.join(config.outputDir, `${reportBaseName}.html`);
-      await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
-    } catch (err) {
-      console.warn(`Warning: HTML report generation failed: ${err instanceof Error ? err.message : String(err)}`);
-      htmlPath = undefined;
-    }
-  }
+  const htmlPath = await maybeGenerateHtmlReport(config, reportBaseName, reportOptions);
 
   const markdownSummary = generateGitHubSummary(report, config);
   printSummary(report);
@@ -633,6 +615,26 @@ export async function scorePipeline(
     htmlPath,
     markdownSummary,
   };
+}
+
+/**
+ * Generate the HTML report if enabled in config, returning the output path.
+ * Logs a warning and returns undefined if generation fails.
+ */
+async function maybeGenerateHtmlReport(
+  config: EvalConfig,
+  reportBaseName: string,
+  reportOptions: Omit<ReportOptions, 'outputPath'>,
+): Promise<string | undefined> {
+  if (!config.htmlReport) return undefined;
+  try {
+    const htmlPath = path.join(config.outputDir, `${reportBaseName}.html`);
+    await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
+    return htmlPath;
+  } catch (err) {
+    console.warn(`Warning: HTML report generation failed: ${err instanceof Error ? err.message : String(err)}`);
+    return undefined;
+  }
 }
 
 function printSummary(report: EvaluationReport): void {

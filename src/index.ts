@@ -66,7 +66,7 @@ export { scoreTask, scoreAll } from './scorer/scorer.js';
 export { scoreDeterministic } from './scorer/deterministic.js';
 export { SkillJudge, blindCompareAll, BLIND_BIAS_THRESHOLD, DEFAULT_CONCURRENCY } from './scorer/judge.js';
 export type { BlindCompareOptions } from './scorer/judge.js';
-export { aggregateResults, aggregateScores, computeStddev, FLAKY_STDDEV_THRESHOLD } from './scorer/aggregator.js';
+export { aggregateResults, aggregateScores, computeStddev, FLAKY_STDDEV_THRESHOLD, isFlaky } from './scorer/aggregator.js';
 
 // Session
 export { SessionLogger } from './session/session-logger.js';

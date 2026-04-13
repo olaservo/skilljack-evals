@@ -185,6 +185,7 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
  * - EVAL_DISCOVERY_THRESHOLD: Min discovery rate 0-1 (default: 0.8)
  * - EVAL_SCORE_THRESHOLD: Min avg score 1-5 (default: 4.0)
  * - EVAL_GITHUB_SUMMARY: Write GitHub Actions summary (default: false)
+ * - EVAL_HTML_REPORT: Generate HTML report (default: true)
  */
 function loadEnvConfig(): Partial<EvalConfig> {
   const config: Partial<EvalConfig> = {};
