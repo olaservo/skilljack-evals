@@ -18,8 +18,9 @@ import { generateHtmlReport } from './report/html-report.js';
 import { SkillJudge } from './scorer/judge.js';
 import type { EvalTask, TaskResult, JudgeScore, SkillEvaluation, CombinedScore } from './types.js';
 import { validateFeedback } from './feedback.js';
-import { VALID_RUNNER_TYPES } from './config.js';
+import { VALID_RUNNER_TYPES, loadConfig } from './config.js';
 import type { EvalConfig, RunnerType } from './config.js';
+import { ResponseCache } from './cache/response-cache.js';
 
 const program = new Command();
 
@@ -61,6 +62,8 @@ program
   .option('--compare-skill <path>', 'Path to baseline skill directory (e.g., previous version) for A/B comparison')
   .option('--compare-label <label>', 'Custom label for the baseline in comparison reports')
   .option('--blind-compare', 'Run blind A/B comparison alongside --compare')
+  .option('--no-cache', 'Skip reading from cache (still writes new results)')
+  .option('--bust-cache', 'Skip both reading and writing cache')
   .action(async (tasksFile: string, options: {
     runner?: string;
     model?: string;
@@ -86,6 +89,8 @@ program
     compareSkill?: string;
     blindCompare?: boolean;
     compareLabel?: string;
+    cache?: boolean;
+    bustCache?: boolean;
   }) => {
     try {
       if (options.runner && !VALID_RUNNER_TYPES.includes(options.runner as RunnerType)) {
@@ -122,6 +127,8 @@ program
         compareSkillPath: options.compareSkill,
         compareLabel: options.compareLabel,
         blindCompare: options.blindCompare,
+        noCache: options.cache === false,
+        bustCache: options.bustCache,
       });
 
       if (!result.passed) {
@@ -325,6 +332,30 @@ program
       for (const error of errors) {
         console.error(`  - ${error}`);
       }
+      process.exit(1);
+    }
+  });
+
+// ============================================
+// Cache management
+// ============================================
+
+const cacheCommand = program
+  .command('cache')
+  .description('Manage the response cache');
+
+cacheCommand
+  .command('clear')
+  .description('Clear all cached agent responses')
+  .option('--config <path>', 'Path to eval.config.yaml')
+  .action(async (options: { config?: string }) => {
+    try {
+      const config = await loadConfig(options.config);
+      const cache = new ResponseCache(config.cache);
+      const { deletedCount } = await cache.clear();
+      console.log(`Cleared ${deletedCount} cached response(s) from ${config.cache.dir}`);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
     }
   });

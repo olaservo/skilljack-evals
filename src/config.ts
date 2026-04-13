@@ -54,6 +54,13 @@ export interface EvalConfig {
 
   // Security
   allowedWriteDirs: string[];
+
+  // Response cache
+  cache: {
+    enabled: boolean;
+    dir: string;
+    ttlHours: number;
+  };
 }
 
 /**
@@ -78,6 +85,11 @@ export const DEFAULT_CONFIG: EvalConfig = {
   discoveryThreshold: 0.8,
   scoreThreshold: 4.0,
   allowedWriteDirs: ['./results/', './fixtures/'],
+  cache: {
+    enabled: true,
+    dir: './results/.cache',
+    ttlHours: 168,
+  },
 };
 
 /**
@@ -113,6 +125,11 @@ interface RawConfigFile {
     exit_on_failure?: boolean;
     github_summary?: boolean;
     html_report?: boolean;
+  };
+  cache?: {
+    enabled?: boolean;
+    dir?: string;
+    ttl_hours?: number;
   };
 }
 
@@ -159,6 +176,14 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
     if (raw.ci?.exit_on_failure !== undefined) config.exitOnFailure = raw.ci.exit_on_failure;
     if (raw.ci?.github_summary !== undefined) config.githubSummary = raw.ci.github_summary;
     if (raw.ci?.html_report !== undefined) config.htmlReport = raw.ci.html_report;
+
+    if (raw.cache) {
+      config.cache = {
+        enabled: raw.cache.enabled ?? DEFAULT_CONFIG.cache.enabled,
+        dir: raw.cache.dir ?? DEFAULT_CONFIG.cache.dir,
+        ttlHours: raw.cache.ttl_hours ?? DEFAULT_CONFIG.cache.ttlHours,
+      };
+    }
 
     return config;
   } catch (err: unknown) {
@@ -228,6 +253,16 @@ function loadEnvConfig(): Partial<EvalConfig> {
     config.htmlReport = process.env.EVAL_HTML_REPORT.toLowerCase() !== 'false';
   }
 
+  if (process.env.EVAL_CACHE_ENABLED !== undefined || process.env.EVAL_CACHE_DIR) {
+    config.cache = {
+      enabled: process.env.EVAL_CACHE_ENABLED !== undefined
+        ? process.env.EVAL_CACHE_ENABLED !== 'false'
+        : DEFAULT_CONFIG.cache.enabled,
+      dir: process.env.EVAL_CACHE_DIR ?? DEFAULT_CONFIG.cache.dir,
+      ttlHours: DEFAULT_CONFIG.cache.ttlHours,
+    };
+  }
+
   return config;
 }
 
@@ -252,6 +287,7 @@ function mergeConfigs(...configs: Partial<EvalConfig>[]): EvalConfig {
     if (config.discoveryThreshold !== undefined) result.discoveryThreshold = config.discoveryThreshold;
     if (config.scoreThreshold !== undefined) result.scoreThreshold = config.scoreThreshold;
     if (config.allowedWriteDirs !== undefined) result.allowedWriteDirs = config.allowedWriteDirs;
+    if (config.cache !== undefined) result.cache = { ...result.cache, ...config.cache };
   }
 
   return result;
