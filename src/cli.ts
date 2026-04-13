@@ -50,6 +50,7 @@ program
   .option('--threshold-score <score>', 'Min avg score (1-5)')
   .option('--no-judge', 'Skip LLM judge scoring (deterministic only)')
   .option('--no-deterministic', 'Skip deterministic scoring (LLM judge only)')
+  .option('--concurrency <number>', 'Max concurrent tasks (1=sequential, 0=unlimited)')
   .option('--runs <number>', 'Number of times to run each task (default: 3)')
   .option('--generate-feedback <path>', 'Generate feedback template JSON with task IDs after run')
   .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
@@ -78,6 +79,7 @@ program
     thresholdScore?: string;
     judge?: boolean;
     deterministic?: boolean;
+    concurrency?: string;
     runs?: string;
     generateFeedback?: string;
     feedback?: string;
@@ -108,6 +110,14 @@ program
       if (options.thresholdScore) configOverrides.scoreThreshold = parseFloat(options.thresholdScore);
       if (options.githubSummary) configOverrides.githubSummary = true;
       if (options.html !== undefined) configOverrides.htmlReport = options.html;
+      if (options.concurrency) {
+        const c = parseInt(options.concurrency, 10);
+        if (isNaN(c) || c < 0) {
+          console.error('Error: --concurrency must be an integer >= 0');
+          process.exit(1);
+        }
+        configOverrides.concurrency = c;
+      }
 
       const result = await runPipeline({
         tasksFile,

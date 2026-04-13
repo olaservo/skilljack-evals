@@ -35,6 +35,10 @@ inputs:
     description: 'Per-task timeout in milliseconds'
     required: false
     default: '300000'
+  concurrency:
+    description: 'Max concurrent tasks (1=sequential, 0=unlimited)'
+    required: false
+    default: '1'
   tasks-filter:
     description: 'Comma-separated list of task IDs to run'
     required: false

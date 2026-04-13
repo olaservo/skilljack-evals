@@ -14,6 +14,7 @@ import type {
 import { loadConfigSync } from '../config.js';
 import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
+import { withConcurrencyLimit } from '../utils/concurrency.js';
 
 export abstract class BaseRunner implements AgentRunner {
   abstract readonly providerName: string;
@@ -37,6 +38,7 @@ export abstract class BaseRunner implements AgentRunner {
     this.options = {
       cwd: options.cwd ?? process.cwd(),
       parallel: options.parallel ?? false,
+      concurrency: options.concurrency ?? (options.parallel ? 0 : undefined) ?? resolvedConfig.concurrency ?? 1,
       model: options.model ?? resolvedConfig.defaultAgentModel,
       taskTimeoutMs: options.taskTimeoutMs ?? resolvedConfig.taskTimeoutMs,
       allowedWriteDirs: options.allowedWriteDirs ?? resolvedConfig.allowedWriteDirs,
@@ -117,44 +119,38 @@ export abstract class BaseRunner implements AgentRunner {
 
   /**
    * Run all tasks in an evaluation suite.
+   *
+   * Concurrency is controlled by `options.concurrency`:
+   * - 1 = sequential (default)
+   * - 0 = unlimited
+   * - N = at most N tasks in flight
    */
   async runAll(
     evaluation: SkillEvaluation,
     createLogger?: (task: EvalTask) => SessionLogger,
   ): Promise<TaskResult[]> {
-    if (this.options.parallel) {
-      const results = await Promise.allSettled(
-        evaluation.tasks.map((task) => {
-          const logger = createLogger?.(task);
-          return this.runTaskWithTimeout(task, undefined, logger);
-        }),
-      );
+    const limit = this.options.concurrency ?? 1;
 
-      return results.map((result, i) => {
-        if (result.status === 'fulfilled') {
-          return result.value;
+    const factories = evaluation.tasks.map((task) => async () => {
+      console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
+      try {
+        const logger = createLogger?.(task);
+        const result = await this.runTaskWithTimeout(task, undefined, logger);
+
+        if (result.isError) {
+          console.error(`  Task ${task.id} ERROR: ${result.errorMessage}`);
+        } else {
+          console.log(`  Task ${task.id} done — Skills loaded: ${result.skillLoads.join(', ') || 'none'}`);
+          console.log(`  Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
         }
-        const task = evaluation.tasks[i];
-        const errMsg = result.reason?.message || 'Unknown error';
+        return result;
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : String(error);
         console.error(`  Task ${task.id} ERROR: ${errMsg}`);
         return this.createErrorResult(task, errMsg, 0);
-      });
-    }
-
-    const results: TaskResult[] = [];
-    for (const task of evaluation.tasks) {
-      console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
-      const logger = createLogger?.(task);
-      const result = await this.runTaskWithTimeout(task, undefined, logger);
-      results.push(result);
-
-      if (result.isError) {
-        console.error(`  ERROR: ${result.errorMessage}`);
-      } else {
-        console.log(`  Skills loaded: ${result.skillLoads.join(', ') || 'none'}`);
-        console.log(`  Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
       }
-    }
-    return results;
+    });
+
+    return withConcurrencyLimit(factories, limit);
   }
 }

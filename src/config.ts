@@ -42,6 +42,9 @@ export interface EvalConfig {
   // Timeouts
   taskTimeoutMs: number;
 
+  // Concurrency
+  concurrency: number;
+
   // CI/CD behavior
   exitOnFailure: boolean;
   outputDir: string;
@@ -78,6 +81,7 @@ export const DEFAULT_CONFIG: EvalConfig = {
   judgeOutputTruncation: 5000,
   reportOutputTruncation: 2000,
   taskTimeoutMs: 300000, // 5 minutes
+  concurrency: 1, // sequential by default
   exitOnFailure: true,
   outputDir: './results',
   githubSummary: false,
@@ -114,6 +118,7 @@ interface RawConfigFile {
   runner?: {
     type?: string;
     timeout_ms?: number;
+    concurrency?: number;
     allowed_write_dirs?: string[];
   };
   output?: {
@@ -167,6 +172,7 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
     if (raw.thresholds?.avg_score !== undefined) config.scoreThreshold = raw.thresholds.avg_score;
 
     if (raw.runner?.timeout_ms !== undefined) config.taskTimeoutMs = raw.runner.timeout_ms;
+    if (raw.runner?.concurrency !== undefined) config.concurrency = raw.runner.concurrency;
     if (raw.runner?.allowed_write_dirs) config.allowedWriteDirs = raw.runner.allowed_write_dirs;
 
     if (raw.output?.dir) config.outputDir = raw.output.dir;
@@ -236,6 +242,9 @@ function loadEnvConfig(): Partial<EvalConfig> {
   const timeout = parseInt(process.env.EVAL_TASK_TIMEOUT_MS || '', 10);
   if (!isNaN(timeout)) config.taskTimeoutMs = timeout;
 
+  const concurrency = parseInt(process.env.EVAL_RUNNER_CONCURRENCY || '', 10);
+  if (!isNaN(concurrency) && concurrency >= 0) config.concurrency = concurrency;
+
   if (process.env.EVAL_EXIT_ON_FAILURE !== undefined) {
     config.exitOnFailure = process.env.EVAL_EXIT_ON_FAILURE !== 'false';
   }
@@ -292,6 +301,7 @@ function mergeConfigs(...configs: Partial<EvalConfig>[]): EvalConfig {
     if (config.judgeOutputTruncation !== undefined) result.judgeOutputTruncation = config.judgeOutputTruncation;
     if (config.reportOutputTruncation !== undefined) result.reportOutputTruncation = config.reportOutputTruncation;
     if (config.taskTimeoutMs !== undefined) result.taskTimeoutMs = config.taskTimeoutMs;
+    if (config.concurrency !== undefined) result.concurrency = config.concurrency;
     if (config.exitOnFailure !== undefined) result.exitOnFailure = config.exitOnFailure;
     if (config.outputDir !== undefined) result.outputDir = config.outputDir;
     if (config.githubSummary !== undefined) result.githubSummary = config.githubSummary;

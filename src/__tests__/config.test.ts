@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
-import { loadConfig } from '../config.js';
+import { loadConfig, DEFAULT_CONFIG } from '../config.js';
 
 describe('loadConfig', () => {
   const tmpDirs: string[] = [];
@@ -116,5 +116,69 @@ describe('loadConfig htmlReport', () => {
 
     const config = await loadConfig(configPath, { htmlReport: true });
     expect(config.htmlReport).toBe(true);
+  });
+});
+
+describe('concurrency config', () => {
+  const tmpDirs: string[] = [];
+  let savedEnv: string | undefined;
+
+  beforeEach(() => {
+    savedEnv = process.env.EVAL_RUNNER_CONCURRENCY;
+    delete process.env.EVAL_RUNNER_CONCURRENCY;
+  });
+
+  afterEach(async () => {
+    if (savedEnv !== undefined) {
+      process.env.EVAL_RUNNER_CONCURRENCY = savedEnv;
+    } else {
+      delete process.env.EVAL_RUNNER_CONCURRENCY;
+    }
+    for (const dir of tmpDirs) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    tmpDirs.length = 0;
+  });
+
+  it('defaults concurrency to 1 (sequential)', async () => {
+    expect(DEFAULT_CONFIG.concurrency).toBe(1);
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.concurrency).toBe(1);
+  });
+
+  it('loads concurrency from EVAL_RUNNER_CONCURRENCY env var', async () => {
+    process.env.EVAL_RUNNER_CONCURRENCY = '5';
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.concurrency).toBe(5);
+  });
+
+  it('loads concurrency=0 (unlimited) from env var', async () => {
+    process.env.EVAL_RUNNER_CONCURRENCY = '0';
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.concurrency).toBe(0);
+  });
+
+  it('ignores negative EVAL_RUNNER_CONCURRENCY', async () => {
+    process.env.EVAL_RUNNER_CONCURRENCY = '-1';
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.concurrency).toBe(1); // default
+  });
+
+  it('loads concurrency from YAML config', async () => {
+    const tmpDir = path.join(os.tmpdir(), `eval-test-concurrency-${Date.now()}`);
+    await fs.mkdir(tmpDir, { recursive: true });
+    tmpDirs.push(tmpDir);
+
+    const configPath = path.join(tmpDir, 'eval.config.yaml');
+    await fs.writeFile(configPath, 'runner:\n  concurrency: 3\n');
+
+    const config = await loadConfig(configPath);
+    expect(config.concurrency).toBe(3);
+  });
+
+  it('CLI override takes precedence over env var', async () => {
+    process.env.EVAL_RUNNER_CONCURRENCY = '5';
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml', { concurrency: 2 });
+    expect(config.concurrency).toBe(2);
   });
 });
