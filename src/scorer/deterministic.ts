@@ -5,11 +5,17 @@
  * No LLM calls required — checks are purely based on the session data.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type {
   EvalTask,
   TaskResult,
   DeterministicResult,
 } from '../types.js';
+
+export interface DeterministicOptions {
+  cwd?: string;
+}
 
 /**
  * Check if a tool name is a skill activation tool.
@@ -35,7 +41,8 @@ function extractSkillName(input: unknown): string | undefined {
  */
 export function scoreDeterministic(
   task: EvalTask,
-  result: TaskResult
+  result: TaskResult,
+  options?: DeterministicOptions
 ): DeterministicResult | null {
   const check = task.deterministic;
   if (!check) return null;
@@ -133,14 +140,103 @@ export function scoreDeterministic(
     }
   }
 
+  // 5. Check expect_contains (case-sensitive substring checks)
+  let containsCheckPassed: boolean | null = null;
+  if (check.expectContains && check.expectContains.length > 0) {
+    const missing = check.expectContains.filter((s) => !result.output.includes(s));
+    containsCheckPassed = missing.length === 0;
+    if (containsCheckPassed) {
+      details.push('All expected substrings found in output');
+    } else {
+      details.push(`Expected substrings not found: ${missing.map((s) => `"${s}"`).join(', ')}`);
+    }
+  }
+
+  // 6. Check expect_not_contains (case-sensitive forbidden substring checks)
+  let notContainsCheckPassed: boolean | null = null;
+  if (check.expectNotContains && check.expectNotContains.length > 0) {
+    const found = check.expectNotContains.filter((s) => result.output.includes(s));
+    notContainsCheckPassed = found.length === 0;
+    if (notContainsCheckPassed) {
+      details.push('No forbidden substrings found in output');
+    } else {
+      details.push(`Forbidden substrings found: ${found.map((s) => `"${s}"`).join(', ')}`);
+    }
+  }
+
+  // 7. Check expect_regex (regex pattern matching)
+  let regexCheckPassed: boolean | null = null;
+  if (check.expectRegex && check.expectRegex.length > 0) {
+    const failures: string[] = [];
+    for (const pattern of check.expectRegex) {
+      try {
+        const re = new RegExp(pattern);
+        if (!re.test(result.output)) {
+          failures.push(`/${pattern}/`);
+        }
+      } catch {
+        failures.push(`/${pattern}/ (invalid regex)`);
+      }
+    }
+    regexCheckPassed = failures.length === 0;
+    if (regexCheckPassed) {
+      details.push('All regex patterns matched');
+    } else {
+      details.push(`Regex patterns not matched: ${failures.join(', ')}`);
+    }
+  }
+
+  // 8. Check expect_javascript (JS expression returning boolean)
+  let javascriptCheckPassed: boolean | null = null;
+  if (check.expectJavascript) {
+    try {
+      const fn = new Function('output', `return (${check.expectJavascript})`);
+      const value = fn(result.output);
+      if (value === true) {
+        javascriptCheckPassed = true;
+        details.push('JavaScript assertion passed');
+      } else {
+        javascriptCheckPassed = false;
+        details.push(`JavaScript assertion returned ${JSON.stringify(value)} (expected true)`);
+      }
+    } catch (e) {
+      javascriptCheckPassed = false;
+      details.push(`JavaScript assertion error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  // 9. Check expect_file_exists
+  let fileExistsCheckPassed: boolean | null = null;
+  if (check.expectFileExists && check.expectFileExists.length > 0) {
+    const cwd = options?.cwd ?? process.cwd();
+    const missing: string[] = [];
+    for (const filePath of check.expectFileExists) {
+      const resolved = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+      if (!fs.existsSync(resolved)) {
+        missing.push(filePath);
+      }
+    }
+    fileExistsCheckPassed = missing.length === 0;
+    if (fileExistsCheckPassed) {
+      details.push('All expected files exist');
+    } else {
+      details.push(`Expected files not found: ${missing.join(', ')}`);
+    }
+  }
+
   // Compute overall pass/fail
   let passed: boolean;
   if (check.expectSkillActivation) {
-    // For positive tests: skill must be activated
+    // For positive tests: skill must be activated and all checks must pass
     passed = skillActivated;
     if (markerFound !== null) passed = passed && markerFound;
     if (expectedToolsCalled !== null) passed = passed && expectedToolsCalled;
     if (unexpectedToolsCalled !== null) passed = passed && !unexpectedToolsCalled;
+    if (containsCheckPassed !== null) passed = passed && containsCheckPassed;
+    if (notContainsCheckPassed !== null) passed = passed && notContainsCheckPassed;
+    if (regexCheckPassed !== null) passed = passed && regexCheckPassed;
+    if (javascriptCheckPassed !== null) passed = passed && javascriptCheckPassed;
+    if (fileExistsCheckPassed !== null) passed = passed && fileExistsCheckPassed;
   } else {
     // For negative tests (false positive): skill must NOT be activated
     passed = !skillActivated;
@@ -152,6 +248,11 @@ export function scoreDeterministic(
     markerFound,
     expectedToolsCalled,
     unexpectedToolsCalled,
+    containsCheckPassed,
+    notContainsCheckPassed,
+    regexCheckPassed,
+    javascriptCheckPassed,
+    fileExistsCheckPassed,
     passed,
     details,
   };

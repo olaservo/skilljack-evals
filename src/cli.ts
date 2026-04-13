@@ -141,6 +141,11 @@ program
         bustCache: options.bustCache,
       });
 
+      if (options.open && result.htmlPath) {
+        const { openInBrowser } = await import('./report/html-report.js');
+        await openInBrowser(result.htmlPath);
+      }
+
       if (!result.passed) {
         process.exit(1);
       }

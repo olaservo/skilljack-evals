@@ -28,6 +28,13 @@ tasks:
     deterministic:
       expect_skill_activation: true
       expect_marker: "GREETING_SUCCESS"
+      expect_contains:
+        - "welcome"
+      expect_not_contains:
+        - "ERROR"
+        - "FIXME"
+      expect_regex:
+        - "(?i)welcome|hello|hi"
     criteria:
       discovery: { weight: 0.3, description: "Should discover and load the greeting skill from context — the prompt asks for a greeting without naming the skill" }
       adherence: { weight: 0.4, description: "Should follow the greeting format specified in the skill" }

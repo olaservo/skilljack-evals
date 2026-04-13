@@ -19,6 +19,7 @@ import { SessionLogger } from './session/session-logger.js';
 import { generateReport, generateJsonResults, computeSummary, type ReportOptions } from './report/report.js';
 import { generateHtmlReport } from './report/html-report.js';
 import { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
+import { writeHtmlReport } from './report/html-report.js';
 import { loadConfig, type EvalConfig } from './config.js';
 import { aggregateResults, aggregateScores } from './scorer/aggregator.js';
 import { loadPreviousReport, compareResults, formatComparisonConsole } from './report/comparison.js';
@@ -449,6 +450,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     noJudge: options.noJudge,
     judgeOptions: { model: config.defaultJudgeModel },
     humanFeedback,
+    cwd,
   };
 
   // 2b. Set up response cache
