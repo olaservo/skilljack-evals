@@ -29,11 +29,14 @@ CLI for evaluating [Agent Skills](https://agentskills.io/home) - a format for ex
 ## Commands
 
 ```bash
-npm run build      # Compile TypeScript to dist/
-npm run dev        # Run CLI in dev mode (tsx)
-npm run typecheck  # Type check without emitting
-npm run start      # Run compiled CLI
+npm run build           # Compile TypeScript to dist/
+npm run bundle:action   # Build + bundle GitHub Action (action/dist/index.cjs)
+npm run dev             # Run CLI in dev mode (tsx)
+npm run typecheck       # Type check without emitting
+npm run start           # Run compiled CLI
 ```
+
+**Important:** When changing scorer, parser, types, or pipeline code, run `npm run bundle:action` before committing to keep the GitHub Action bundle in sync.
 
 ## Architecture
 
