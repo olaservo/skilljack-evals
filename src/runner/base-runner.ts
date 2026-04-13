@@ -37,7 +37,6 @@ export abstract class BaseRunner implements AgentRunner {
 
     this.options = {
       cwd: options.cwd ?? process.cwd(),
-      parallel: options.parallel ?? false,
       // Precedence: explicit concurrency > parallel (deprecated, maps to unlimited) > config file > default (1)
       concurrency: options.concurrency ?? (options.parallel ? 0 : undefined) ?? resolvedConfig.concurrency ?? DEFAULT_RUNNER_CONCURRENCY,
       model: options.model ?? resolvedConfig.defaultAgentModel,

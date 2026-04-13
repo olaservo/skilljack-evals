@@ -249,8 +249,14 @@ function loadEnvConfig(): Partial<EvalConfig> {
   const timeout = parseInt(process.env.EVAL_TASK_TIMEOUT_MS || '', 10);
   if (!isNaN(timeout)) config.taskTimeoutMs = timeout;
 
-  const concurrency = parseInt(process.env.EVAL_RUNNER_CONCURRENCY || '', 10);
-  if (!isNaN(concurrency) && concurrency >= 0) config.concurrency = concurrency;
+  const concurrencyRaw = process.env.EVAL_RUNNER_CONCURRENCY;
+  if (concurrencyRaw !== undefined && concurrencyRaw !== '') {
+    const concurrency = Number(concurrencyRaw);
+    if (!Number.isInteger(concurrency) || concurrency < 0) {
+      throw new Error(`Invalid EVAL_RUNNER_CONCURRENCY "${concurrencyRaw}". Must be a non-negative integer.`);
+    }
+    config.concurrency = concurrency;
+  }
 
   if (process.env.EVAL_EXIT_ON_FAILURE !== undefined) {
     config.exitOnFailure = process.env.EVAL_EXIT_ON_FAILURE !== 'false';

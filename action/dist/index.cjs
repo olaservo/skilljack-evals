@@ -22591,9 +22591,14 @@ function loadEnvConfig() {
   const timeout = parseInt(process.env.EVAL_TASK_TIMEOUT_MS || "", 10);
   if (!isNaN(timeout))
     config2.taskTimeoutMs = timeout;
-  const concurrency = parseInt(process.env.EVAL_RUNNER_CONCURRENCY || "", 10);
-  if (!isNaN(concurrency) && concurrency >= 0)
+  const concurrencyRaw = process.env.EVAL_RUNNER_CONCURRENCY;
+  if (concurrencyRaw !== void 0 && concurrencyRaw !== "") {
+    const concurrency = Number(concurrencyRaw);
+    if (!Number.isInteger(concurrency) || concurrency < 0) {
+      throw new Error(`Invalid EVAL_RUNNER_CONCURRENCY "${concurrencyRaw}". Must be a non-negative integer.`);
+    }
     config2.concurrency = concurrency;
+  }
   if (process.env.EVAL_EXIT_ON_FAILURE !== void 0) {
     config2.exitOnFailure = process.env.EVAL_EXIT_ON_FAILURE !== "false";
   }
@@ -22719,7 +22724,6 @@ var init_base_runner = __esm({
         const resolvedConfig = config2 ?? loadConfigSync();
         this.options = {
           cwd: options.cwd ?? process.cwd(),
-          parallel: options.parallel ?? false,
           // Precedence: explicit concurrency > parallel (deprecated, maps to unlimited) > config file > default (1)
           concurrency: options.concurrency ?? (options.parallel ? 0 : void 0) ?? resolvedConfig.concurrency ?? DEFAULT_RUNNER_CONCURRENCY,
           model: options.model ?? resolvedConfig.defaultAgentModel,
@@ -47866,9 +47870,10 @@ async function run() {
     const thresholdDiscovery = parseFloat(core2.getInput("threshold-discovery") || "0.8");
     const thresholdScore = parseFloat(core2.getInput("threshold-score") || "4.0");
     const timeout = parseInt(core2.getInput("timeout") || "300000", 10);
-    const concurrency = parseInt(core2.getInput("concurrency") || "1", 10);
-    if (isNaN(concurrency) || concurrency < 0) {
-      core2.setFailed("concurrency input must be an integer >= 0");
+    const concurrencyRaw = core2.getInput("concurrency") || "1";
+    const concurrency = Number(concurrencyRaw);
+    if (!Number.isInteger(concurrency) || concurrency < 0) {
+      core2.setFailed("concurrency input must be a non-negative integer");
       return;
     }
     const tasksFilter = core2.getInput("tasks-filter") || void 0;

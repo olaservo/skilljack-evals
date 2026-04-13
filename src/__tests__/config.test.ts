@@ -158,10 +158,14 @@ describe('concurrency config', () => {
     expect(config.concurrency).toBe(0);
   });
 
-  it('ignores negative EVAL_RUNNER_CONCURRENCY', async () => {
+  it('throws on negative EVAL_RUNNER_CONCURRENCY', async () => {
     process.env.EVAL_RUNNER_CONCURRENCY = '-1';
-    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
-    expect(config.concurrency).toBe(1); // default
+    await expect(loadConfig('/nonexistent/path/eval.config.yaml')).rejects.toThrow('Must be a non-negative integer');
+  });
+
+  it('throws on non-integer EVAL_RUNNER_CONCURRENCY', async () => {
+    process.env.EVAL_RUNNER_CONCURRENCY = '2.5';
+    await expect(loadConfig('/nonexistent/path/eval.config.yaml')).rejects.toThrow('Must be a non-negative integer');
   });
 
   it('loads concurrency from YAML config', async () => {

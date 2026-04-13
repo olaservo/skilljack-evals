@@ -111,9 +111,9 @@ program
       if (options.githubSummary) configOverrides.githubSummary = true;
       if (options.html !== undefined) configOverrides.htmlReport = options.html;
       if (options.concurrency !== undefined) {
-        const c = parseInt(options.concurrency, 10);
-        if (isNaN(c) || c < 0) {
-          console.error('Error: --concurrency must be an integer >= 0');
+        const c = Number(options.concurrency);
+        if (!Number.isInteger(c) || c < 0) {
+          console.error('Error: --concurrency must be a non-negative integer');
           process.exit(1);
         }
         configOverrides.concurrency = c;
