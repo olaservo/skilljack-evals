@@ -367,6 +367,22 @@ describe('generateHtmlReport', () => {
     expect(mockWriteFile).not.toHaveBeenCalled();
   });
 
+  // --- Edge cases ---
+
+  it('handles zero tasks gracefully', async () => {
+    const opts = makeReportOptions({
+      evaluation: { skillName: 'empty-skill', tasks: [] },
+      results: [],
+      scores: [],
+    });
+    const html = await generateHtmlReport(opts);
+
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('empty-skill');
+    expect(html).toContain('>0<'); // 0 tasks in stats
+    expect(html).not.toContain('NaN');
+  });
+
   // --- Flaky indicator ---
 
   it('marks flaky tasks in embedded data', async () => {

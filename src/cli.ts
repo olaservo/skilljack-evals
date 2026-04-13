@@ -184,12 +184,12 @@ program
   .requiredOption('-r, --results <path>', 'Path to results JSON file')
   .option('-o, --output <path>', 'Output markdown file')
   .option('--json <path>', 'Also output JSON report')
-  .option('--html <path>', 'Also output HTML report')
+  .option('--html-output <path>', 'Also output HTML report')
   .action(async (options: {
     results: string;
     output?: string;
     json?: string;
-    html?: string;
+    htmlOutput?: string;
   }) => {
     try {
       const resultsData = await fs.readFile(options.results, 'utf-8');
@@ -228,8 +228,8 @@ program
         await generateJsonResults({ ...reportOptions, outputPath: options.json });
       }
 
-      if (options.html) {
-        await generateHtmlReport({ ...reportOptions, outputPath: options.html });
+      if (options.htmlOutput) {
+        await generateHtmlReport({ ...reportOptions, outputPath: options.htmlOutput });
       }
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
