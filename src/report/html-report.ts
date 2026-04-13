@@ -52,6 +52,10 @@ export async function generateHtmlReport(options: ReportOptions): Promise<string
   const numRuns = options.numRuns ?? 1;
   const config = options.config ?? loadConfigSync();
   const generatedAt = new Date().toISOString();
+  if (results.length !== evaluation.tasks.length || scores.length !== evaluation.tasks.length) {
+    throw new Error(`Mismatched array lengths: ${evaluation.tasks.length} tasks, ${results.length} results, ${scores.length} scores`);
+  }
+
   const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
 
@@ -418,9 +422,9 @@ function renderComparisonSection(comparison: ComparisonData): string {
     const b = t.withoutSkill.score;
     taskRows += `<tr>
       <td>${escapeHtml(t.taskId)}</td>
-      <td>${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / <span class="delta">${formatDelta(t.delta.adherenceDelta, 1)}</span></td>
-      <td>${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / <span class="delta">${formatDelta(t.delta.outputQualityDelta, 1)}</span></td>
-      <td>${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / <span class="delta">${formatDelta(t.delta.weightedScoreDelta)}</span></td>
+      <td>${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.adherenceDelta, 1))}</span></td>
+      <td>${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.outputQualityDelta, 1))}</span></td>
+      <td>${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / <span class="delta">${escapeHtml(formatDelta(t.delta.weightedScoreDelta))}</span></td>
     </tr>`;
   }
 
@@ -431,12 +435,12 @@ function renderComparisonSection(comparison: ComparisonData): string {
   <table>
     <thead><tr><th>Metric</th><th>With Skill</th><th>Baseline</th><th>Delta</th></tr></thead>
     <tbody>
-      <tr><td>Discovery</td><td>${(ws.discoveryAccuracy * 100).toFixed(0)}%</td><td>${(bs.discoveryAccuracy * 100).toFixed(0)}%</td><td class="delta">${formatDelta(d.discoveryAccuracyDelta * 100, 0)}%</td></tr>
-      <tr><td>Adherence</td><td>${ws.avgAdherence.toFixed(2)}/5</td><td>${bs.avgAdherence.toFixed(2)}/5</td><td class="delta">${formatDelta(d.avgAdherenceDelta)}</td></tr>
-      <tr><td>Output Quality</td><td>${ws.avgOutputQuality.toFixed(2)}/5</td><td>${bs.avgOutputQuality.toFixed(2)}/5</td><td class="delta">${formatDelta(d.avgOutputQualityDelta)}</td></tr>
-      <tr><td>Weighted Score</td><td>${ws.avgWeightedScore.toFixed(2)}</td><td>${bs.avgWeightedScore.toFixed(2)}</td><td class="delta">${formatDelta(d.avgWeightedScoreDelta)}</td></tr>
-      <tr><td>Duration</td><td>${(ws.totalDurationMs / 1000).toFixed(1)}s</td><td>${(bs.totalDurationMs / 1000).toFixed(1)}s</td><td class="delta">${formatDelta(d.totalDurationDeltaMs / 1000, 1)}s</td></tr>
-      <tr><td>Cost</td><td>$${ws.totalCostUsd.toFixed(4)}</td><td>$${bs.totalCostUsd.toFixed(4)}</td><td class="delta">$${formatDelta(d.totalCostDeltaUsd, 4)}</td></tr>
+      <tr><td>Discovery</td><td>${(ws.discoveryAccuracy * 100).toFixed(0)}%</td><td>${(bs.discoveryAccuracy * 100).toFixed(0)}%</td><td class="delta">${escapeHtml(formatDelta(d.discoveryAccuracyDelta * 100, 0))}%</td></tr>
+      <tr><td>Adherence</td><td>${ws.avgAdherence.toFixed(2)}/5</td><td>${bs.avgAdherence.toFixed(2)}/5</td><td class="delta">${escapeHtml(formatDelta(d.avgAdherenceDelta))}</td></tr>
+      <tr><td>Output Quality</td><td>${ws.avgOutputQuality.toFixed(2)}/5</td><td>${bs.avgOutputQuality.toFixed(2)}/5</td><td class="delta">${escapeHtml(formatDelta(d.avgOutputQualityDelta))}</td></tr>
+      <tr><td>Weighted Score</td><td>${ws.avgWeightedScore.toFixed(2)}</td><td>${bs.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(d.avgWeightedScoreDelta))}</td></tr>
+      <tr><td>Duration</td><td>${(ws.totalDurationMs / 1000).toFixed(1)}s</td><td>${(bs.totalDurationMs / 1000).toFixed(1)}s</td><td class="delta">${escapeHtml(formatDelta(d.totalDurationDeltaMs / 1000, 1))}s</td></tr>
+      <tr><td>Cost</td><td>$${ws.totalCostUsd.toFixed(4)}</td><td>$${bs.totalCostUsd.toFixed(4)}</td><td class="delta">$${escapeHtml(formatDelta(d.totalCostDeltaUsd, 4))}</td></tr>
     </tbody>
   </table>
   <h3>Per-Task Comparison</h3>
@@ -512,9 +516,9 @@ function renderCrossIterationSection(comparison: ComparisonResult): string {
       : '';
     taskRows += `<tr class="${changeClass}">
       <td>${escapeHtml(td.taskId)}</td>
-      <td>${td.previous.adherence.toFixed(1)} &rarr; ${td.current.adherence.toFixed(1)} (${formatDelta(td.delta.adherence, 1)})</td>
-      <td>${td.previous.outputQuality.toFixed(1)} &rarr; ${td.current.outputQuality.toFixed(1)} (${formatDelta(td.delta.outputQuality, 1)})</td>
-      <td>${td.previous.weightedScore.toFixed(2)} &rarr; ${td.current.weightedScore.toFixed(2)} (${formatDelta(td.delta.weightedScore)})</td>
+      <td>${td.previous.adherence.toFixed(1)} &rarr; ${td.current.adherence.toFixed(1)} (${escapeHtml(formatDelta(td.delta.adherence, 1))})</td>
+      <td>${td.previous.outputQuality.toFixed(1)} &rarr; ${td.current.outputQuality.toFixed(1)} (${escapeHtml(formatDelta(td.delta.outputQuality, 1))})</td>
+      <td>${td.previous.weightedScore.toFixed(2)} &rarr; ${td.current.weightedScore.toFixed(2)} (${escapeHtml(formatDelta(td.delta.weightedScore))})</td>
       <td><span class="status ${td.significantChange === 'improved' ? 'status-pass' : td.significantChange === 'regressed' ? 'status-fail' : 'status-neutral'}">${td.significantChange}</span></td>
     </tr>`;
   }
@@ -534,10 +538,10 @@ function renderCrossIterationSection(comparison: ComparisonResult): string {
   <table>
     <thead><tr><th>Metric</th><th>Previous</th><th>Current</th><th>Delta</th></tr></thead>
     <tbody>
-      <tr><td>Discovery</td><td>${(sd.previous.discoveryAccuracy * 100).toFixed(1)}%</td><td>${(sd.current.discoveryAccuracy * 100).toFixed(1)}%</td><td class="delta">${formatDelta(sd.delta.discoveryAccuracy * 100, 1)}%</td></tr>
-      <tr><td>Adherence</td><td>${sd.previous.avgAdherence.toFixed(2)}</td><td>${sd.current.avgAdherence.toFixed(2)}</td><td class="delta">${formatDelta(sd.delta.avgAdherence)}</td></tr>
-      <tr><td>Output Quality</td><td>${sd.previous.avgOutputQuality.toFixed(2)}</td><td>${sd.current.avgOutputQuality.toFixed(2)}</td><td class="delta">${formatDelta(sd.delta.avgOutputQuality)}</td></tr>
-      <tr><td>Weighted Score</td><td>${sd.previous.avgWeightedScore.toFixed(2)}</td><td>${sd.current.avgWeightedScore.toFixed(2)}</td><td class="delta">${formatDelta(sd.delta.avgWeightedScore)}</td></tr>
+      <tr><td>Discovery</td><td>${(sd.previous.discoveryAccuracy * 100).toFixed(1)}%</td><td>${(sd.current.discoveryAccuracy * 100).toFixed(1)}%</td><td class="delta">${escapeHtml(formatDelta(sd.delta.discoveryAccuracy * 100, 1))}%</td></tr>
+      <tr><td>Adherence</td><td>${sd.previous.avgAdherence.toFixed(2)}</td><td>${sd.current.avgAdherence.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd.delta.avgAdherence))}</td></tr>
+      <tr><td>Output Quality</td><td>${sd.previous.avgOutputQuality.toFixed(2)}</td><td>${sd.current.avgOutputQuality.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd.delta.avgOutputQuality))}</td></tr>
+      <tr><td>Weighted Score</td><td>${sd.previous.avgWeightedScore.toFixed(2)}</td><td>${sd.current.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd.delta.avgWeightedScore))}</td></tr>
     </tbody>
   </table>
   <h3>Per-Task Changes</h3>
@@ -807,9 +811,10 @@ function renderScript(): string {
   document.querySelector('#task-table tbody').addEventListener('click', function(e) {
     var row = e.target.closest('tr.task-row');
     if (!row) return;
-    var taskId = row.getAttribute('data-task-id');
-    var details = document.querySelectorAll('tr.detail-row[data-task-id=\"' + taskId + '\"]');
-    details.forEach(function(d) { d.classList.toggle('open'); });
+    var detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('detail-row')) {
+      detail.classList.toggle('open');
+    }
   });
 
   // Search

@@ -508,8 +508,13 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
   let htmlPath: string | undefined;
   if (config.htmlReport) {
-    htmlPath = path.join(config.outputDir, `${reportBaseName}.html`);
-    await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
+    try {
+      htmlPath = path.join(config.outputDir, `${reportBaseName}.html`);
+      await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
+    } catch (err) {
+      console.warn(`Warning: HTML report generation failed: ${err instanceof Error ? err.message : String(err)}`);
+      htmlPath = undefined;
+    }
   }
 
   if (config.githubSummary) {
@@ -604,8 +609,13 @@ export async function scorePipeline(
 
   let htmlPath: string | undefined;
   if (config.htmlReport) {
-    htmlPath = path.join(config.outputDir, `${reportBaseName}.html`);
-    await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
+    try {
+      htmlPath = path.join(config.outputDir, `${reportBaseName}.html`);
+      await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
+    } catch (err) {
+      console.warn(`Warning: HTML report generation failed: ${err instanceof Error ? err.message : String(err)}`);
+      htmlPath = undefined;
+    }
   }
 
   const markdownSummary = generateGitHubSummary(report, config);
