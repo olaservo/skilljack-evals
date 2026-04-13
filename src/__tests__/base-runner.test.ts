@@ -56,6 +56,7 @@ function makeResult(taskId: string = 'test-1'): TaskResult {
     skillLoads: ['test-skill'],
     toolCalls: [],
     isError: false,
+    errorMessage: '',
   };
 }
 

@@ -36,6 +36,8 @@ export async function runFixtureScript(
 ): Promise<FixtureExecResult> {
   const resolvedPath = path.resolve(cwd, scriptPath);
 
+  // Security note: Fixture scripts are defined in eval YAML authored by trusted users.
+  // No path restriction is enforced — the eval author is responsible for script safety.
   try {
     const { stdout, stderr } = await execFileAsync(resolvedPath, [], {
       cwd,
