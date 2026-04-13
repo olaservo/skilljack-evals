@@ -7,6 +7,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vm from 'vm';
 import type {
   EvalTask,
   TaskResult,
@@ -101,7 +102,7 @@ export function scoreDeterministic(
     }
   }
 
-  // 2. Check marker in output
+  // 2. Check marker in output (case-insensitive, unlike expect_contains)
   let markerFound: boolean | null = null;
   if (check.expectMarker) {
     const output = result.output.toLowerCase();
@@ -140,7 +141,7 @@ export function scoreDeterministic(
     }
   }
 
-  // 5. Check expect_contains (case-sensitive substring checks)
+  // 5. Check expect_contains (case-sensitive, unlike expect_marker)
   let containsCheckPassed: boolean | null = null;
   if (check.expectContains && check.expectContains.length > 0) {
     const missing = check.expectContains.filter((s) => !result.output.includes(s));
@@ -164,18 +165,24 @@ export function scoreDeterministic(
     }
   }
 
-  // 7. Check expect_regex (regex pattern matching)
+  // 7. Check expect_regex (regex pattern matching, with timeout to guard against ReDoS)
   let regexCheckPassed: boolean | null = null;
   if (check.expectRegex && check.expectRegex.length > 0) {
     const failures: string[] = [];
     for (const pattern of check.expectRegex) {
       try {
-        const re = new RegExp(pattern);
-        if (!re.test(result.output)) {
+        const sandbox = { pattern, output: result.output, result: false };
+        vm.createContext(sandbox);
+        vm.runInContext('result = new RegExp(pattern).test(output)', sandbox, { timeout: 5000 });
+        if (!sandbox.result) {
           failures.push(`/${pattern}/`);
         }
-      } catch {
-        failures.push(`/${pattern}/ (invalid regex)`);
+      } catch (e) {
+        if (e instanceof Error && e.message.includes('timed out')) {
+          failures.push(`/${pattern}/ (timed out — possible ReDoS)`);
+        } else {
+          failures.push(`/${pattern}/ (invalid regex)`);
+        }
       }
     }
     regexCheckPassed = failures.length === 0;
@@ -186,12 +193,12 @@ export function scoreDeterministic(
     }
   }
 
-  // 8. Check expect_javascript (JS expression returning boolean)
+  // 8. Check expect_javascript (JS expression returning boolean, sandboxed via vm)
   let javascriptCheckPassed: boolean | null = null;
   if (check.expectJavascript) {
     try {
-      const fn = new Function('output', `return (${check.expectJavascript})`);
-      const value = fn(result.output);
+      const sandbox = { output: result.output, JSON, Math };
+      const value = vm.runInNewContext(`(${check.expectJavascript})`, sandbox, { timeout: 5000 });
       if (value === true) {
         javascriptCheckPassed = true;
         details.push('JavaScript assertion passed');
@@ -205,13 +212,18 @@ export function scoreDeterministic(
     }
   }
 
-  // 9. Check expect_file_exists
+  // 9. Check expect_file_exists (with path traversal guard)
   let fileExistsCheckPassed: boolean | null = null;
   if (check.expectFileExists && check.expectFileExists.length > 0) {
     const cwd = options?.cwd ?? process.cwd();
+    const resolvedCwd = path.resolve(cwd);
     const missing: string[] = [];
     for (const filePath of check.expectFileExists) {
-      const resolved = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+      const resolved = path.resolve(cwd, filePath);
+      if (!resolved.startsWith(resolvedCwd + path.sep) && resolved !== resolvedCwd) {
+        missing.push(`${filePath} (outside working directory)`);
+        continue;
+      }
       if (!fs.existsSync(resolved)) {
         missing.push(filePath);
       }

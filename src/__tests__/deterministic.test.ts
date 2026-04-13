@@ -334,7 +334,22 @@ describe('expect_file_exists', () => {
     }
   });
 
-  it('handles absolute paths', () => {
+  it('handles absolute paths within cwd', () => {
+    setup();
+    try {
+      const absPath = path.join(tmpDir, 'abs.txt');
+      fs.writeFileSync(absPath, 'content');
+
+      const task = makeTask({ expectFileExists: [absPath] });
+      const result = makeResult();
+      const det = scoreDeterministic(task, result, { cwd: tmpDir })!;
+      expect(det.fileExistsCheckPassed).toBe(true);
+    } finally {
+      teardown();
+    }
+  });
+
+  it('rejects paths outside cwd', () => {
     setup();
     try {
       const absPath = path.join(tmpDir, 'abs.txt');
@@ -343,7 +358,8 @@ describe('expect_file_exists', () => {
       const task = makeTask({ expectFileExists: [absPath] });
       const result = makeResult();
       const det = scoreDeterministic(task, result, { cwd: '/nonexistent' })!;
-      expect(det.fileExistsCheckPassed).toBe(true);
+      expect(det.fileExistsCheckPassed).toBe(false);
+      expect(det.details.some((d: string) => d.includes('outside working directory'))).toBe(true);
     } finally {
       teardown();
     }
