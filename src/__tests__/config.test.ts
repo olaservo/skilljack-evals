@@ -192,4 +192,15 @@ describe('concurrency config', () => {
 
     await expect(loadConfig(configPath)).rejects.toThrow('Invalid runner.concurrency');
   });
+
+  it('throws on non-integer concurrency in YAML config', async () => {
+    const tmpDir = path.join(os.tmpdir(), `eval-test-concurrency-float-${Date.now()}`);
+    await fs.mkdir(tmpDir, { recursive: true });
+    tmpDirs.push(tmpDir);
+
+    const configPath = path.join(tmpDir, 'eval.config.yaml');
+    await fs.writeFile(configPath, 'runner:\n  concurrency: 2.5\n');
+
+    await expect(loadConfig(configPath)).rejects.toThrow('Must be a non-negative integer');
+  });
 });

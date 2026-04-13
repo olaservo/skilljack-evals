@@ -174,8 +174,8 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
 
     if (raw.runner?.timeout_ms !== undefined) config.taskTimeoutMs = raw.runner.timeout_ms;
     if (raw.runner?.concurrency !== undefined) {
-      if (raw.runner.concurrency < 0) {
-        throw new Error(`Invalid runner.concurrency "${raw.runner.concurrency}" in config file. Must be >= 0.`);
+      if (!Number.isInteger(raw.runner.concurrency) || raw.runner.concurrency < 0) {
+        throw new Error(`Invalid runner.concurrency "${raw.runner.concurrency}" in config file. Must be a non-negative integer.`);
       }
       config.concurrency = raw.runner.concurrency;
     }

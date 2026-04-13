@@ -83,6 +83,12 @@ describe('withConcurrencyLimit', () => {
     const results = await withConcurrencyLimit(factories, 100);
     expect(results).toEqual([1, 2]);
   });
+
+  it('throws RangeError for negative limit', async () => {
+    const factories = [async () => 1];
+    await expect(withConcurrencyLimit(factories, -1)).rejects.toThrow(RangeError);
+    await expect(withConcurrencyLimit(factories, -5)).rejects.toThrow('Concurrency limit must be >= 0');
+  });
 });
 
 describe('constants', () => {

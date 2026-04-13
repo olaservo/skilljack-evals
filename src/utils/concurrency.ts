@@ -27,8 +27,12 @@ export async function withConcurrencyLimit<T>(
 ): Promise<T[]> {
   if (factories.length === 0) return [];
 
-  // Handle unlimited: if limit <= 0, run all at once
-  const effectiveLimit = limit <= 0 ? factories.length : limit;
+  if (limit < 0) {
+    throw new RangeError(`Concurrency limit must be >= 0, got ${limit}`);
+  }
+
+  // Handle unlimited: if limit === 0, run all at once
+  const effectiveLimit = limit === 0 ? factories.length : limit;
 
   const results: T[] = new Array(factories.length);
   let next = 0;
