@@ -54,13 +54,19 @@ export class ResponseCache {
    * Look up a cached TaskResult by key. Returns null on miss, expiry, or error.
    */
   async get(key: string): Promise<TaskResult | null> {
+    if (!this.config.enabled) return null;
     if (!/^[a-f0-9]{64}$/.test(key)) {
       return null;
     }
     try {
       const filePath = path.join(this.config.dir, `${key}.json`);
       const content = await fs.readFile(filePath, 'utf-8');
-      const entry: CacheEntry = JSON.parse(content);
+      const entry = JSON.parse(content);
+
+      // Shape check — guard against stale or corrupted entries
+      if (!entry?.taskResult?.taskId || !entry?.cachedAt) {
+        return null;
+      }
 
       // TTL check
       const age = Date.now() - new Date(entry.cachedAt).getTime();
@@ -78,6 +84,7 @@ export class ResponseCache {
    * Store a TaskResult in the cache.
    */
   async set(key: string, result: TaskResult, keyInputs: CacheKeyInputs): Promise<void> {
+    if (!this.config.enabled) return;
     if (!/^[a-f0-9]{64}$/.test(key)) {
       return;
     }
@@ -106,12 +113,10 @@ export class ResponseCache {
     try {
       const entries = await fs.readdir(this.config.dir);
       const cacheFiles = entries.filter(e => e.endsWith('.json'));
-      const deletedCount = cacheFiles.length;
-      if (entries.length > 0) {
-        await fs.rm(this.config.dir, { recursive: true });
-        await fs.mkdir(this.config.dir, { recursive: true });
-      }
-      return { deletedCount };
+      await Promise.all(
+        cacheFiles.map(f => fs.unlink(path.join(this.config.dir, f)))
+      );
+      return { deletedCount: cacheFiles.length };
     } catch (err) {
       if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'ENOENT') {
         // Directory doesn't exist — nothing to clear

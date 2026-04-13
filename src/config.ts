@@ -257,14 +257,20 @@ function loadEnvConfig(): Partial<EvalConfig> {
   }
 
   const cacheTtl = parseInt(process.env.EVAL_CACHE_TTL_HOURS || '', 10);
-  if (process.env.EVAL_CACHE_ENABLED !== undefined || process.env.EVAL_CACHE_DIR || !isNaN(cacheTtl)) {
-    config.cache = {
-      enabled: process.env.EVAL_CACHE_ENABLED !== undefined
-        ? process.env.EVAL_CACHE_ENABLED !== 'false'
-        : DEFAULT_CONFIG.cache.enabled,
-      dir: process.env.EVAL_CACHE_DIR ?? DEFAULT_CONFIG.cache.dir,
-      ttlHours: !isNaN(cacheTtl) ? cacheTtl : DEFAULT_CONFIG.cache.ttlHours,
-    };
+  const hasAnyCacheEnv = process.env.EVAL_CACHE_ENABLED !== undefined || process.env.EVAL_CACHE_DIR || !isNaN(cacheTtl);
+  if (hasAnyCacheEnv) {
+    // Only include fields explicitly set via env vars to avoid overriding YAML config
+    const cacheOverrides: Partial<EvalConfig['cache']> = {};
+    if (process.env.EVAL_CACHE_ENABLED !== undefined) {
+      cacheOverrides.enabled = process.env.EVAL_CACHE_ENABLED !== 'false';
+    }
+    if (process.env.EVAL_CACHE_DIR) {
+      cacheOverrides.dir = process.env.EVAL_CACHE_DIR;
+    }
+    if (!isNaN(cacheTtl)) {
+      cacheOverrides.ttlHours = cacheTtl;
+    }
+    config.cache = cacheOverrides as EvalConfig['cache'];
   }
 
   return config;

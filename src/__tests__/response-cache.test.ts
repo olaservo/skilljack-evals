@@ -29,7 +29,6 @@ function makeTaskResult(overrides: Partial<TaskResult> = {}): TaskResult {
 // Valid 64-char hex strings for use as cache keys in tests
 const hexKey1 = 'a'.repeat(64);
 const hexKey2 = 'b'.repeat(64);
-const hexKey3 = 'c'.repeat(64);
 
 function makeKeyParams(overrides: Partial<CacheKeyParams> = {}): CacheKeyParams {
   return {
@@ -216,12 +215,40 @@ describe('ResponseCache get/set', () => {
   });
 
   it('returns null for expired entries', async () => {
-    const cache = makeCache({ ttlHours: 0 });
+    const cache = makeCache({ ttlHours: 1 });
+    const taskResult = makeTaskResult();
+
+    // Write the entry, then patch cachedAt to 2 hours ago to guarantee expiry
+    await cache.set(hexKey1, taskResult, keyInputs);
+    const cacheDir = (cache as unknown as { config: CacheConfig }).config.dir;
+    const filePath = path.join(cacheDir, `${hexKey1}.json`);
+    const raw = JSON.parse(await fs.readFile(filePath, 'utf-8'));
+    raw.cachedAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    await fs.writeFile(filePath, JSON.stringify(raw));
+
+    const retrieved = await cache.get(hexKey1);
+    expect(retrieved).toBeNull();
+  });
+
+  it('short-circuits get and set when disabled', async () => {
+    const cache = makeCache({ enabled: false });
     const taskResult = makeTaskResult();
 
     await cache.set(hexKey1, taskResult, keyInputs);
     const retrieved = await cache.get(hexKey1);
+    expect(retrieved).toBeNull();
+  });
 
+  it('returns null for malformed cache entries', async () => {
+    const cache = makeCache();
+    const cacheDir = (cache as unknown as { config: CacheConfig }).config.dir;
+    await fs.mkdir(cacheDir, { recursive: true });
+
+    // Write a JSON file missing required fields
+    const filePath = path.join(cacheDir, `${hexKey1}.json`);
+    await fs.writeFile(filePath, JSON.stringify({ bad: 'data' }));
+
+    const retrieved = await cache.get(hexKey1);
     expect(retrieved).toBeNull();
   });
 

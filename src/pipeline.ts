@@ -184,8 +184,10 @@ async function runPhase(
 
     const runLogDir = numRuns > 1 ? path.join(logBaseDir, `run-${run + 1}`) : logBaseDir;
 
-    // Per-task execution with cache support
+    // Per-task execution with cache support.
+    // Tasks run sequentially (not via runAll) so each result can be cached individually.
     const results: TaskResult[] = [];
+    let cacheHits = 0;
     for (const task of evaluation.tasks) {
       // Compute cache key if caching is available
       const cacheKey = cacheOptions
@@ -207,6 +209,7 @@ async function runPhase(
         result = await cacheOptions.cache.get(cacheKey);
         if (result) {
           console.log(`Task ${task.id}: cache hit (hash ${cacheKey.substring(0, 8)})`);
+          cacheHits++;
         }
       }
 
@@ -236,6 +239,10 @@ async function runPhase(
       }
 
       results.push(result);
+    }
+
+    if (cacheOptions && cacheHits > 0) {
+      console.log(`\n${cacheHits} of ${evaluation.tasks.length} task(s) served from cache`);
     }
 
     allResults.push(results);
