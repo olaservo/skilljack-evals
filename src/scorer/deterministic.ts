@@ -141,113 +141,122 @@ export function scoreDeterministic(
     }
   }
 
-  // 5. Check expect_contains (case-sensitive, unlike expect_marker)
+  // Output assertions (5-9) are skipped for negative tests where
+  // expectSkillActivation is false — only skill activation matters there.
+  // They are also skipped when skill activation was expected but failed,
+  // since output checks would be misleading in that case.
   let containsCheckPassed: boolean | null = null;
-  if (Array.isArray(check.expectContains) && check.expectContains.length > 0) {
-    const missing = check.expectContains.filter((s) => !result.output.includes(s));
-    containsCheckPassed = missing.length === 0;
-    if (containsCheckPassed) {
-      details.push('All expected substrings found in output');
-    } else {
-      details.push(`Expected substrings not found: ${missing.map((s) => `"${s}"`).join(', ')}`);
-    }
-  }
-
-  // 6. Check expect_not_contains (case-sensitive forbidden substring checks)
   let notContainsCheckPassed: boolean | null = null;
-  if (Array.isArray(check.expectNotContains) && check.expectNotContains.length > 0) {
-    const found = check.expectNotContains.filter((s) => result.output.includes(s));
-    notContainsCheckPassed = found.length === 0;
-    if (notContainsCheckPassed) {
-      details.push('No forbidden substrings found in output');
-    } else {
-      details.push(`Forbidden substrings found: ${found.map((s) => `"${s}"`).join(', ')}`);
-    }
-  }
-
-  // 7. Check expect_regex (regex pattern matching, with timeout to guard against ReDoS)
   let regexCheckPassed: boolean | null = null;
-  if (Array.isArray(check.expectRegex) && check.expectRegex.length > 0) {
-    const failures: string[] = [];
-    for (const pattern of check.expectRegex) {
+  let javascriptCheckPassed: boolean | null = null;
+  let fileExistsCheckPassed: boolean | null = null;
+
+  // Only run output assertions when skill activation succeeded (or was not expected).
+  // If skill activation was expected but failed, output checks would be misleading.
+  if (check.expectSkillActivation !== false && (skillActivated || !check.expectSkillActivation)) {
+    // 5. Check expect_contains (case-sensitive, unlike expect_marker)
+    if (Array.isArray(check.expectContains) && check.expectContains.length > 0) {
+      const missing = check.expectContains.filter((s) => !result.output.includes(s));
+      containsCheckPassed = missing.length === 0;
+      if (containsCheckPassed) {
+        details.push('All expected substrings found in output');
+      } else {
+        details.push(`Expected substrings not found: ${missing.map((s) => `"${s}"`).join(', ')}`);
+      }
+    }
+
+    // 6. Check expect_not_contains (case-sensitive forbidden substring checks)
+    if (Array.isArray(check.expectNotContains) && check.expectNotContains.length > 0) {
+      const found = check.expectNotContains.filter((s) => result.output.includes(s));
+      notContainsCheckPassed = found.length === 0;
+      if (notContainsCheckPassed) {
+        details.push('No forbidden substrings found in output');
+      } else {
+        details.push(`Forbidden substrings found: ${found.map((s) => `"${s}"`).join(', ')}`);
+      }
+    }
+
+    // 7. Check expect_regex (regex pattern matching, with timeout to guard against ReDoS)
+    if (Array.isArray(check.expectRegex) && check.expectRegex.length > 0) {
+      const failures: string[] = [];
+      for (const pattern of check.expectRegex) {
+        try {
+          const sandbox = { pattern, output: result.output, result: false };
+          vm.runInNewContext('result = new RegExp(pattern).test(output)', sandbox, { timeout: 5000 });
+          if (!sandbox.result) {
+            failures.push(`/${pattern}/`);
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.includes('timed out')) {
+            failures.push(`/${pattern}/ (timed out — possible ReDoS)`);
+          } else {
+            failures.push(`/${pattern}/ (invalid regex)`);
+          }
+        }
+      }
+      regexCheckPassed = failures.length === 0;
+      if (regexCheckPassed) {
+        details.push('All regex patterns matched');
+      } else {
+        details.push(`Regex patterns not matched: ${failures.join(', ')}`);
+      }
+    }
+
+    // 8. Check expect_javascript (JS expression returning boolean, sandboxed via vm)
+    // NOTE: vm.runInNewContext is NOT a true security sandbox (per Node.js docs).
+    // This is acceptable because eval YAML files are author-controlled, not
+    // untrusted user input. The timeout guards against accidental infinite loops.
+    if (check.expectJavascript) {
       try {
-        const sandbox = { pattern, output: result.output, result: false };
-        vm.runInNewContext('result = new RegExp(pattern).test(output)', sandbox, { timeout: 5000 });
-        if (!sandbox.result) {
-          failures.push(`/${pattern}/`);
+        const sandbox = {
+          output: result.output,
+          JSON, Math, parseInt, parseFloat,
+          String, Number, Boolean, Array, Object, RegExp, Date,
+          isNaN, isFinite,
+        };
+        const value = vm.runInNewContext(`(${check.expectJavascript})`, sandbox, { timeout: 5000 });
+        if (value === true) {
+          javascriptCheckPassed = true;
+          details.push('JavaScript assertion passed');
+        } else {
+          javascriptCheckPassed = false;
+          details.push(`JavaScript assertion returned ${JSON.stringify(value)} (expected true)`);
         }
       } catch (e) {
-        if (e instanceof Error && e.message.includes('timed out')) {
-          failures.push(`/${pattern}/ (timed out — possible ReDoS)`);
-        } else {
-          failures.push(`/${pattern}/ (invalid regex)`);
-        }
-      }
-    }
-    regexCheckPassed = failures.length === 0;
-    if (regexCheckPassed) {
-      details.push('All regex patterns matched');
-    } else {
-      details.push(`Regex patterns not matched: ${failures.join(', ')}`);
-    }
-  }
-
-  // 8. Check expect_javascript (JS expression returning boolean, sandboxed via vm)
-  // NOTE: vm.runInNewContext is NOT a true security sandbox (per Node.js docs).
-  // This is acceptable because eval YAML files are author-controlled, not
-  // untrusted user input. The timeout guards against accidental infinite loops.
-  let javascriptCheckPassed: boolean | null = null;
-  if (check.expectJavascript) {
-    try {
-      const sandbox = {
-        output: result.output,
-        JSON, Math, parseInt, parseFloat,
-        String, Number, Boolean, Array, Object, RegExp, Date,
-        isNaN, isFinite,
-      };
-      const value = vm.runInNewContext(`(${check.expectJavascript})`, sandbox, { timeout: 5000 });
-      if (value === true) {
-        javascriptCheckPassed = true;
-        details.push('JavaScript assertion passed');
-      } else {
         javascriptCheckPassed = false;
-        details.push(`JavaScript assertion returned ${JSON.stringify(value)} (expected true)`);
+        details.push(`JavaScript assertion error: ${e instanceof Error ? e.message : String(e)}`);
       }
-    } catch (e) {
-      javascriptCheckPassed = false;
-      details.push(`JavaScript assertion error: ${e instanceof Error ? e.message : String(e)}`);
     }
-  }
 
-  // 9. Check expect_file_exists (with path traversal guard)
-  // NOTE: path traversal guard uses lexical path checks. Symlinks inside cwd
-  // pointing outside are not detected. This is acceptable for controlled eval
-  // environments; use fs.realpathSync if untrusted paths are ever supported.
-  let fileExistsCheckPassed: boolean | null = null;
-  if (Array.isArray(check.expectFileExists) && check.expectFileExists.length > 0) {
-    const cwd = options?.cwd ?? process.cwd();
-    const resolvedCwd = path.resolve(cwd);
-    if (!fs.existsSync(resolvedCwd)) {
-      fileExistsCheckPassed = false;
-      details.push(`Working directory does not exist: ${resolvedCwd}`);
-    } else {
-      const cwdPrefix = resolvedCwd.endsWith(path.sep) ? resolvedCwd : resolvedCwd + path.sep;
-      const missing: string[] = [];
-      for (const filePath of check.expectFileExists) {
-        const resolved = path.resolve(cwd, filePath);
-        if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
-          missing.push(`${filePath} (outside working directory)`);
-          continue;
-        }
-        if (!fs.existsSync(resolved)) {
-          missing.push(filePath);
-        }
-      }
-      fileExistsCheckPassed = missing.length === 0;
-      if (fileExistsCheckPassed) {
-        details.push('All expected files exist');
+    // 9. Check expect_file_exists (with path traversal guard)
+    // NOTE: path traversal guard uses lexical path checks. Symlinks inside cwd
+    // pointing outside are not detected. This is acceptable for controlled eval
+    // environments; use fs.realpathSync if untrusted paths are ever supported.
+    if (Array.isArray(check.expectFileExists) && check.expectFileExists.length > 0) {
+      const cwd = options?.cwd ?? process.cwd();
+      const resolvedCwd = path.resolve(cwd);
+      if (!fs.existsSync(resolvedCwd)) {
+        fileExistsCheckPassed = false;
+        details.push(`Working directory does not exist: ${resolvedCwd}`);
       } else {
-        details.push(`Expected files not found: ${missing.join(', ')}`);
+        const cwdPrefix = resolvedCwd.endsWith(path.sep) ? resolvedCwd : resolvedCwd + path.sep;
+        const missing: string[] = [];
+        for (const filePath of check.expectFileExists) {
+          const resolved = path.resolve(cwd, filePath);
+          if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
+            missing.push(`${filePath} (outside working directory)`);
+            continue;
+          }
+          if (!fs.existsSync(resolved)) {
+            missing.push(filePath);
+          }
+        }
+        fileExistsCheckPassed = missing.length === 0;
+        if (fileExistsCheckPassed) {
+          details.push('All expected files exist');
+        } else {
+          details.push(`Expected files not found: ${missing.join(', ')}`);
+        }
       }
     }
   }

@@ -2,15 +2,15 @@
  * Fixture script execution for evaluation tasks.
  *
  * Runs setup/teardown scripts defined in FixtureConfig before and after
- * task execution. Scripts are executed via child_process.exec in the
+ * task execution. Scripts are executed via child_process.execFile in the
  * task's working directory.
  */
 
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface FixtureExecResult {
   success: boolean;
@@ -37,7 +37,7 @@ export async function runFixtureScript(
   const resolvedPath = path.resolve(cwd, scriptPath);
 
   try {
-    const { stdout, stderr } = await execAsync(`"${resolvedPath}"`, {
+    const { stdout, stderr } = await execFileAsync(resolvedPath, [], {
       cwd,
       timeout: timeoutMs,
       encoding: 'utf-8',

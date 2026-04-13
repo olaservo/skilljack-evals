@@ -460,8 +460,8 @@ describe('pass/fail logic', () => {
     expect(det.passed).toBe(false);
   });
 
-  it('only checks skill non-activation for negative test', () => {
-    // Even though contains would fail, negative test only cares about non-activation
+  it('skips output assertions for negative test', () => {
+    // Negative tests only check non-activation; output assertions are skipped entirely
     const task = makeTask({
       expectSkillActivation: false,
       expectContains: ['missing substring'],
@@ -469,6 +469,7 @@ describe('pass/fail logic', () => {
     const result = makeResult({ output: 'some output', skillLoads: [] });
     const det = scoreDeterministic(task, result)!;
     expect(det.passed).toBe(true); // Passed because skill wasn't activated
+    expect(det.containsCheckPassed).toBeNull(); // Skipped for negative tests
   });
 
   it('ignores non-array array-typed fields without crashing', () => {

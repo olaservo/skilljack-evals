@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as path from 'path';
 
 vi.mock('child_process', () => {
-  const mockExec = vi.fn();
-  return { exec: mockExec };
+  const mock = vi.fn();
+  return { execFile: mock };
 });
 
 vi.mock('util', () => ({
@@ -11,9 +11,9 @@ vi.mock('util', () => ({
 }));
 
 import { runFixtureScript } from '../runner/fixture-runner.js';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 
-const mockExec = exec as unknown as ReturnType<typeof vi.fn>;
+const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
 
 describe('runFixtureScript', () => {
   const cwd = '/app';
@@ -23,7 +23,7 @@ describe('runFixtureScript', () => {
   });
 
   it('returns success when script executes successfully', async () => {
-    mockExec.mockResolvedValueOnce({ stdout: 'setup done', stderr: '' });
+    mockExecFile.mockResolvedValueOnce({ stdout: 'setup done', stderr: '' });
 
     const result = await runFixtureScript('scripts/setup.sh', cwd);
 
@@ -34,12 +34,12 @@ describe('runFixtureScript', () => {
   });
 
   it('resolves script path against cwd', async () => {
-    mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' });
+    mockExecFile.mockResolvedValueOnce({ stdout: '', stderr: '' });
 
     await runFixtureScript('scripts/setup.sh', cwd);
 
     const expectedPath = path.resolve(cwd, 'scripts/setup.sh');
-    expect(mockExec).toHaveBeenCalledWith(`"${expectedPath}"`, {
+    expect(mockExecFile).toHaveBeenCalledWith(expectedPath, [], {
       cwd,
       timeout: 30_000,
       encoding: 'utf-8',
@@ -47,22 +47,23 @@ describe('runFixtureScript', () => {
   });
 
   it('passes absolute script path unchanged', async () => {
-    mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' });
+    mockExecFile.mockResolvedValueOnce({ stdout: '', stderr: '' });
 
     // Use path.resolve to build a cross-platform absolute path
     const absPath = path.resolve('/usr/local/bin/setup.sh');
     await runFixtureScript(absPath, cwd);
 
-    expect(mockExec).toHaveBeenCalledWith(`"${absPath}"`, expect.objectContaining({ cwd }));
+    expect(mockExecFile).toHaveBeenCalledWith(absPath, [], expect.objectContaining({ cwd }));
   });
 
   it('uses custom timeout when provided', async () => {
-    mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' });
+    mockExecFile.mockResolvedValueOnce({ stdout: '', stderr: '' });
 
     await runFixtureScript('setup.sh', cwd, 5000);
 
-    expect(mockExec).toHaveBeenCalledWith(
+    expect(mockExecFile).toHaveBeenCalledWith(
       expect.any(String),
+      [],
       expect.objectContaining({ timeout: 5000 }),
     );
   });
@@ -70,7 +71,7 @@ describe('runFixtureScript', () => {
   it('returns failure with message when script is not found (ENOENT)', async () => {
     const error = new Error('spawn ENOENT') as Error & { code: string };
     error.code = 'ENOENT';
-    mockExec.mockRejectedValueOnce(error);
+    mockExecFile.mockRejectedValueOnce(error);
 
     const result = await runFixtureScript('missing.sh', cwd);
 
@@ -81,7 +82,7 @@ describe('runFixtureScript', () => {
 
   it('returns failure with message when ENOENT appears in error message', async () => {
     const error = new Error('ENOENT: no such file or directory');
-    mockExec.mockRejectedValueOnce(error);
+    mockExecFile.mockRejectedValueOnce(error);
 
     const result = await runFixtureScript('missing.sh', cwd);
 
@@ -95,7 +96,7 @@ describe('runFixtureScript', () => {
       stdout: 'partial output',
       stderr: 'error details',
     });
-    mockExec.mockRejectedValueOnce(error);
+    mockExecFile.mockRejectedValueOnce(error);
 
     const result = await runFixtureScript('bad-script.sh', cwd);
 
@@ -111,7 +112,7 @@ describe('runFixtureScript', () => {
       stdout: '',
       stderr: '',
     });
-    mockExec.mockRejectedValueOnce(error);
+    mockExecFile.mockRejectedValueOnce(error);
 
     const result = await runFixtureScript('slow-script.sh', cwd, 5000);
 
@@ -121,7 +122,7 @@ describe('runFixtureScript', () => {
   });
 
   it('handles null stdout/stderr in success response', async () => {
-    mockExec.mockResolvedValueOnce({ stdout: null, stderr: null });
+    mockExecFile.mockResolvedValueOnce({ stdout: null, stderr: null });
 
     const result = await runFixtureScript('setup.sh', cwd);
 
@@ -132,7 +133,7 @@ describe('runFixtureScript', () => {
 
   it('handles null stdout/stderr in error response', async () => {
     const error = Object.assign(new Error('failed'), { code: 1 });
-    mockExec.mockRejectedValueOnce(error);
+    mockExecFile.mockRejectedValueOnce(error);
 
     const result = await runFixtureScript('setup.sh', cwd);
 
