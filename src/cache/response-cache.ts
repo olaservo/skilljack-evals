@@ -31,7 +31,7 @@ export interface CacheKeyParams {
 
 export interface CacheKeyInputs {
   taskId: string;
-  promptHash: string;
+  cacheKeyPrefix: string;
   modelId: string;
   runnerType: string;
   skillsHash: string;
@@ -54,6 +54,9 @@ export class ResponseCache {
    * Look up a cached TaskResult by key. Returns null on miss, expiry, or error.
    */
   async get(key: string): Promise<TaskResult | null> {
+    if (!/^[a-f0-9]{64}$/.test(key)) {
+      return null;
+    }
     try {
       const filePath = path.join(this.config.dir, `${key}.json`);
       const content = await fs.readFile(filePath, 'utf-8');
@@ -75,6 +78,9 @@ export class ResponseCache {
    * Store a TaskResult in the cache.
    */
   async set(key: string, result: TaskResult, keyInputs: CacheKeyInputs): Promise<void> {
+    if (!/^[a-f0-9]{64}$/.test(key)) {
+      return;
+    }
     try {
       await fs.mkdir(this.config.dir, { recursive: true });
 
@@ -85,7 +91,7 @@ export class ResponseCache {
       };
 
       const filePath = path.join(this.config.dir, `${key}.json`);
-      const tmpPath = filePath + '.tmp';
+      const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
       await fs.writeFile(tmpPath, JSON.stringify(entry, null, 2));
       await fs.rename(tmpPath, filePath);
     } catch (err) {
@@ -99,8 +105,7 @@ export class ResponseCache {
   async clear(): Promise<{ deletedCount: number }> {
     try {
       const entries = await fs.readdir(this.config.dir);
-      const jsonFiles = entries.filter(e => e.endsWith('.json'));
-      const deletedCount = jsonFiles.length;
+      const deletedCount = entries.length;
       if (deletedCount > 0) {
         await fs.rm(this.config.dir, { recursive: true });
         await fs.mkdir(this.config.dir, { recursive: true });
@@ -148,14 +153,14 @@ export class ResponseCache {
       const files = await collectFiles(skillsDir);
       if (files.length === 0) return 'no-skills';
 
-      // Sort for determinism
-      files.sort();
+      // Normalize to relative paths first, then sort for cross-platform determinism
+      const relativePaths = files.map(f => path.relative(skillsDir, f).split(path.sep).join('/'));
+      relativePaths.sort();
 
       const hash = crypto.createHash('sha256');
-      for (const filePath of files) {
-        const relativePath = path.relative(skillsDir, filePath).split(path.sep).join('/');
-        const content = await fs.readFile(filePath);
-        hash.update(relativePath);
+      for (const relPath of relativePaths) {
+        const content = await fs.readFile(path.join(skillsDir, relPath));
+        hash.update(relPath);
         hash.update(content);
       }
       return hash.digest('hex');

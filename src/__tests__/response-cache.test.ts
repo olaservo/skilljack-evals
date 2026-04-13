@@ -26,6 +26,11 @@ function makeTaskResult(overrides: Partial<TaskResult> = {}): TaskResult {
   };
 }
 
+// Valid 64-char hex strings for use as cache keys in tests
+const hexKey1 = 'a'.repeat(64);
+const hexKey2 = 'b'.repeat(64);
+const hexKey3 = 'c'.repeat(64);
+
 function makeKeyParams(overrides: Partial<CacheKeyParams> = {}): CacheKeyParams {
   return {
     taskId: 'test-001',
@@ -41,7 +46,7 @@ function makeKeyParams(overrides: Partial<CacheKeyParams> = {}): CacheKeyParams 
 
 const keyInputs = {
   taskId: 'test-001',
-  promptHash: 'abcd1234',
+  cacheKeyPrefix: 'abcd1234',
   modelId: 'sonnet',
   runnerType: 'claude-sdk',
   skillsHash: 'abc123',
@@ -138,6 +143,13 @@ describe('ResponseCache.hashSkillsDir', () => {
     expect(await ResponseCache.hashSkillsDir('/nonexistent/path')).toBe('no-skills');
   });
 
+  it('returns sentinel for empty directory', async () => {
+    const dir = makeTmpDir();
+    tmpDirs.push(dir);
+    await fs.mkdir(dir, { recursive: true });
+    expect(await ResponseCache.hashSkillsDir(dir)).toBe('no-skills');
+  });
+
   it('produces consistent hashes for same contents', async () => {
     const dir = makeTmpDir();
     tmpDirs.push(dir);
@@ -183,17 +195,22 @@ describe('ResponseCache get/set', () => {
 
   it('returns null for missing key', async () => {
     const cache = makeCache();
-    const result = await cache.get('nonexistent-key');
+    const result = await cache.get(hexKey1);
+    expect(result).toBeNull();
+  });
+
+  it('returns null for invalid key format', async () => {
+    const cache = makeCache();
+    const result = await cache.get('not-a-valid-hex-key');
     expect(result).toBeNull();
   });
 
   it('round-trips a TaskResult', async () => {
     const cache = makeCache();
     const taskResult = makeTaskResult();
-    const key = 'test-key-abc';
 
-    await cache.set(key, taskResult, keyInputs);
-    const retrieved = await cache.get(key);
+    await cache.set(hexKey1, taskResult, keyInputs);
+    const retrieved = await cache.get(hexKey1);
 
     expect(retrieved).toEqual(taskResult);
   });
@@ -201,24 +218,22 @@ describe('ResponseCache get/set', () => {
   it('returns null for expired entries', async () => {
     const cache = makeCache({ ttlHours: 0 });
     const taskResult = makeTaskResult();
-    const key = 'expired-key';
 
-    await cache.set(key, taskResult, keyInputs);
-    const retrieved = await cache.get(key);
+    await cache.set(hexKey1, taskResult, keyInputs);
+    const retrieved = await cache.get(hexKey1);
 
     expect(retrieved).toBeNull();
   });
 
   it('handles concurrent sets to same key', async () => {
     const cache = makeCache();
-    const key = 'concurrent-key';
 
     await Promise.all([
-      cache.set(key, makeTaskResult({ output: 'A' }), keyInputs),
-      cache.set(key, makeTaskResult({ output: 'B' }), keyInputs),
+      cache.set(hexKey1, makeTaskResult({ output: 'A' }), keyInputs),
+      cache.set(hexKey1, makeTaskResult({ output: 'B' }), keyInputs),
     ]);
 
-    const retrieved = await cache.get(key);
+    const retrieved = await cache.get(hexKey1);
     expect(retrieved).not.toBeNull();
     expect(['A', 'B']).toContain(retrieved!.output);
   });
@@ -239,14 +254,14 @@ describe('ResponseCache clear', () => {
     tmpDirs.push(dir);
     const cache = new ResponseCache({ enabled: true, dir, ttlHours: 168 });
 
-    await cache.set('key-1', makeTaskResult({ taskId: 'a' }), keyInputs);
-    await cache.set('key-2', makeTaskResult({ taskId: 'b' }), keyInputs);
+    await cache.set(hexKey1, makeTaskResult({ taskId: 'a' }), keyInputs);
+    await cache.set(hexKey2, makeTaskResult({ taskId: 'b' }), keyInputs);
 
     const { deletedCount } = await cache.clear();
     expect(deletedCount).toBe(2);
 
-    expect(await cache.get('key-1')).toBeNull();
-    expect(await cache.get('key-2')).toBeNull();
+    expect(await cache.get(hexKey1)).toBeNull();
+    expect(await cache.get(hexKey2)).toBeNull();
   });
 
   it('returns 0 for nonexistent cache directory', async () => {

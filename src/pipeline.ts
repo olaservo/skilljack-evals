@@ -244,7 +244,7 @@ async function runPhase(
         if (cacheKey && cacheOptions && !result.isError) {
           await cacheOptions.cache.set(cacheKey, result, {
             taskId: task.id,
-            promptHash: cacheKey.substring(0, 8),
+            cacheKeyPrefix: cacheKey.substring(0, 8),
             modelId: config.defaultAgentModel,
             runnerType: config.runnerType,
             skillsHash: cacheOptions.skillsHash,
