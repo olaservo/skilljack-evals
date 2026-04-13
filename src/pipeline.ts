@@ -144,7 +144,6 @@ interface PhaseCacheOptions {
   cache: ResponseCache;
   skillsHash: string;
   noCache?: boolean;
-  bustCache?: boolean;
 }
 
 /**
@@ -204,7 +203,7 @@ async function runPhase(
 
       // Attempt cache read
       let result: TaskResult | null = null;
-      if (cacheKey && cacheOptions && !cacheOptions.noCache && !cacheOptions.bustCache) {
+      if (cacheKey && cacheOptions && !cacheOptions.noCache) {
         result = await cacheOptions.cache.get(cacheKey);
         if (result) {
           console.log(`Task ${task.id}: cache hit (hash ${cacheKey.substring(0, 8)})`);
@@ -241,8 +240,8 @@ async function runPhase(
           console.log(`  Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
         }
 
-        // Write to cache (skip for errors and bust-cache mode)
-        if (cacheKey && cacheOptions && !cacheOptions.bustCache && !result.isError) {
+        // Write to cache (skip for errors)
+        if (cacheKey && cacheOptions && !result.isError) {
           await cacheOptions.cache.set(cacheKey, result, {
             taskId: task.id,
             promptHash: cacheKey.substring(0, 8),
@@ -467,7 +466,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   const cache = cacheEnabled ? new ResponseCache(config.cache) : null;
   const skillsHash = cache ? await ResponseCache.hashSkillsDir(skillsDir) : '';
   const cacheOpts: PhaseCacheOptions | undefined = cache
-    ? { cache, skillsHash, noCache: options.noCache, bustCache: options.bustCache }
+    ? { cache, skillsHash, noCache: options.noCache }
     : undefined;
 
   // 3. Run evaluation phase(s)
@@ -523,7 +522,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
       // Recompute skills hash for baseline phase (different skill dir or no skills)
       const baseCacheOpts: PhaseCacheOptions | undefined = cache
-        ? { cache, skillsHash: await ResponseCache.hashSkillsDir(baseSkillsDir), noCache: options.noCache, bustCache: options.bustCache }
+        ? { cache, skillsHash: await ResponseCache.hashSkillsDir(baseSkillsDir), noCache: options.noCache }
         : undefined;
 
       const basePhase = await runPhase(

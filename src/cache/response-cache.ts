@@ -18,12 +18,6 @@ export interface CacheConfig {
   ttlHours: number;
 }
 
-export const DEFAULT_CACHE_CONFIG: CacheConfig = {
-  enabled: true,
-  dir: './results/.cache',
-  ttlHours: 168, // 7 days
-};
-
 export interface CacheKeyParams {
   taskId: string;
   prompt: string;
@@ -91,7 +85,9 @@ export class ResponseCache {
       };
 
       const filePath = path.join(this.config.dir, `${key}.json`);
-      await fs.writeFile(filePath, JSON.stringify(entry, null, 2));
+      const tmpPath = filePath + '.tmp';
+      await fs.writeFile(tmpPath, JSON.stringify(entry, null, 2));
+      await fs.rename(tmpPath, filePath);
     } catch (err) {
       console.warn(`Cache write failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -101,15 +97,15 @@ export class ResponseCache {
    * Remove all cached entries. Returns the count of deleted files.
    */
   async clear(): Promise<{ deletedCount: number }> {
-    let deletedCount = 0;
     try {
       const entries = await fs.readdir(this.config.dir);
-      for (const entry of entries) {
-        if (entry.endsWith('.json')) {
-          await fs.unlink(path.join(this.config.dir, entry));
-          deletedCount++;
-        }
+      const jsonFiles = entries.filter(e => e.endsWith('.json'));
+      const deletedCount = jsonFiles.length;
+      if (deletedCount > 0) {
+        await fs.rm(this.config.dir, { recursive: true });
+        await fs.mkdir(this.config.dir, { recursive: true });
       }
+      return { deletedCount };
     } catch (err) {
       if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'ENOENT') {
         // Directory doesn't exist — nothing to clear
@@ -117,7 +113,6 @@ export class ResponseCache {
       }
       throw err;
     }
-    return { deletedCount };
   }
 
   /**
@@ -158,7 +153,7 @@ export class ResponseCache {
 
       const hash = crypto.createHash('sha256');
       for (const filePath of files) {
-        const relativePath = path.relative(skillsDir, filePath);
+        const relativePath = path.relative(skillsDir, filePath).split(path.sep).join('/');
         const content = await fs.readFile(filePath);
         hash.update(relativePath);
         hash.update(content);

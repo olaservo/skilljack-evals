@@ -62,8 +62,8 @@ program
   .option('--compare-skill <path>', 'Path to baseline skill directory (e.g., previous version) for A/B comparison')
   .option('--compare-label <label>', 'Custom label for the baseline in comparison reports')
   .option('--blind-compare', 'Run blind A/B comparison alongside --compare')
-  .option('--no-cache', 'Skip reading from cache (still writes new results)')
-  .option('--bust-cache', 'Skip both reading and writing cache')
+  .option('--force-rerun', 'Force re-execution of all tasks (cache writes still occur)')
+  .option('--bust-cache', 'Disable caching entirely (skip both reads and writes)')
   .action(async (tasksFile: string, options: {
     runner?: string;
     model?: string;
@@ -89,7 +89,7 @@ program
     compareSkill?: string;
     blindCompare?: boolean;
     compareLabel?: string;
-    cache?: boolean;
+    forceRerun?: boolean;
     bustCache?: boolean;
   }) => {
     try {
@@ -127,7 +127,7 @@ program
         compareSkillPath: options.compareSkill,
         compareLabel: options.compareLabel,
         blindCompare: options.blindCompare,
-        noCache: options.cache === false,
+        noCache: options.forceRerun,
         bustCache: options.bustCache,
       });
 

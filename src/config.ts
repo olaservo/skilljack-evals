@@ -211,6 +211,9 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
  * - EVAL_SCORE_THRESHOLD: Min avg score 1-5 (default: 4.0)
  * - EVAL_GITHUB_SUMMARY: Write GitHub Actions summary (default: false)
  * - EVAL_HTML_REPORT: Generate HTML report (default: true)
+ * - EVAL_CACHE_ENABLED: Enable/disable response cache (default: true)
+ * - EVAL_CACHE_DIR: Directory for cached responses (default: './results/.cache')
+ * - EVAL_CACHE_TTL_HOURS: Cache entry TTL in hours (default: 168)
  */
 function loadEnvConfig(): Partial<EvalConfig> {
   const config: Partial<EvalConfig> = {};
@@ -253,13 +256,14 @@ function loadEnvConfig(): Partial<EvalConfig> {
     config.htmlReport = process.env.EVAL_HTML_REPORT.toLowerCase() !== 'false';
   }
 
-  if (process.env.EVAL_CACHE_ENABLED !== undefined || process.env.EVAL_CACHE_DIR) {
+  const cacheTtl = parseInt(process.env.EVAL_CACHE_TTL_HOURS || '', 10);
+  if (process.env.EVAL_CACHE_ENABLED !== undefined || process.env.EVAL_CACHE_DIR || !isNaN(cacheTtl)) {
     config.cache = {
       enabled: process.env.EVAL_CACHE_ENABLED !== undefined
         ? process.env.EVAL_CACHE_ENABLED !== 'false'
         : DEFAULT_CONFIG.cache.enabled,
       dir: process.env.EVAL_CACHE_DIR ?? DEFAULT_CONFIG.cache.dir,
-      ttlHours: DEFAULT_CONFIG.cache.ttlHours,
+      ttlHours: !isNaN(cacheTtl) ? cacheTtl : DEFAULT_CONFIG.cache.ttlHours,
     };
   }
 
