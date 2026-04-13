@@ -127,6 +127,13 @@ describe('expect_contains', () => {
     const det = scoreDeterministic(task, result)!;
     expect(det.containsCheckPassed).toBeNull();
   });
+
+  it('is skipped (null) when configured with empty array', () => {
+    const task = makeTask({ expectContains: [] });
+    const result = makeResult();
+    const det = scoreDeterministic(task, result)!;
+    expect(det.containsCheckPassed).toBeNull();
+  });
 });
 
 // ============================================
@@ -161,6 +168,13 @@ describe('expect_not_contains', () => {
 
   it('is skipped (null) when not configured', () => {
     const task = makeTask({});
+    const result = makeResult();
+    const det = scoreDeterministic(task, result)!;
+    expect(det.notContainsCheckPassed).toBeNull();
+  });
+
+  it('is skipped (null) when configured with empty array', () => {
+    const task = makeTask({ expectNotContains: [] });
     const result = makeResult();
     const det = scoreDeterministic(task, result)!;
     expect(det.notContainsCheckPassed).toBeNull();
@@ -200,6 +214,13 @@ describe('expect_regex', () => {
 
   it('is skipped (null) when not configured', () => {
     const task = makeTask({});
+    const result = makeResult();
+    const det = scoreDeterministic(task, result)!;
+    expect(det.regexCheckPassed).toBeNull();
+  });
+
+  it('is skipped (null) when configured with empty array', () => {
+    const task = makeTask({ expectRegex: [] });
     const result = makeResult();
     const det = scoreDeterministic(task, result)!;
     expect(det.regexCheckPassed).toBeNull();
@@ -380,6 +401,13 @@ describe('expect_file_exists', () => {
 
   it('is skipped (null) when not configured', () => {
     const task = makeTask({});
+    const result = makeResult();
+    const det = scoreDeterministic(task, result)!;
+    expect(det.fileExistsCheckPassed).toBeNull();
+  });
+
+  it('is skipped (null) when configured with empty array', () => {
+    const task = makeTask({ expectFileExists: [] });
     const result = makeResult();
     const det = scoreDeterministic(task, result)!;
     expect(det.fileExistsCheckPassed).toBeNull();

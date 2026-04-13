@@ -172,8 +172,7 @@ export function scoreDeterministic(
     for (const pattern of check.expectRegex) {
       try {
         const sandbox = { pattern, output: result.output, result: false };
-        vm.createContext(sandbox);
-        vm.runInContext('result = new RegExp(pattern).test(output)', sandbox, { timeout: 5000 });
+        vm.runInNewContext('result = new RegExp(pattern).test(output)', sandbox, { timeout: 5000 });
         if (!sandbox.result) {
           failures.push(`/${pattern}/`);
         }
@@ -194,6 +193,9 @@ export function scoreDeterministic(
   }
 
   // 8. Check expect_javascript (JS expression returning boolean, sandboxed via vm)
+  // NOTE: vm.runInNewContext is NOT a true security sandbox (per Node.js docs).
+  // This is acceptable because eval YAML files are author-controlled, not
+  // untrusted user input. The timeout guards against accidental infinite loops.
   let javascriptCheckPassed: boolean | null = null;
   if (check.expectJavascript) {
     try {
@@ -218,15 +220,18 @@ export function scoreDeterministic(
   }
 
   // 9. Check expect_file_exists (with path traversal guard)
+  // NOTE: path traversal guard uses lexical path checks. Symlinks inside cwd
+  // pointing outside are not detected. This is acceptable for controlled eval
+  // environments; use fs.realpathSync if untrusted paths are ever supported.
   let fileExistsCheckPassed: boolean | null = null;
   if (check.expectFileExists && check.expectFileExists.length > 0) {
     const cwd = options?.cwd ?? process.cwd();
     const resolvedCwd = path.resolve(cwd);
+    const cwdPrefix = resolvedCwd.endsWith(path.sep) ? resolvedCwd : resolvedCwd + path.sep;
     const missing: string[] = [];
     for (const filePath of check.expectFileExists) {
       const resolved = path.resolve(cwd, filePath);
-      const cwdPrefix = resolvedCwd.endsWith(path.sep) ? resolvedCwd : resolvedCwd + path.sep;
-    if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
+      if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
         missing.push(`${filePath} (outside working directory)`);
         continue;
       }
