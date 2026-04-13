@@ -244,6 +244,17 @@ export async function validateEvalFile(filePath: string): Promise<string[]> {
       errors.push(`${prefix}: Missing 'prompt'`);
     }
 
+    // Validate regex patterns are syntactically valid
+    if (task.deterministic?.expect_regex) {
+      for (const pattern of task.deterministic.expect_regex) {
+        try {
+          new RegExp(pattern);
+        } catch (e) {
+          errors.push(`${prefix}: Invalid regex in expect_regex: "${pattern}" — ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+
     // Validate criteria weights sum roughly to 1
     if (task.criteria) {
       const weights = Object.values(task.criteria)

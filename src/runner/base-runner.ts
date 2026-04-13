@@ -15,6 +15,7 @@ import { loadConfigSync } from '../config.js';
 import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
 import { withConcurrencyLimit, DEFAULT_RUNNER_CONCURRENCY } from '../utils/concurrency.js';
+import { runFixtureScript } from './fixture-runner.js';
 
 export abstract class BaseRunner implements AgentRunner {
   abstract readonly providerName: string;
@@ -85,7 +86,11 @@ export abstract class BaseRunner implements AgentRunner {
   abstract runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult>;
 
   /**
-   * Execute a task with timeout protection.
+   * Execute a task with timeout protection and fixture setup/teardown.
+   *
+   * If the task has a fixture with setup/teardown scripts, they are executed
+   * around the task: setup before, teardown after (in a finally block).
+   * Setup failure skips the task. Teardown failure warns but does not fail.
    */
   async runTaskWithTimeout(
     task: EvalTask,
@@ -93,27 +98,66 @@ export abstract class BaseRunner implements AgentRunner {
     logger?: SessionLogger,
   ): Promise<TaskResult> {
     const timeout = timeoutMs ?? this.options.taskTimeoutMs ?? 300000;
+    const cwd = this.options.cwd ?? process.cwd();
+    const fixture = task.fixture;
 
-    const controller = new AbortController();
-    const abortTimer = setTimeout(() => controller.abort(), timeout);
+    let taskResult: TaskResult | undefined;
+    let setupFailed = false;
 
     try {
-      const result = await Promise.race([
-        this.runTask(task, logger),
-        new Promise<never>((_, reject) => {
-          controller.signal.addEventListener('abort', () =>
-            reject(new Error(`Task ${task.id} timed out after ${timeout}ms`)),
+      // Run fixture setup if defined
+      if (fixture?.setup) {
+        const setupResult = await runFixtureScript(fixture.setup, cwd);
+        if (!setupResult.success) {
+          setupFailed = true;
+          taskResult = this.createErrorResult(
+            task,
+            `Fixture setup failed: ${setupResult.errorMessage}`,
+            0,
           );
-        }),
-      ]);
-      return result;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger?.markAsError(errorMessage);
+          return taskResult;
+        }
+      }
 
-      return this.createErrorResult(task, errorMessage, timeout);
+      // Run the task with timeout
+      const controller = new AbortController();
+      const abortTimer = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const result = await Promise.race([
+          this.runTask(task, logger),
+          new Promise<never>((_, reject) => {
+            controller.signal.addEventListener('abort', () =>
+              reject(new Error(`Task ${task.id} timed out after ${timeout}ms`)),
+            );
+          }),
+        ]);
+        taskResult = result;
+        return result;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger?.markAsError(errorMessage);
+        taskResult = this.createErrorResult(task, errorMessage, timeout);
+        return taskResult;
+      } finally {
+        clearTimeout(abortTimer);
+      }
     } finally {
-      clearTimeout(abortTimer);
+      // Run fixture teardown if defined (always, even after setup failure)
+      if (fixture?.teardown) {
+        try {
+          const teardownResult = await runFixtureScript(fixture.teardown, cwd);
+          if (!teardownResult.success) {
+            console.warn(
+              `Fixture teardown failed for task ${task.id}: ${teardownResult.errorMessage}`,
+            );
+          }
+        } catch (teardownError) {
+          console.warn(
+            `Fixture teardown threw for task ${task.id}: ${teardownError instanceof Error ? teardownError.message : String(teardownError)}`,
+          );
+        }
+      }
     }
   }
 

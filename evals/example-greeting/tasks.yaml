@@ -14,6 +14,8 @@ tasks:
     deterministic:
       expect_skill_activation: true
       expect_marker: "GREETING_SUCCESS"
+      expect_contains: ["GREETING_SUCCESS"]
+      expect_not_contains: ["ERROR", "FIXME"]
     criteria:
       discovery: { weight: 0.3, description: "Should load the greeting skill" }
       adherence: { weight: 0.4, description: "Should follow the greeting format specified in the skill" }
