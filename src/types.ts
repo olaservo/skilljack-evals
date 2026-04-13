@@ -14,11 +14,11 @@ export interface EvalCriteria {
 
 export interface DeterministicCheck {
   expectSkillActivation: boolean;
-  expectMarker?: string; // String or regex pattern to match in output
+  expectMarker?: string; // String to match in output (case-insensitive)
   expectToolCalls?: string[]; // Tools that should be called
   expectNoToolCalls?: string[]; // Tools that should NOT be called
-  expectContains?: string[]; // Substrings that must appear in output
-  expectNotContains?: string[]; // Substrings that must NOT appear in output
+  expectContains?: string[]; // Substrings that must appear in output (case-sensitive)
+  expectNotContains?: string[]; // Substrings that must NOT appear in output (case-sensitive)
   expectRegex?: string[]; // Regex patterns that must match output
   expectJavascript?: string; // JS expression evaluated with `output` in scope, must return true
   expectFileExists?: string[]; // Files that must exist (relative to cwd)

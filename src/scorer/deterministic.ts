@@ -197,7 +197,12 @@ export function scoreDeterministic(
   let javascriptCheckPassed: boolean | null = null;
   if (check.expectJavascript) {
     try {
-      const sandbox = { output: result.output, JSON, Math };
+      const sandbox = {
+        output: result.output,
+        JSON, Math, parseInt, parseFloat,
+        String, Number, Boolean, Array, Object, RegExp, Date,
+        isNaN, isFinite,
+      };
       const value = vm.runInNewContext(`(${check.expectJavascript})`, sandbox, { timeout: 5000 });
       if (value === true) {
         javascriptCheckPassed = true;
@@ -220,7 +225,8 @@ export function scoreDeterministic(
     const missing: string[] = [];
     for (const filePath of check.expectFileExists) {
       const resolved = path.resolve(cwd, filePath);
-      if (!resolved.startsWith(resolvedCwd + path.sep) && resolved !== resolvedCwd) {
+      const cwdPrefix = resolvedCwd.endsWith(path.sep) ? resolvedCwd : resolvedCwd + path.sep;
+    if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
         missing.push(`${filePath} (outside working directory)`);
         continue;
       }
@@ -252,6 +258,11 @@ export function scoreDeterministic(
   } else {
     // For negative tests (false positive): skill must NOT be activated
     passed = !skillActivated;
+    const hasOtherAssertions = containsCheckPassed !== null || notContainsCheckPassed !== null
+      || regexCheckPassed !== null || javascriptCheckPassed !== null || fileExistsCheckPassed !== null;
+    if (hasOtherAssertions) {
+      details.push('Note: non-activation assertions were evaluated but do not affect pass/fail for negative tests');
+    }
   }
 
   return {
