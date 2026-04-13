@@ -97,6 +97,27 @@ describe('ResponseCache.computeCacheKey', () => {
     const key2 = ResponseCache.computeCacheKey(makeKeyParams({ allowedWriteDirs: ['./b/', './a/'] }));
     expect(key1).toBe(key2);
   });
+
+  it('produces different hashes for different run indices', () => {
+    const key0 = ResponseCache.computeCacheKey(makeKeyParams({ runIndex: 0 }));
+    const key1 = ResponseCache.computeCacheKey(makeKeyParams({ runIndex: 1 }));
+    const key2 = ResponseCache.computeCacheKey(makeKeyParams({ runIndex: 2 }));
+    expect(key0).not.toBe(key1);
+    expect(key1).not.toBe(key2);
+    expect(key0).not.toBe(key2);
+  });
+
+  it('produces same hash when runIndex is undefined (single-run mode)', () => {
+    const key1 = ResponseCache.computeCacheKey(makeKeyParams());
+    const key2 = ResponseCache.computeCacheKey(makeKeyParams({ runIndex: undefined }));
+    expect(key1).toBe(key2);
+  });
+
+  it('produces different hash with vs without runIndex', () => {
+    const keyNoIndex = ResponseCache.computeCacheKey(makeKeyParams());
+    const keyWithIndex = ResponseCache.computeCacheKey(makeKeyParams({ runIndex: 0 }));
+    expect(keyNoIndex).not.toBe(keyWithIndex);
+  });
 });
 
 describe('ResponseCache.hashSkillsDir', () => {

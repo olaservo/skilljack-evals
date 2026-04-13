@@ -32,6 +32,7 @@ export interface CacheKeyParams {
   skillsHash: string;
   taskTimeoutMs: number;
   allowedWriteDirs: string[];
+  runIndex?: number;
 }
 
 export interface CacheKeyInputs {
@@ -123,7 +124,7 @@ export class ResponseCache {
    * Compute a deterministic SHA-256 cache key from execution-affecting params.
    */
   static computeCacheKey(params: CacheKeyParams): string {
-    const canonical = {
+    const canonical: Record<string, unknown> = {
       taskId: params.taskId,
       prompt: params.prompt,
       model: params.model,
@@ -132,6 +133,9 @@ export class ResponseCache {
       taskTimeoutMs: params.taskTimeoutMs,
       allowedWriteDirs: [...params.allowedWriteDirs].sort(),
     };
+    if (params.runIndex !== undefined) {
+      canonical.runIndex = params.runIndex;
+    }
     const json = JSON.stringify(canonical);
     return crypto.createHash('sha256').update(json).digest('hex');
   }

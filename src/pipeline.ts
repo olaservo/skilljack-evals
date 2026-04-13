@@ -198,6 +198,7 @@ async function runPhase(
             skillsHash: cacheOptions.skillsHash,
             taskTimeoutMs: config.taskTimeoutMs,
             allowedWriteDirs: config.allowedWriteDirs,
+            runIndex: numRuns > 1 ? run : undefined,
           })
         : null;
 
