@@ -225,7 +225,7 @@ function loadEnvConfig(): Partial<EvalConfig> {
   }
 
   if (process.env.EVAL_HTML_REPORT !== undefined) {
-    config.htmlReport = process.env.EVAL_HTML_REPORT !== 'false';
+    config.htmlReport = process.env.EVAL_HTML_REPORT.toLowerCase() !== 'false';
   }
 
   return config;

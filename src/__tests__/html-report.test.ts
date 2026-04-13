@@ -389,6 +389,56 @@ describe('generateHtmlReport', () => {
     expect(html).not.toContain('NaN');
   });
 
+  // --- Gauge edge cases ---
+
+  it('does not produce NaN when all scores are zero', async () => {
+    const opts = makeReportOptions({
+      results: [
+        makeResult({ taskId: 'task-1', output: 'out' }),
+        makeResult({ taskId: 'task-2', output: 'out' }),
+      ],
+      scores: [
+        makeScore({ taskId: 'task-1', discovery: 0, adherence: 0, outputQuality: 0, weightedScore: 0 }),
+        makeScore({ taskId: 'task-2', discovery: 0, adherence: 0, outputQuality: 0, weightedScore: 0 }),
+      ],
+    });
+    const html = await generateHtmlReport(opts);
+
+    expect(html).not.toContain('NaN');
+    expect(html).toContain('0.0%'); // discovery gauge
+  });
+
+  // --- Metadata edge cases ---
+
+  it('omits Agent and Judge metadata items when fields are empty', async () => {
+    const html = await generateHtmlReport(makeReportOptions({
+      metadata: {
+        skillPath: '/path/to/skill',
+        runnerType: 'claude-sdk',
+        agentModel: '',
+        judgeModel: '',
+      },
+    }));
+
+    expect(html).toContain('claude-sdk');
+    expect(html).not.toContain('Agent:');
+    expect(html).not.toContain('Judge:');
+  });
+
+  it('renders Agent and Judge metadata when fields are present', async () => {
+    const html = await generateHtmlReport(makeReportOptions({
+      metadata: {
+        skillPath: '/path/to/skill',
+        runnerType: 'claude-sdk',
+        agentModel: 'sonnet',
+        judgeModel: 'haiku',
+      },
+    }));
+
+    expect(html).toContain('Agent: sonnet');
+    expect(html).toContain('Judge: haiku');
+  });
+
   // --- Flaky indicator ---
 
   it('marks flaky tasks in embedded data', async () => {

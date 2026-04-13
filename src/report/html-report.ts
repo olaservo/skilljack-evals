@@ -139,8 +139,8 @@ function renderHeader(skillName: string, passed: boolean, metadata: ReportMetada
   if (metadata) {
     if (metadata.gitCommit) metaItems.push(`<span>Git: ${escapeHtml(metadata.gitBranch ?? '')}@${escapeHtml(metadata.gitCommit.slice(0, 7))}</span>`);
     if (metadata.runnerType) metaItems.push(`<span>Runner: ${escapeHtml(metadata.runnerType)}</span>`);
-    metaItems.push(`<span>Agent: ${escapeHtml(metadata.agentModel)}</span>`);
-    metaItems.push(`<span>Judge: ${escapeHtml(metadata.judgeModel)}</span>`);
+    if (metadata.agentModel) metaItems.push(`<span>Agent: ${escapeHtml(metadata.agentModel)}</span>`);
+    if (metadata.judgeModel) metaItems.push(`<span>Judge: ${escapeHtml(metadata.judgeModel)}</span>`);
   }
   if (numRuns > 1) metaItems.push(`<span>Runs: ${numRuns}</span>`);
   if (comparison) metaItems.push(`<span>Mode: Comparison vs ${escapeHtml(comparison.summary.baselineLabel)}</span>`);
@@ -156,8 +156,8 @@ function renderHeader(skillName: string, passed: boolean, metadata: ReportMetada
 }
 
 function renderGauge(label: string, value: number, max: number, threshold: number, format: (v: number) => string): string {
-  const pctValue = Math.min(value / max, 1);
-  const pctThreshold = Math.min(threshold / max, 1);
+  const pctValue = max > 0 ? Math.min(value / max, 1) : 0;
+  const pctThreshold = max > 0 ? Math.min(threshold / max, 1) : 0;
   const passed = value >= threshold;
   // SVG arc: 180-degree semicircle
   const radius = 60;
@@ -759,17 +759,17 @@ footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--color-
 function renderScript(): string {
   return `
 (function() {
-  var data = window.__REPORT_DATA__;
-  var currentFilter = 'all';
-  var currentSearch = '';
-  var sortCol = 'index';
-  var sortAsc = true;
+  const data = window.__REPORT_DATA__;
+  let currentFilter = 'all';
+  let currentSearch = '';
+  let sortCol = 'index';
+  let sortAsc = true;
 
   // Sorting
-  var headers = document.querySelectorAll('th.sortable');
+  const headers = document.querySelectorAll('th.sortable');
   headers.forEach(function(th) {
     th.addEventListener('click', function() {
-      var col = th.getAttribute('data-col');
+      const col = th.getAttribute('data-col');
       if (sortCol === col) {
         sortAsc = !sortAsc;
       } else {
@@ -783,14 +783,14 @@ function renderScript(): string {
   });
 
   function sortTable() {
-    var tbody = document.querySelector('#task-table tbody');
-    var rows = Array.from(tbody.querySelectorAll('tr.task-row'));
+    const tbody = document.querySelector('#task-table tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr.task-row'));
     rows.sort(function(a, b) {
-      var idxA = parseInt(a.getAttribute('data-index'));
-      var idxB = parseInt(b.getAttribute('data-index'));
-      var dA = data[idxA];
-      var dB = data[idxB];
-      var valA, valB;
+      const idxA = parseInt(a.getAttribute('data-index'));
+      const idxB = parseInt(b.getAttribute('data-index'));
+      const dA = data[idxA];
+      const dB = data[idxB];
+      let valA, valB;
       if (sortCol === 'index') { valA = idxA; valB = idxB; }
       else if (sortCol === 'taskId') { valA = dA.taskId.toLowerCase(); valB = dB.taskId.toLowerCase(); }
       else if (sortCol === 'failureCategory') { valA = dA.failureCategory; valB = dB.failureCategory; }
@@ -800,7 +800,7 @@ function renderScript(): string {
       return 0;
     });
     rows.forEach(function(row) {
-      var detailRow = row.nextElementSibling;
+      const detailRow = row.nextElementSibling;
       tbody.appendChild(row);
       tbody.appendChild(detailRow);
     });
@@ -809,23 +809,23 @@ function renderScript(): string {
 
   // Collapsible details
   document.querySelector('#task-table tbody').addEventListener('click', function(e) {
-    var row = e.target.closest('tr.task-row');
+    const row = e.target.closest('tr.task-row');
     if (!row) return;
-    var detail = row.nextElementSibling;
+    const detail = row.nextElementSibling;
     if (detail && detail.classList.contains('detail-row')) {
       detail.classList.toggle('open');
     }
   });
 
   // Search
-  var searchInput = document.getElementById('search');
+  const searchInput = document.getElementById('search');
   searchInput.addEventListener('input', function() {
     currentSearch = searchInput.value.toLowerCase();
     applyFilters();
   });
 
   // Filter toggles
-  var filterBtns = document.querySelectorAll('.filter-btn');
+  const filterBtns = document.querySelectorAll('.filter-btn');
   filterBtns.forEach(function(btn) {
     btn.addEventListener('click', function() {
       filterBtns.forEach(function(b) { b.classList.remove('active'); });
@@ -836,12 +836,12 @@ function renderScript(): string {
   });
 
   function applyFilters() {
-    var rows = document.querySelectorAll('#task-table tbody tr.task-row');
-    var visible = 0;
+    const rows = document.querySelectorAll('#task-table tbody tr.task-row');
+    let visible = 0;
     rows.forEach(function(row) {
-      var idx = parseInt(row.getAttribute('data-index'));
-      var d = data[idx];
-      var show = true;
+      const idx = parseInt(row.getAttribute('data-index'));
+      const d = data[idx];
+      let show = true;
 
       // Search filter
       if (currentSearch && d.taskId.toLowerCase().indexOf(currentSearch) === -1
@@ -856,7 +856,7 @@ function renderScript(): string {
 
       row.style.display = show ? '' : 'none';
       // Also hide detail row
-      var detail = row.nextElementSibling;
+      const detail = row.nextElementSibling;
       if (detail && detail.classList.contains('detail-row')) {
         if (!show) {
           detail.style.display = 'none';
@@ -868,14 +868,14 @@ function renderScript(): string {
       if (show) visible++;
     });
 
-    var countEl = document.getElementById('visible-count');
+    const countEl = document.getElementById('visible-count');
     countEl.textContent = visible + ' of ' + data.length + ' tasks';
   }
 
   // Gauge animation
   document.querySelectorAll('.gauge-fill').forEach(function(el) {
-    var target = el.getAttribute('stroke-dashoffset');
-    var dasharray = parseFloat(el.getAttribute('stroke-dasharray'));
+    const target = el.getAttribute('stroke-dashoffset');
+    const dasharray = parseFloat(el.getAttribute('stroke-dasharray'));
     el.setAttribute('stroke-dashoffset', String(dasharray));
     requestAnimationFrame(function() {
       el.style.transition = 'stroke-dashoffset 0.6s ease-out';
