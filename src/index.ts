@@ -74,6 +74,7 @@ export { SessionLogger } from './session/session-logger.js';
 // Report
 export { generateReport, generateJsonResults, computeSummary, computeFailureBreakdown } from './report/report.js';
 export type { ReportOptions } from './report/report.js';
+export { generateHtmlReport } from './report/html-report.js';
 export { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
 export { loadPreviousReport, compareResults, formatComparisonMarkdown, formatComparisonConsole } from './report/comparison.js';
 export { formatDelta, formatCategory, pct } from './utils/format.js';

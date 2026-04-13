@@ -17,6 +17,7 @@ import { createRunner } from './runner/runner-factory.js';
 import { scoreAll, type ScorerOptions } from './scorer/scorer.js';
 import { SessionLogger } from './session/session-logger.js';
 import { generateReport, generateJsonResults, computeSummary } from './report/report.js';
+import { generateHtmlReport } from './report/html-report.js';
 import { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
 import { loadConfig, type EvalConfig } from './config.js';
 import { aggregateResults, aggregateScores } from './scorer/aggregator.js';
@@ -115,6 +116,7 @@ export interface PipelineResult {
   report: EvaluationReport;
   reportPath?: string;
   jsonPath?: string;
+  htmlPath?: string;
   markdownSummary: string;
   feedbackTemplatePath?: string;
   comparison?: ComparisonData;
@@ -504,6 +506,12 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
 
+  let htmlPath: string | undefined;
+  if (config.htmlReport) {
+    htmlPath = path.join(config.outputDir, `${reportBaseName}.html`);
+    await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
+  }
+
   if (config.githubSummary) {
     const wrote = await writeGitHubSummary(report, config);
     if (wrote) {
@@ -533,6 +541,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     report,
     reportPath,
     jsonPath,
+    htmlPath,
     markdownSummary,
     comparison,
     blindComparison,
@@ -593,6 +602,12 @@ export async function scorePipeline(
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
 
+  let htmlPath: string | undefined;
+  if (config.htmlReport) {
+    htmlPath = path.join(config.outputDir, `${reportBaseName}.html`);
+    await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
+  }
+
   const markdownSummary = generateGitHubSummary(report, config);
   printSummary(report);
 
@@ -605,6 +620,7 @@ export async function scorePipeline(
     report,
     reportPath,
     jsonPath,
+    htmlPath,
     markdownSummary,
   };
 }

@@ -14,6 +14,7 @@ import * as path from 'path';
 import { parseEvalFile, createEvalTemplate, validateEvalFile } from './parser.js';
 import { runPipeline, scorePipeline } from './pipeline.js';
 import { generateReport, generateJsonResults } from './report/report.js';
+import { generateHtmlReport } from './report/html-report.js';
 import { SkillJudge } from './scorer/judge.js';
 import type { EvalTask, TaskResult, JudgeScore, SkillEvaluation, CombinedScore } from './types.js';
 import { validateFeedback } from './feedback.js';
@@ -52,6 +53,8 @@ program
   .option('--generate-feedback <path>', 'Generate feedback template JSON with task IDs after run')
   .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
   .option('--github-summary', 'Write GitHub Actions step summary')
+  .option('--html', 'Generate HTML report (default: true)')
+  .option('--no-html', 'Skip HTML report generation')
   .option('--compare-results <path>', 'Path to previous JSON results for comparison')
   .option('--verbose', 'Enable verbose output')
   .option('--compare', 'Run with and without skill to measure skill impact')
@@ -76,6 +79,7 @@ program
     generateFeedback?: string;
     feedback?: string;
     githubSummary?: boolean;
+    html?: boolean;
     compareResults?: string;
     verbose?: boolean;
     compare?: boolean;
@@ -98,6 +102,7 @@ program
       if (options.thresholdDiscovery) configOverrides.discoveryThreshold = parseFloat(options.thresholdDiscovery);
       if (options.thresholdScore) configOverrides.scoreThreshold = parseFloat(options.thresholdScore);
       if (options.githubSummary) configOverrides.githubSummary = true;
+      if (options.html !== undefined) configOverrides.htmlReport = options.html;
 
       const result = await runPipeline({
         tasksFile,
@@ -179,10 +184,12 @@ program
   .requiredOption('-r, --results <path>', 'Path to results JSON file')
   .option('-o, --output <path>', 'Output markdown file')
   .option('--json <path>', 'Also output JSON report')
+  .option('--html <path>', 'Also output HTML report')
   .action(async (options: {
     results: string;
     output?: string;
     json?: string;
+    html?: string;
   }) => {
     try {
       const resultsData = await fs.readFile(options.results, 'utf-8');
@@ -219,6 +226,10 @@ program
 
       if (options.json) {
         await generateJsonResults({ ...reportOptions, outputPath: options.json });
+      }
+
+      if (options.html) {
+        await generateHtmlReport({ ...reportOptions, outputPath: options.html });
       }
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
