@@ -102,14 +102,12 @@ export abstract class BaseRunner implements AgentRunner {
     const fixture = task.fixture;
 
     let taskResult: TaskResult | undefined;
-    let setupFailed = false;
 
     try {
       // Run fixture setup if defined
       if (fixture?.setup) {
         const setupResult = await runFixtureScript(fixture.setup, cwd);
         if (!setupResult.success) {
-          setupFailed = true;
           taskResult = this.createErrorResult(
             task,
             `Fixture setup failed: ${setupResult.errorMessage}`,

@@ -39,7 +39,7 @@ describe('runFixtureScript', () => {
     await runFixtureScript('scripts/setup.sh', cwd);
 
     const expectedPath = path.resolve(cwd, 'scripts/setup.sh');
-    expect(mockExec).toHaveBeenCalledWith(expectedPath, {
+    expect(mockExec).toHaveBeenCalledWith(`"${expectedPath}"`, {
       cwd,
       timeout: 30_000,
       encoding: 'utf-8',
@@ -53,7 +53,7 @@ describe('runFixtureScript', () => {
     const absPath = path.resolve('/usr/local/bin/setup.sh');
     await runFixtureScript(absPath, cwd);
 
-    expect(mockExec).toHaveBeenCalledWith(absPath, expect.objectContaining({ cwd }));
+    expect(mockExec).toHaveBeenCalledWith(`"${absPath}"`, expect.objectContaining({ cwd }));
   });
 
   it('uses custom timeout when provided', async () => {

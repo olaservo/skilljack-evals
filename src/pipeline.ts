@@ -641,6 +641,7 @@ export async function scorePipeline(
     noJudge?: boolean;
     noDeterministic?: boolean;
     feedbackPath?: string;
+    cwd?: string;
   } = {}
 ): Promise<PipelineResult> {
   const config = await loadConfig(options.configPath, options.configOverrides);
@@ -660,6 +661,7 @@ export async function scorePipeline(
     noJudge: options.noJudge,
     judgeOptions: { model: config.defaultJudgeModel },
     humanFeedback,
+    cwd: options.cwd,
   };
 
   console.log(`Scoring ${results.length} result(s)...`);

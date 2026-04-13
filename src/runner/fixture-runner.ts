@@ -37,7 +37,7 @@ export async function runFixtureScript(
   const resolvedPath = path.resolve(cwd, scriptPath);
 
   try {
-    const { stdout, stderr } = await execAsync(resolvedPath, {
+    const { stdout, stderr } = await execAsync(`"${resolvedPath}"`, {
       cwd,
       timeout: timeoutMs,
       encoding: 'utf-8',
