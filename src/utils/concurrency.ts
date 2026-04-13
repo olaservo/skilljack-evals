@@ -14,6 +14,9 @@ export const DEFAULT_RUNNER_CONCURRENCY = 1;
 /**
  * Run async tasks with a concurrency limit.
  *
+ * Note: if a factory throws, remaining in-flight workers are NOT cancelled.
+ * Callers that need graceful shutdown should catch inside each factory.
+ *
  * @param factories - Array of zero-argument async functions to execute.
  * @param limit - Max concurrent tasks. 1 = sequential, 0 = unlimited, N = bounded.
  * @returns Results in the same order as the input factories.

@@ -15,6 +15,7 @@
 import yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { DEFAULT_RUNNER_CONCURRENCY } from './utils/concurrency.js';
 
 export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents' | 'copilot-sdk';
 
@@ -81,7 +82,7 @@ export const DEFAULT_CONFIG: EvalConfig = {
   judgeOutputTruncation: 5000,
   reportOutputTruncation: 2000,
   taskTimeoutMs: 300000, // 5 minutes
-  concurrency: 1, // sequential by default
+  concurrency: DEFAULT_RUNNER_CONCURRENCY, // sequential by default
   exitOnFailure: true,
   outputDir: './results',
   githubSummary: false,
@@ -172,7 +173,12 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
     if (raw.thresholds?.avg_score !== undefined) config.scoreThreshold = raw.thresholds.avg_score;
 
     if (raw.runner?.timeout_ms !== undefined) config.taskTimeoutMs = raw.runner.timeout_ms;
-    if (raw.runner?.concurrency !== undefined) config.concurrency = raw.runner.concurrency;
+    if (raw.runner?.concurrency !== undefined) {
+      if (raw.runner.concurrency < 0) {
+        throw new Error(`Invalid runner.concurrency "${raw.runner.concurrency}" in config file. Must be >= 0.`);
+      }
+      config.concurrency = raw.runner.concurrency;
+    }
     if (raw.runner?.allowed_write_dirs) config.allowedWriteDirs = raw.runner.allowed_write_dirs;
 
     if (raw.output?.dir) config.outputDir = raw.output.dir;
@@ -211,6 +217,7 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
  * - EVAL_OUTPUT_TRUNCATION: Max chars to show judge (default: 5000)
  * - EVAL_REPORT_TRUNCATION: Max chars in reports (default: 2000)
  * - EVAL_TASK_TIMEOUT_MS: Per-task timeout in ms (default: 300000)
+ * - EVAL_RUNNER_CONCURRENCY: Max concurrent tasks (default: 1, 0=unlimited)
  * - EVAL_EXIT_ON_FAILURE: Exit with code 1 on failures (default: true)
  * - EVAL_OUTPUT_DIR: Directory for results (default: './results')
  * - EVAL_DISCOVERY_THRESHOLD: Min discovery rate 0-1 (default: 0.8)

@@ -110,7 +110,7 @@ program
       if (options.thresholdScore) configOverrides.scoreThreshold = parseFloat(options.thresholdScore);
       if (options.githubSummary) configOverrides.githubSummary = true;
       if (options.html !== undefined) configOverrides.htmlReport = options.html;
-      if (options.concurrency) {
+      if (options.concurrency !== undefined) {
         const c = parseInt(options.concurrency, 10);
         if (isNaN(c) || c < 0) {
           console.error('Error: --concurrency must be an integer >= 0');

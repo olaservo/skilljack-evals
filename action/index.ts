@@ -27,6 +27,10 @@ async function run(): Promise<void> {
     const thresholdScore = parseFloat(core.getInput('threshold-score') || '4.0');
     const timeout = parseInt(core.getInput('timeout') || '300000', 10);
     const concurrency = parseInt(core.getInput('concurrency') || '1', 10);
+    if (isNaN(concurrency) || concurrency < 0) {
+      core.setFailed('concurrency input must be an integer >= 0');
+      return;
+    }
     const tasksFilter = core.getInput('tasks-filter') || undefined;
     const skillsDir = core.getInput('skills-dir') || undefined;
     const cwd = core.getInput('working-directory') || process.cwd();

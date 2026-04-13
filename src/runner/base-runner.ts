@@ -14,7 +14,7 @@ import type {
 import { loadConfigSync } from '../config.js';
 import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
-import { withConcurrencyLimit } from '../utils/concurrency.js';
+import { withConcurrencyLimit, DEFAULT_RUNNER_CONCURRENCY } from '../utils/concurrency.js';
 
 export abstract class BaseRunner implements AgentRunner {
   abstract readonly providerName: string;
@@ -38,7 +38,7 @@ export abstract class BaseRunner implements AgentRunner {
     this.options = {
       cwd: options.cwd ?? process.cwd(),
       parallel: options.parallel ?? false,
-      concurrency: options.concurrency ?? (options.parallel ? 0 : undefined) ?? resolvedConfig.concurrency ?? 1,
+      concurrency: options.concurrency ?? (options.parallel ? 0 : undefined) ?? resolvedConfig.concurrency ?? DEFAULT_RUNNER_CONCURRENCY,
       model: options.model ?? resolvedConfig.defaultAgentModel,
       taskTimeoutMs: options.taskTimeoutMs ?? resolvedConfig.taskTimeoutMs,
       allowedWriteDirs: options.allowedWriteDirs ?? resolvedConfig.allowedWriteDirs,
