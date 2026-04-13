@@ -105,8 +105,9 @@ export class ResponseCache {
   async clear(): Promise<{ deletedCount: number }> {
     try {
       const entries = await fs.readdir(this.config.dir);
-      const deletedCount = entries.length;
-      if (deletedCount > 0) {
+      const cacheFiles = entries.filter(e => e.endsWith('.json'));
+      const deletedCount = cacheFiles.length;
+      if (entries.length > 0) {
         await fs.rm(this.config.dir, { recursive: true });
         await fs.mkdir(this.config.dir, { recursive: true });
       }
@@ -161,6 +162,7 @@ export class ResponseCache {
       for (const relPath of relativePaths) {
         const content = await fs.readFile(path.join(skillsDir, relPath));
         hash.update(relPath);
+        hash.update('\0');
         hash.update(content);
       }
       return hash.digest('hex');

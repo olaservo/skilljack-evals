@@ -107,7 +107,7 @@ export interface PipelineOptions {
   /** Run blind A/B comparison alongside --compare */
   blindCompare?: boolean;
   /** Skip reading from cache (still writes new results) */
-  noCache?: boolean;
+  skipCache?: boolean;
   /** Skip both reading and writing cache */
   bustCache?: boolean;
 }
@@ -143,7 +143,7 @@ interface PhaseResult {
 interface PhaseCacheOptions {
   cache: ResponseCache;
   skillsHash: string;
-  noCache?: boolean;
+  skipCache?: boolean;
 }
 
 /**
@@ -203,7 +203,7 @@ async function runPhase(
 
       // Attempt cache read
       let result: TaskResult | null = null;
-      if (cacheKey && cacheOptions && !cacheOptions.noCache) {
+      if (cacheKey && cacheOptions && !cacheOptions.skipCache) {
         result = await cacheOptions.cache.get(cacheKey);
         if (result) {
           console.log(`Task ${task.id}: cache hit (hash ${cacheKey.substring(0, 8)})`);
@@ -214,24 +214,7 @@ async function runPhase(
       if (!result) {
         console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
         const logger = new SessionLogger(task.id, runLogDir);
-        try {
-          result = await runner.runTaskWithTimeout(task, undefined, logger);
-        } catch (error) {
-          const errMsg = error instanceof Error ? error.message : String(error);
-          console.error(`  Task ${task.id} ERROR: ${errMsg}`);
-          result = {
-            taskId: task.id,
-            prompt: task.prompt,
-            output: '',
-            durationMs: 0,
-            numTurns: 0,
-            costUsd: 0,
-            skillLoads: [],
-            toolCalls: [],
-            isError: true,
-            errorMessage: errMsg,
-          };
-        }
+        result = await runner.runTaskWithTimeout(task, undefined, logger);
 
         if (result.isError) {
           console.error(`  ERROR: ${result.errorMessage}`);
@@ -466,7 +449,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   const cache = cacheEnabled ? new ResponseCache(config.cache) : null;
   const skillsHash = cache ? await ResponseCache.hashSkillsDir(skillsDir) : '';
   const cacheOpts: PhaseCacheOptions | undefined = cache
-    ? { cache, skillsHash, noCache: options.noCache }
+    ? { cache, skillsHash, skipCache: options.skipCache }
     : undefined;
 
   // 3. Run evaluation phase(s)
@@ -522,7 +505,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
       // Recompute skills hash for baseline phase (different skill dir or no skills)
       const baseCacheOpts: PhaseCacheOptions | undefined = cache
-        ? { cache, skillsHash: await ResponseCache.hashSkillsDir(baseSkillsDir), noCache: options.noCache }
+        ? { cache, skillsHash: await ResponseCache.hashSkillsDir(baseSkillsDir), skipCache: options.skipCache }
         : undefined;
 
       const basePhase = await runPhase(

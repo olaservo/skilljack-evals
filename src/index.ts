@@ -88,4 +88,4 @@ export type { PipelineOptions, PipelineResult } from './pipeline.js';
 
 // Cache
 export { ResponseCache } from './cache/response-cache.js';
-export type { CacheConfig, CacheEntry, CacheKeyParams } from './cache/response-cache.js';
+export type { CacheConfig, CacheEntry, CacheKeyParams, CacheKeyInputs } from './cache/response-cache.js';

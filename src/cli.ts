@@ -127,7 +127,7 @@ program
         compareSkillPath: options.compareSkill,
         compareLabel: options.compareLabel,
         blindCompare: options.blindCompare,
-        noCache: options.skipCache,
+        skipCache: options.skipCache,
         bustCache: options.bustCache,
       });
 
