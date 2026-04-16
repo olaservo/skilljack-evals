@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeStddev, aggregateScores, FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
+import { computeStddev, aggregateScores, FLAKY_STDDEV_THRESHOLD, isFlaky } from '../scorer/aggregator.js';
 import { computeSummary } from '../report/report.js';
 import { makeScore, makeResult } from './fixtures/test-helpers.js';
 
@@ -92,6 +92,28 @@ describe('aggregateScores', () => {
 describe('FLAKY_STDDEV_THRESHOLD', () => {
   it('is exported and equals 1.0', () => {
     expect(FLAKY_STDDEV_THRESHOLD).toBe(1.0);
+  });
+});
+
+describe('isFlaky', () => {
+  it('returns false for undefined stddev', () => {
+    expect(isFlaky(undefined)).toBe(false);
+  });
+
+  it('returns false when both adherence and outputQuality are below threshold', () => {
+    expect(isFlaky({ discovery: 0, adherence: 0.5, outputQuality: 0.8, weightedScore: 0.1 })).toBe(false);
+  });
+
+  it('returns true when adherence exceeds threshold', () => {
+    expect(isFlaky({ discovery: 0, adherence: 1.5, outputQuality: 0.5, weightedScore: 0.1 })).toBe(true);
+  });
+
+  it('returns true when outputQuality exceeds threshold', () => {
+    expect(isFlaky({ discovery: 0, adherence: 0.5, outputQuality: 1.5, weightedScore: 0.1 })).toBe(true);
+  });
+
+  it('returns false when values equal the threshold (not exceeded)', () => {
+    expect(isFlaky({ discovery: 0, adherence: 1.0, outputQuality: 1.0, weightedScore: 0.1 })).toBe(false);
   });
 });
 

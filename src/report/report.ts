@@ -22,7 +22,7 @@ import type {
   BlindComparisonData,
 } from '../types.js';
 import { loadConfigSync, type EvalConfig } from '../config.js';
-import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
+import { isFlaky } from '../scorer/aggregator.js';
 import { formatComparisonMarkdown } from './comparison.js';
 
 export interface ReportOptions {
@@ -165,7 +165,7 @@ ${metaSection}
 | Adherence | ${score.adherence.toFixed(1)}/5${score.stddev ? ` \u00B1 ${score.stddev.adherence.toFixed(1)}` : ''} | ${score.adherence >= 4 ? 'PASS' : 'FAIL'} |
 | Output Quality | ${score.outputQuality.toFixed(1)}/5${score.stddev ? ` \u00B1 ${score.stddev.outputQuality.toFixed(1)}` : ''} | ${score.outputQuality >= 4 ? 'PASS' : 'FAIL'} |
 | **Weighted** | **${score.weightedScore.toFixed(2)}${score.stddev ? ` \u00B1 ${score.stddev.weightedScore.toFixed(2)}` : ''}** | |
-${score.stddev && (score.stddev.adherence > FLAKY_STDDEV_THRESHOLD || score.stddev.outputQuality > FLAKY_STDDEV_THRESHOLD) ? `\n> **Warning: Potentially Flaky** \u2014 High variance across runs (adherence \u03C3=${score.stddev.adherence.toFixed(2)}, output \u03C3=${score.stddev.outputQuality.toFixed(2)})
+${isFlaky(score.stddev) ? `\n> **Warning: Potentially Flaky** \u2014 High variance across runs (adherence \u03C3=${score.stddev!.adherence.toFixed(2)}, output \u03C3=${score.stddev!.outputQuality.toFixed(2)})
 > _Only adherence and output quality are checked: discovery (0/1) and weighted score (0-1) cannot exceed the threshold._\n` : ''}
 **Failure Category:** ${formatCategory(score.failureCategory)}
 `;

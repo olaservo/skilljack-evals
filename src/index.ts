@@ -66,7 +66,7 @@ export { scoreTask, scoreAll } from './scorer/scorer.js';
 export { scoreDeterministic } from './scorer/deterministic.js';
 export { SkillJudge, blindCompareAll, BLIND_BIAS_THRESHOLD, DEFAULT_CONCURRENCY } from './scorer/judge.js';
 export type { BlindCompareOptions } from './scorer/judge.js';
-export { aggregateResults, aggregateScores, computeStddev, FLAKY_STDDEV_THRESHOLD } from './scorer/aggregator.js';
+export { aggregateResults, aggregateScores, computeStddev, FLAKY_STDDEV_THRESHOLD, isFlaky } from './scorer/aggregator.js';
 
 // Session
 export { SessionLogger } from './session/session-logger.js';
@@ -74,6 +74,7 @@ export { SessionLogger } from './session/session-logger.js';
 // Report
 export { generateReport, generateJsonResults, computeSummary, computeFailureBreakdown } from './report/report.js';
 export type { ReportOptions } from './report/report.js';
+export { generateHtmlReport } from './report/html-report.js';
 export { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
 export { loadPreviousReport, compareResults, formatComparisonMarkdown, formatComparisonConsole } from './report/comparison.js';
 export { formatDelta, formatCategory, pct } from './utils/format.js';

@@ -13,7 +13,7 @@ import type {
   CombinedScore,
 } from '../types.js';
 import { loadConfigSync, type EvalConfig } from '../config.js';
-import { FLAKY_STDDEV_THRESHOLD } from '../scorer/aggregator.js';
+import { isFlaky } from '../scorer/aggregator.js';
 
 /**
  * Generate a condensed summary for GitHub Actions.
@@ -107,7 +107,7 @@ export function generateGitHubSummary(report: EvaluationReport, config?: EvalCon
       // Only check adherence and outputQuality against the threshold since they
       // use the 1-5 scale. Discovery (0/1) and weightedScore (0-1) cannot exceed 1.0.
       const varianceLabel = s.stddev
-        ? (s.stddev.adherence > FLAKY_STDDEV_THRESHOLD || s.stddev.outputQuality > FLAKY_STDDEV_THRESHOLD ? ':warning: High' : 'Low')
+        ? (isFlaky(s.stddev) ? ':warning: High' : 'Low')
         : 'N/A';
       lines.push(`| ${taskId} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
     } else {

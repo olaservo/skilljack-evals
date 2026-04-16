@@ -12,6 +12,16 @@ import type { TaskResult, CombinedScore, FailureCategory, ScoreStddev } from '..
 export const FLAKY_STDDEV_THRESHOLD = 1.0;
 
 /**
+ * Check whether a score's standard deviation indicates flaky (high-variance) results.
+ *
+ * Only adherence and output quality are checked against the threshold since they
+ * use the 1-5 scale. Discovery (0/1) and weightedScore (0-1) cannot exceed 1.0.
+ */
+export function isFlaky(stddev: ScoreStddev | undefined): boolean {
+  return !!(stddev && (stddev.adherence > FLAKY_STDDEV_THRESHOLD || stddev.outputQuality > FLAKY_STDDEV_THRESHOLD));
+}
+
+/**
  * Compute sample standard deviation (N-1 denominator).
  * Returns 0 when fewer than 2 values are provided.
  *

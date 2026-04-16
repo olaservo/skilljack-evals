@@ -46,6 +46,7 @@ export interface EvalConfig {
   exitOnFailure: boolean;
   outputDir: string;
   githubSummary: boolean;
+  htmlReport: boolean;
 
   // Pass/fail thresholds
   discoveryThreshold: number; // 0-1, default 0.8 (80%)
@@ -73,6 +74,7 @@ export const DEFAULT_CONFIG: EvalConfig = {
   exitOnFailure: true,
   outputDir: './results',
   githubSummary: false,
+  htmlReport: true,
   discoveryThreshold: 0.8,
   scoreThreshold: 4.0,
   allowedWriteDirs: ['./results/', './fixtures/'],
@@ -110,6 +112,7 @@ interface RawConfigFile {
   ci?: {
     exit_on_failure?: boolean;
     github_summary?: boolean;
+    html_report?: boolean;
   };
 }
 
@@ -155,6 +158,7 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
 
     if (raw.ci?.exit_on_failure !== undefined) config.exitOnFailure = raw.ci.exit_on_failure;
     if (raw.ci?.github_summary !== undefined) config.githubSummary = raw.ci.github_summary;
+    if (raw.ci?.html_report !== undefined) config.htmlReport = raw.ci.html_report;
 
     return config;
   } catch (err: unknown) {
@@ -181,6 +185,7 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
  * - EVAL_DISCOVERY_THRESHOLD: Min discovery rate 0-1 (default: 0.8)
  * - EVAL_SCORE_THRESHOLD: Min avg score 1-5 (default: 4.0)
  * - EVAL_GITHUB_SUMMARY: Write GitHub Actions summary (default: false)
+ * - EVAL_HTML_REPORT: Generate HTML report (default: true)
  */
 function loadEnvConfig(): Partial<EvalConfig> {
   const config: Partial<EvalConfig> = {};
@@ -219,6 +224,10 @@ function loadEnvConfig(): Partial<EvalConfig> {
     config.githubSummary = process.env.EVAL_GITHUB_SUMMARY === 'true';
   }
 
+  if (process.env.EVAL_HTML_REPORT !== undefined) {
+    config.htmlReport = process.env.EVAL_HTML_REPORT.toLowerCase() !== 'false';
+  }
+
   return config;
 }
 
@@ -239,6 +248,7 @@ function mergeConfigs(...configs: Partial<EvalConfig>[]): EvalConfig {
     if (config.exitOnFailure !== undefined) result.exitOnFailure = config.exitOnFailure;
     if (config.outputDir !== undefined) result.outputDir = config.outputDir;
     if (config.githubSummary !== undefined) result.githubSummary = config.githubSummary;
+    if (config.htmlReport !== undefined) result.htmlReport = config.htmlReport;
     if (config.discoveryThreshold !== undefined) result.discoveryThreshold = config.discoveryThreshold;
     if (config.scoreThreshold !== undefined) result.scoreThreshold = config.scoreThreshold;
     if (config.allowedWriteDirs !== undefined) result.allowedWriteDirs = config.allowedWriteDirs;
