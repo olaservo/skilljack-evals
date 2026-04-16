@@ -47,6 +47,9 @@ export class ResponseCache {
   private config: CacheConfig;
 
   constructor(config: CacheConfig) {
+    if (config.ttlHours <= 0) {
+      throw new Error('Cache TTL must be a positive number of hours');
+    }
     this.config = config;
   }
 
@@ -112,7 +115,7 @@ export class ResponseCache {
   async clear(): Promise<{ deletedCount: number }> {
     try {
       const entries = await fs.readdir(this.config.dir);
-      const cacheFiles = entries.filter(e => e.endsWith('.json'));
+      const cacheFiles = entries.filter(e => /^[a-f0-9]{64}\.json$/.test(e));
       await Promise.all(
         cacheFiles.map(f => fs.unlink(path.join(this.config.dir, f)))
       );
@@ -171,8 +174,11 @@ export class ResponseCache {
         hash.update(content);
       }
       return hash.digest('hex');
-    } catch {
-      return 'no-skills';
+    } catch (err) {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'ENOENT') {
+        return 'no-skills';
+      }
+      throw err;
     }
   }
 }

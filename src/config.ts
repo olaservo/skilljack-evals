@@ -270,7 +270,9 @@ function loadEnvConfig(): Partial<EvalConfig> {
     if (!isNaN(cacheTtl)) {
       cacheOverrides.ttlHours = cacheTtl;
     }
-    config.cache = cacheOverrides as EvalConfig['cache'];
+    config.cache = Object.fromEntries(
+      Object.entries(cacheOverrides).filter(([, v]) => v !== undefined)
+    ) as EvalConfig['cache'];
   }
 
   return config;

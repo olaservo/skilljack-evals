@@ -296,4 +296,34 @@ describe('ResponseCache clear', () => {
     const { deletedCount } = await cache.clear();
     expect(deletedCount).toBe(0);
   });
+
+  it('only deletes files matching cache key pattern', async () => {
+    const dir = makeTmpDir();
+    tmpDirs.push(dir);
+    const cache = new ResponseCache({ enabled: true, dir, ttlHours: 168 });
+
+    // Write a valid cache entry and a non-cache JSON file
+    await cache.set(hexKey1, makeTaskResult({ taskId: 'a' }), keyInputs);
+    const fs = await import('fs/promises');
+    await fs.writeFile(path.join(dir, 'other-file.json'), '{}');
+
+    const { deletedCount } = await cache.clear();
+    expect(deletedCount).toBe(1);
+
+    // Non-cache file should still exist
+    const remaining = await fs.readdir(dir);
+    expect(remaining).toContain('other-file.json');
+  });
+});
+
+describe('constructor validation', () => {
+  it('rejects zero TTL', () => {
+    expect(() => new ResponseCache({ enabled: true, dir: '/tmp', ttlHours: 0 }))
+      .toThrow('Cache TTL must be a positive number of hours');
+  });
+
+  it('rejects negative TTL', () => {
+    expect(() => new ResponseCache({ enabled: true, dir: '/tmp', ttlHours: -1 }))
+      .toThrow('Cache TTL must be a positive number of hours');
+  });
 });
