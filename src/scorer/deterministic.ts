@@ -117,7 +117,7 @@ export function scoreDeterministic(
 
   // 3. Check expected tool calls
   let expectedToolsCalled: boolean | null = null;
-  if (check.expectToolCalls && check.expectToolCalls.length > 0) {
+  if (Array.isArray(check.expectToolCalls) && check.expectToolCalls.length > 0) {
     const calledTools = new Set(result.toolCalls.map((c) => c.tool));
     const missing = check.expectToolCalls.filter((t) => !calledTools.has(t));
     expectedToolsCalled = missing.length === 0;
@@ -130,7 +130,7 @@ export function scoreDeterministic(
 
   // 4. Check forbidden tool calls
   let unexpectedToolsCalled: boolean | null = null;
-  if (check.expectNoToolCalls && check.expectNoToolCalls.length > 0) {
+  if (Array.isArray(check.expectNoToolCalls) && check.expectNoToolCalls.length > 0) {
     const calledTools = new Set(result.toolCalls.map((c) => c.tool));
     const forbidden = check.expectNoToolCalls.filter((t) => calledTools.has(t));
     unexpectedToolsCalled = forbidden.length > 0;
@@ -143,7 +143,7 @@ export function scoreDeterministic(
 
   // 5. Check expect_contains (case-sensitive, unlike expect_marker)
   let containsCheckPassed: boolean | null = null;
-  if (check.expectContains && check.expectContains.length > 0) {
+  if (Array.isArray(check.expectContains) && check.expectContains.length > 0) {
     const missing = check.expectContains.filter((s) => !result.output.includes(s));
     containsCheckPassed = missing.length === 0;
     if (containsCheckPassed) {
@@ -155,7 +155,7 @@ export function scoreDeterministic(
 
   // 6. Check expect_not_contains (case-sensitive forbidden substring checks)
   let notContainsCheckPassed: boolean | null = null;
-  if (check.expectNotContains && check.expectNotContains.length > 0) {
+  if (Array.isArray(check.expectNotContains) && check.expectNotContains.length > 0) {
     const found = check.expectNotContains.filter((s) => result.output.includes(s));
     notContainsCheckPassed = found.length === 0;
     if (notContainsCheckPassed) {
@@ -167,7 +167,7 @@ export function scoreDeterministic(
 
   // 7. Check expect_regex (regex pattern matching, with timeout to guard against ReDoS)
   let regexCheckPassed: boolean | null = null;
-  if (check.expectRegex && check.expectRegex.length > 0) {
+  if (Array.isArray(check.expectRegex) && check.expectRegex.length > 0) {
     const failures: string[] = [];
     for (const pattern of check.expectRegex) {
       try {
@@ -224,26 +224,31 @@ export function scoreDeterministic(
   // pointing outside are not detected. This is acceptable for controlled eval
   // environments; use fs.realpathSync if untrusted paths are ever supported.
   let fileExistsCheckPassed: boolean | null = null;
-  if (check.expectFileExists && check.expectFileExists.length > 0) {
+  if (Array.isArray(check.expectFileExists) && check.expectFileExists.length > 0) {
     const cwd = options?.cwd ?? process.cwd();
     const resolvedCwd = path.resolve(cwd);
-    const cwdPrefix = resolvedCwd.endsWith(path.sep) ? resolvedCwd : resolvedCwd + path.sep;
-    const missing: string[] = [];
-    for (const filePath of check.expectFileExists) {
-      const resolved = path.resolve(cwd, filePath);
-      if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
-        missing.push(`${filePath} (outside working directory)`);
-        continue;
-      }
-      if (!fs.existsSync(resolved)) {
-        missing.push(filePath);
-      }
-    }
-    fileExistsCheckPassed = missing.length === 0;
-    if (fileExistsCheckPassed) {
-      details.push('All expected files exist');
+    if (!fs.existsSync(resolvedCwd)) {
+      fileExistsCheckPassed = false;
+      details.push(`Working directory does not exist: ${resolvedCwd}`);
     } else {
-      details.push(`Expected files not found: ${missing.join(', ')}`);
+      const cwdPrefix = resolvedCwd.endsWith(path.sep) ? resolvedCwd : resolvedCwd + path.sep;
+      const missing: string[] = [];
+      for (const filePath of check.expectFileExists) {
+        const resolved = path.resolve(cwd, filePath);
+        if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
+          missing.push(`${filePath} (outside working directory)`);
+          continue;
+        }
+        if (!fs.existsSync(resolved)) {
+          missing.push(filePath);
+        }
+      }
+      fileExistsCheckPassed = missing.length === 0;
+      if (fileExistsCheckPassed) {
+        details.push('All expected files exist');
+      } else {
+        details.push(`Expected files not found: ${missing.join(', ')}`);
+      }
     }
   }
 

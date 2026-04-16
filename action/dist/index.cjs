@@ -45665,7 +45665,7 @@ function scoreDeterministic(task, result, options) {
     details.push(markerFound ? `Marker found: "${check2.expectMarker}"` : `Marker not found: "${check2.expectMarker}"`);
   }
   let expectedToolsCalled = null;
-  if (check2.expectToolCalls && check2.expectToolCalls.length > 0) {
+  if (Array.isArray(check2.expectToolCalls) && check2.expectToolCalls.length > 0) {
     const calledTools = new Set(result.toolCalls.map((c) => c.tool));
     const missing = check2.expectToolCalls.filter((t) => !calledTools.has(t));
     expectedToolsCalled = missing.length === 0;
@@ -45676,7 +45676,7 @@ function scoreDeterministic(task, result, options) {
     }
   }
   let unexpectedToolsCalled = null;
-  if (check2.expectNoToolCalls && check2.expectNoToolCalls.length > 0) {
+  if (Array.isArray(check2.expectNoToolCalls) && check2.expectNoToolCalls.length > 0) {
     const calledTools = new Set(result.toolCalls.map((c) => c.tool));
     const forbidden = check2.expectNoToolCalls.filter((t) => calledTools.has(t));
     unexpectedToolsCalled = forbidden.length > 0;
@@ -45687,7 +45687,7 @@ function scoreDeterministic(task, result, options) {
     }
   }
   let containsCheckPassed = null;
-  if (check2.expectContains && check2.expectContains.length > 0) {
+  if (Array.isArray(check2.expectContains) && check2.expectContains.length > 0) {
     const missing = check2.expectContains.filter((s) => !result.output.includes(s));
     containsCheckPassed = missing.length === 0;
     if (containsCheckPassed) {
@@ -45697,7 +45697,7 @@ function scoreDeterministic(task, result, options) {
     }
   }
   let notContainsCheckPassed = null;
-  if (check2.expectNotContains && check2.expectNotContains.length > 0) {
+  if (Array.isArray(check2.expectNotContains) && check2.expectNotContains.length > 0) {
     const found = check2.expectNotContains.filter((s) => result.output.includes(s));
     notContainsCheckPassed = found.length === 0;
     if (notContainsCheckPassed) {
@@ -45707,7 +45707,7 @@ function scoreDeterministic(task, result, options) {
     }
   }
   let regexCheckPassed = null;
-  if (check2.expectRegex && check2.expectRegex.length > 0) {
+  if (Array.isArray(check2.expectRegex) && check2.expectRegex.length > 0) {
     const failures = [];
     for (const pattern of check2.expectRegex) {
       try {
@@ -45764,26 +45764,31 @@ function scoreDeterministic(task, result, options) {
     }
   }
   let fileExistsCheckPassed = null;
-  if (check2.expectFileExists && check2.expectFileExists.length > 0) {
+  if (Array.isArray(check2.expectFileExists) && check2.expectFileExists.length > 0) {
     const cwd2 = options?.cwd ?? process.cwd();
     const resolvedCwd = path7.resolve(cwd2);
-    const cwdPrefix = resolvedCwd.endsWith(path7.sep) ? resolvedCwd : resolvedCwd + path7.sep;
-    const missing = [];
-    for (const filePath of check2.expectFileExists) {
-      const resolved = path7.resolve(cwd2, filePath);
-      if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
-        missing.push(`${filePath} (outside working directory)`);
-        continue;
-      }
-      if (!fs8.existsSync(resolved)) {
-        missing.push(filePath);
-      }
-    }
-    fileExistsCheckPassed = missing.length === 0;
-    if (fileExistsCheckPassed) {
-      details.push("All expected files exist");
+    if (!fs8.existsSync(resolvedCwd)) {
+      fileExistsCheckPassed = false;
+      details.push(`Working directory does not exist: ${resolvedCwd}`);
     } else {
-      details.push(`Expected files not found: ${missing.join(", ")}`);
+      const cwdPrefix = resolvedCwd.endsWith(path7.sep) ? resolvedCwd : resolvedCwd + path7.sep;
+      const missing = [];
+      for (const filePath of check2.expectFileExists) {
+        const resolved = path7.resolve(cwd2, filePath);
+        if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
+          missing.push(`${filePath} (outside working directory)`);
+          continue;
+        }
+        if (!fs8.existsSync(resolved)) {
+          missing.push(filePath);
+        }
+      }
+      fileExistsCheckPassed = missing.length === 0;
+      if (fileExistsCheckPassed) {
+        details.push("All expected files exist");
+      } else {
+        details.push(`Expected files not found: ${missing.join(", ")}`);
+      }
     }
   }
   let passed;

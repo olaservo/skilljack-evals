@@ -372,18 +372,29 @@ describe('expect_file_exists', () => {
 
   it('rejects paths outside cwd', () => {
     setup();
+    const otherDir = fs.mkdtempSync(path.join(os.tmpdir(), 'det-test-other-'));
     try {
       const absPath = path.join(tmpDir, 'abs.txt');
       fs.writeFileSync(absPath, 'content');
 
       const task = makeTask({ expectFileExists: [absPath] });
       const result = makeResult();
-      const det = scoreDeterministic(task, result, { cwd: '/nonexistent' })!;
+      const det = scoreDeterministic(task, result, { cwd: otherDir })!;
       expect(det.fileExistsCheckPassed).toBe(false);
       expect(det.details.some((d: string) => d.includes('outside working directory'))).toBe(true);
     } finally {
+      fs.rmSync(otherDir, { recursive: true, force: true });
       teardown();
     }
+  });
+
+  it('reports a clear error when cwd does not exist', () => {
+    const missingCwd = path.join(os.tmpdir(), `det-test-missing-${Date.now()}`);
+    const task = makeTask({ expectFileExists: ['a.txt'] });
+    const result = makeResult();
+    const det = scoreDeterministic(task, result, { cwd: missingCwd })!;
+    expect(det.fileExistsCheckPassed).toBe(false);
+    expect(det.details.some((d: string) => d.includes('Working directory does not exist'))).toBe(true);
   });
 
   it('rejects relative path traversal (..)', () => {
@@ -458,5 +469,25 @@ describe('pass/fail logic', () => {
     const result = makeResult({ output: 'some output', skillLoads: [] });
     const det = scoreDeterministic(task, result)!;
     expect(det.passed).toBe(true); // Passed because skill wasn't activated
+  });
+
+  it('ignores non-array array-typed fields without crashing', () => {
+    // Simulates YAML like `expect_contains: "hello"` (string instead of array)
+    const task = makeTask({
+      expectContains: 'hello' as unknown as string[],
+      expectNotContains: 'bad' as unknown as string[],
+      expectRegex: 'world' as unknown as string[],
+      expectToolCalls: 'Read' as unknown as string[],
+      expectNoToolCalls: 'Write' as unknown as string[],
+      expectFileExists: 'file.txt' as unknown as string[],
+    });
+    const result = makeResult({ output: 'hello world' });
+    const det = scoreDeterministic(task, result)!;
+    expect(det.containsCheckPassed).toBeNull();
+    expect(det.notContainsCheckPassed).toBeNull();
+    expect(det.regexCheckPassed).toBeNull();
+    expect(det.expectedToolsCalled).toBeNull();
+    expect(det.unexpectedToolsCalled).toBeNull();
+    expect(det.fileExistsCheckPassed).toBeNull();
   });
 });

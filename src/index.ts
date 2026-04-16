@@ -64,6 +64,7 @@ export { createToolPolicy } from './runner/security.js';
 // Scorer
 export { scoreTask, scoreAll } from './scorer/scorer.js';
 export { scoreDeterministic } from './scorer/deterministic.js';
+export type { DeterministicOptions } from './scorer/deterministic.js';
 export { SkillJudge, blindCompareAll, BLIND_BIAS_THRESHOLD } from './scorer/judge.js';
 export { DEFAULT_CONCURRENCY, DEFAULT_RUNNER_CONCURRENCY, withConcurrencyLimit } from './utils/concurrency.js';
 export type { BlindCompareOptions } from './scorer/judge.js';
