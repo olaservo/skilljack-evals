@@ -54,6 +54,13 @@ export interface EvalConfig {
 
   // Security
   allowedWriteDirs: string[];
+
+  // Response cache
+  cache: {
+    enabled: boolean;
+    dir: string;
+    ttlHours: number;
+  };
 }
 
 /**
@@ -78,6 +85,11 @@ export const DEFAULT_CONFIG: EvalConfig = {
   discoveryThreshold: 0.8,
   scoreThreshold: 4.0,
   allowedWriteDirs: ['./results/', './fixtures/'],
+  cache: {
+    enabled: true,
+    dir: './results/.cache',
+    ttlHours: 168,
+  },
 };
 
 /**
@@ -113,6 +125,11 @@ interface RawConfigFile {
     exit_on_failure?: boolean;
     github_summary?: boolean;
     html_report?: boolean;
+  };
+  cache?: {
+    enabled?: boolean;
+    dir?: string;
+    ttl_hours?: number;
   };
 }
 
@@ -160,6 +177,14 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
     if (raw.ci?.github_summary !== undefined) config.githubSummary = raw.ci.github_summary;
     if (raw.ci?.html_report !== undefined) config.htmlReport = raw.ci.html_report;
 
+    if (raw.cache) {
+      config.cache = {
+        enabled: raw.cache.enabled ?? DEFAULT_CONFIG.cache.enabled,
+        dir: raw.cache.dir ?? DEFAULT_CONFIG.cache.dir,
+        ttlHours: raw.cache.ttl_hours ?? DEFAULT_CONFIG.cache.ttlHours,
+      };
+    }
+
     return config;
   } catch (err: unknown) {
     // File not found is fine — use defaults
@@ -186,6 +211,9 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
  * - EVAL_SCORE_THRESHOLD: Min avg score 1-5 (default: 4.0)
  * - EVAL_GITHUB_SUMMARY: Write GitHub Actions summary (default: false)
  * - EVAL_HTML_REPORT: Generate HTML report (default: true)
+ * - EVAL_CACHE_ENABLED: Enable/disable response cache (default: true)
+ * - EVAL_CACHE_DIR: Directory for cached responses (default: './results/.cache')
+ * - EVAL_CACHE_TTL_HOURS: Cache entry TTL in hours (default: 168)
  */
 function loadEnvConfig(): Partial<EvalConfig> {
   const config: Partial<EvalConfig> = {};
@@ -228,6 +256,25 @@ function loadEnvConfig(): Partial<EvalConfig> {
     config.htmlReport = process.env.EVAL_HTML_REPORT.toLowerCase() !== 'false';
   }
 
+  const cacheTtl = parseInt(process.env.EVAL_CACHE_TTL_HOURS || '', 10);
+  const hasAnyCacheEnv = process.env.EVAL_CACHE_ENABLED !== undefined || process.env.EVAL_CACHE_DIR || !isNaN(cacheTtl);
+  if (hasAnyCacheEnv) {
+    // Only include fields explicitly set via env vars to avoid overriding YAML config
+    const cacheOverrides: Partial<EvalConfig['cache']> = {};
+    if (process.env.EVAL_CACHE_ENABLED !== undefined) {
+      cacheOverrides.enabled = process.env.EVAL_CACHE_ENABLED !== 'false';
+    }
+    if (process.env.EVAL_CACHE_DIR) {
+      cacheOverrides.dir = process.env.EVAL_CACHE_DIR;
+    }
+    if (!isNaN(cacheTtl)) {
+      cacheOverrides.ttlHours = cacheTtl;
+    }
+    config.cache = Object.fromEntries(
+      Object.entries(cacheOverrides).filter(([, v]) => v !== undefined)
+    ) as EvalConfig['cache'];
+  }
+
   return config;
 }
 
@@ -252,6 +299,7 @@ function mergeConfigs(...configs: Partial<EvalConfig>[]): EvalConfig {
     if (config.discoveryThreshold !== undefined) result.discoveryThreshold = config.discoveryThreshold;
     if (config.scoreThreshold !== undefined) result.scoreThreshold = config.scoreThreshold;
     if (config.allowedWriteDirs !== undefined) result.allowedWriteDirs = config.allowedWriteDirs;
+    if (config.cache !== undefined) result.cache = { ...result.cache, ...config.cache };
   }
 
   return result;

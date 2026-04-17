@@ -39,6 +39,7 @@ import type {
 } from './types.js';
 import { loadFeedback, writeFeedbackTemplate } from './feedback.js';
 import { SkillJudge, blindCompareAll } from './scorer/judge.js';
+import { ResponseCache } from './cache/response-cache.js';
 
 /**
  * Load human feedback from a file, validating against known task IDs.
@@ -105,6 +106,10 @@ export interface PipelineOptions {
   compareLabel?: string;
   /** Run blind A/B comparison alongside --compare */
   blindCompare?: boolean;
+  /** Skip reading from cache (still writes new results) */
+  skipCache?: boolean;
+  /** Skip both reading and writing cache */
+  bustCache?: boolean;
 }
 
 export interface PipelineResult {
@@ -134,10 +139,19 @@ interface PhaseResult {
   runDetails: Array<{ result: TaskResult; score: CombinedScore }>[];
 }
 
+/** Cache options passed into runPhase. */
+interface PhaseCacheOptions {
+  cache: ResponseCache;
+  skillsHash: string;
+  skipCache?: boolean;
+}
+
 /**
  * Run a single evaluation phase (with or without skills).
  *
  * Encapsulates: create runner → run N times → score → aggregate.
+ * When cacheOptions is provided, individual task results are cached
+ * so unchanged executions replay from cache.
  */
 async function runPhase(
   phaseLabel: string,
@@ -148,6 +162,7 @@ async function runPhase(
   numRuns: number,
   scorerOptions: ScorerOptions,
   logBaseDir: string,
+  cacheOptions?: PhaseCacheOptions,
 ): Promise<PhaseResult> {
   const runner = await createRunner(config.runnerType, {
     cwd,
@@ -168,10 +183,68 @@ async function runPhase(
     }
 
     const runLogDir = numRuns > 1 ? path.join(logBaseDir, `run-${run + 1}`) : logBaseDir;
-    const results = await runner.runAll(
-      evaluation,
-      (task: EvalTask) => new SessionLogger(task.id, runLogDir)
-    );
+
+    // Per-task execution with cache support.
+    // Tasks run sequentially (not via runAll) so each result can be cached individually.
+    const results: TaskResult[] = [];
+    let cacheHits = 0;
+    for (const task of evaluation.tasks) {
+      // Compute cache key if caching is available
+      const cacheKey = cacheOptions
+        ? ResponseCache.computeCacheKey({
+            taskId: task.id,
+            prompt: task.prompt,
+            model: config.defaultAgentModel,
+            runnerType: config.runnerType,
+            skillsHash: cacheOptions.skillsHash,
+            taskTimeoutMs: config.taskTimeoutMs,
+            allowedWriteDirs: config.allowedWriteDirs,
+            runIndex: numRuns > 1 ? run : undefined,
+          })
+        : null;
+
+      // Attempt cache read
+      let result: TaskResult | null = null;
+      if (cacheKey && cacheOptions && !cacheOptions.skipCache) {
+        result = await cacheOptions.cache.get(cacheKey);
+        if (result) {
+          console.log(`Task ${task.id}: cache hit (hash ${cacheKey.substring(0, 8)})`);
+          cacheHits++;
+        }
+      }
+
+      // Cache miss: run the task
+      if (!result) {
+        console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
+        const logger = new SessionLogger(task.id, runLogDir);
+        result = await runner.runTaskWithTimeout(task, undefined, logger);
+
+        if (result.isError) {
+          console.error(`  ERROR: ${result.errorMessage}`);
+        } else {
+          console.log(`  Skills loaded: ${result.skillLoads.join(', ') || 'none'}`);
+          console.log(`  Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
+        }
+
+        // Write to cache (skip for errors)
+        if (cacheKey && cacheOptions && !result.isError) {
+          await cacheOptions.cache.set(cacheKey, result, {
+            taskId: task.id,
+            cacheKeyPrefix: cacheKey.substring(0, 8),
+            modelId: config.defaultAgentModel,
+            runnerType: config.runnerType,
+            skillsHash: cacheOptions.skillsHash,
+          });
+        }
+      }
+
+      results.push(result);
+    }
+
+    if (cacheOptions && cacheHits > 0) {
+      console.log(`\n${cacheHits} of ${evaluation.tasks.length} task(s) served from cache`);
+    }
+
     allResults.push(results);
 
     if (numRuns > 1) {
@@ -378,6 +451,14 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     humanFeedback,
   };
 
+  // 2b. Set up response cache
+  const cacheEnabled = config.cache.enabled && !options.bustCache;
+  const cache = cacheEnabled ? new ResponseCache(config.cache) : null;
+  const skillsHash = cache ? await ResponseCache.hashSkillsDir(skillsDir) : '';
+  const cacheOpts: PhaseCacheOptions | undefined = cache
+    ? { cache, skillsHash, skipCache: options.skipCache }
+    : undefined;
+
   // 3. Run evaluation phase(s)
   let primaryPhase: PhaseResult;
   let comparison: ComparisonData | undefined;
@@ -404,7 +485,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
       const withPhase = await runPhase(
         'With Skill', evaluation, config, cwd, skillsDir, numRuns, scorerOptions,
-        path.join(logDir, 'with-skill'),
+        path.join(logDir, 'with-skill'), cacheOpts,
       );
 
       // Clean up between phases
@@ -429,9 +510,14 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
         isBaseline: isNoSkillBaseline,
       };
 
+      // Recompute skills hash for baseline phase (different skill dir or no skills)
+      const baseCacheOpts: PhaseCacheOptions | undefined = cache
+        ? { cache, skillsHash: await ResponseCache.hashSkillsDir(baseSkillsDir), skipCache: options.skipCache }
+        : undefined;
+
       const basePhase = await runPhase(
         baselineLabel, evaluation, config, cwd, baseSkillsDir, numRuns, baselineScorerOptions,
-        path.join(logDir, 'baseline'),
+        path.join(logDir, 'baseline'), baseCacheOpts,
       );
 
       console.log('\n=== Computing Comparison Deltas ===\n');
@@ -447,7 +533,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     } else {
       // --- Normal mode: single phase ---
       needsCleanup = await setupSkills(skillsDir, config, cwd);
-      primaryPhase = await runPhase('Evaluation', evaluation, config, cwd, skillsDir, numRuns, scorerOptions, logDir);
+      primaryPhase = await runPhase('Evaluation', evaluation, config, cwd, skillsDir, numRuns, scorerOptions, logDir, cacheOpts);
     }
 
     // Compare with previous results if requested (cross-iteration comparison)
