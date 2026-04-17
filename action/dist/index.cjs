@@ -22444,28 +22444,29 @@ var init_js_yaml = __esm({
 });
 
 // dist/src/runner/security.js
+function resolveWriteDirs(allowedWriteDirs, cwd2) {
+  return allowedWriteDirs.map((dir) => {
+    const resolved = path2.resolve(cwd2, dir);
+    return resolved.endsWith(path2.sep) ? resolved : resolved + path2.sep;
+  });
+}
+function isPathInDirs(resolvedPath, resolvedDirs) {
+  return resolvedDirs.some((dir) => resolvedPath.startsWith(dir) || resolvedPath === dir.slice(0, -1));
+}
 function isWriteAllowed(resolvedPath, allowedWriteDirs, cwd2) {
   if (allowedWriteDirs.length === 0)
     return true;
-  const resolvedDirs = allowedWriteDirs.map((dir) => {
-    const resolved = path2.resolve(cwd2, dir);
-    return resolved.endsWith(path2.sep) ? resolved : resolved + path2.sep;
-  });
-  return resolvedDirs.some((dir) => resolvedPath.startsWith(dir) || resolvedPath === dir.slice(0, -1));
+  return isPathInDirs(resolvedPath, resolveWriteDirs(allowedWriteDirs, cwd2));
 }
 function createToolPolicy(allowedWriteDirs, cwd2) {
-  const resolvedDirs = allowedWriteDirs.map((dir) => {
-    const resolved = path2.resolve(cwd2, dir);
-    return resolved.endsWith(path2.sep) ? resolved : resolved + path2.sep;
-  });
+  const resolvedDirs = resolveWriteDirs(allowedWriteDirs, cwd2);
   return async (toolName, input, _options) => {
     if (!["Write", "Edit"].includes(toolName)) {
       return { behavior: "allow", updatedInput: input };
     }
     const filePath = input.file_path || "";
     const resolvedPath = path2.resolve(cwd2, filePath);
-    const isAllowed = resolvedDirs.some((dir) => resolvedPath.startsWith(dir) || resolvedPath === dir.slice(0, -1));
-    if (isAllowed) {
+    if (isPathInDirs(resolvedPath, resolvedDirs)) {
       return { behavior: "allow", updatedInput: input };
     }
     return {
@@ -22479,6 +22480,35 @@ var init_security = __esm({
   "dist/src/runner/security.js"() {
     "use strict";
     path2 = __toESM(require("path"), 1);
+  }
+});
+
+// dist/src/utils/concurrency.js
+async function withConcurrencyLimit(factories, limit = DEFAULT_CONCURRENCY) {
+  if (factories.length === 0)
+    return [];
+  if (limit < 0) {
+    throw new RangeError(`Concurrency limit must be >= 0, got ${limit}`);
+  }
+  const effectiveLimit = limit === 0 ? factories.length : limit;
+  const results = new Array(factories.length);
+  let next = 0;
+  async function worker() {
+    while (next < factories.length) {
+      const idx = next++;
+      results[idx] = await factories[idx]();
+    }
+  }
+  const workers = Array.from({ length: Math.min(effectiveLimit, factories.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+var DEFAULT_CONCURRENCY, DEFAULT_RUNNER_CONCURRENCY;
+var init_concurrency = __esm({
+  "dist/src/utils/concurrency.js"() {
+    "use strict";
+    DEFAULT_CONCURRENCY = 5;
+    DEFAULT_RUNNER_CONCURRENCY = 1;
   }
 });
 
@@ -22514,6 +22544,12 @@ async function loadConfigFile(configPath) {
       config2.scoreThreshold = raw.thresholds.avg_score;
     if (raw.runner?.timeout_ms !== void 0)
       config2.taskTimeoutMs = raw.runner.timeout_ms;
+    if (raw.runner?.concurrency !== void 0) {
+      if (!Number.isInteger(raw.runner.concurrency) || raw.runner.concurrency < 0) {
+        throw new Error(`Invalid runner.concurrency "${raw.runner.concurrency}" in config file. Must be a non-negative integer.`);
+      }
+      config2.concurrency = raw.runner.concurrency;
+    }
     if (raw.runner?.allowed_write_dirs)
       config2.allowedWriteDirs = raw.runner.allowed_write_dirs;
     if (raw.output?.dir)
@@ -22555,6 +22591,14 @@ function loadEnvConfig() {
   const timeout = parseInt(process.env.EVAL_TASK_TIMEOUT_MS || "", 10);
   if (!isNaN(timeout))
     config2.taskTimeoutMs = timeout;
+  const concurrencyRaw = process.env.EVAL_RUNNER_CONCURRENCY;
+  if (concurrencyRaw !== void 0 && concurrencyRaw !== "") {
+    const concurrency = Number(concurrencyRaw);
+    if (!Number.isInteger(concurrency) || concurrency < 0) {
+      throw new Error(`Invalid EVAL_RUNNER_CONCURRENCY "${concurrencyRaw}". Must be a non-negative integer.`);
+    }
+    config2.concurrency = concurrency;
+  }
   if (process.env.EVAL_EXIT_ON_FAILURE !== void 0) {
     config2.exitOnFailure = process.env.EVAL_EXIT_ON_FAILURE !== "false";
   }
@@ -22588,6 +22632,8 @@ function mergeConfigs(...configs) {
       result.reportOutputTruncation = config2.reportOutputTruncation;
     if (config2.taskTimeoutMs !== void 0)
       result.taskTimeoutMs = config2.taskTimeoutMs;
+    if (config2.concurrency !== void 0)
+      result.concurrency = config2.concurrency;
     if (config2.exitOnFailure !== void 0)
       result.exitOnFailure = config2.exitOnFailure;
     if (config2.outputDir !== void 0)
@@ -22627,6 +22673,7 @@ var init_config = __esm({
     init_js_yaml();
     fs4 = __toESM(require("fs/promises"), 1);
     path3 = __toESM(require("path"), 1);
+    init_concurrency();
     VALID_RUNNER_TYPES = ["claude-sdk", "vercel-ai", "openai-agents", "copilot-sdk"];
     DEFAULT_CONFIG = {
       runnerType: "claude-sdk",
@@ -22641,6 +22688,8 @@ var init_config = __esm({
       reportOutputTruncation: 2e3,
       taskTimeoutMs: 3e5,
       // 5 minutes
+      concurrency: DEFAULT_RUNNER_CONCURRENCY,
+      // sequential by default
       exitOnFailure: true,
       outputDir: "./results",
       githubSummary: false,
@@ -22657,6 +22706,7 @@ var init_base_runner = __esm({
   "dist/src/runner/base-runner.js"() {
     "use strict";
     init_config();
+    init_concurrency();
     BaseRunner = class {
       options;
       /** Read-only access to resolved runner options (for testing and introspection). */
@@ -22674,7 +22724,8 @@ var init_base_runner = __esm({
         const resolvedConfig = config2 ?? loadConfigSync();
         this.options = {
           cwd: options.cwd ?? process.cwd(),
-          parallel: options.parallel ?? false,
+          // Precedence: explicit concurrency > parallel (deprecated, maps to unlimited) > config file > default (1)
+          concurrency: options.concurrency ?? (options.parallel ? 0 : void 0) ?? resolvedConfig.concurrency ?? DEFAULT_RUNNER_CONCURRENCY,
           model: options.model ?? resolvedConfig.defaultAgentModel,
           taskTimeoutMs: options.taskTimeoutMs ?? resolvedConfig.taskTimeoutMs,
           allowedWriteDirs: options.allowedWriteDirs ?? resolvedConfig.allowedWriteDirs,
@@ -22698,6 +22749,18 @@ var init_base_runner = __esm({
           isError: true,
           errorMessage
         };
+      }
+      /**
+       * Dynamically import a module, throwing a helpful error if missing.
+       * Protected to allow test subclasses to inject mocks.
+       */
+      async dynamicImport(pkg, installHint) {
+        try {
+          return await Function("pkg", "return import(pkg)")(pkg);
+        } catch (err) {
+          const detail = err instanceof Error ? `: ${err.message}` : "";
+          throw new Error(`${pkg} is required${detail}. Install with: npm install ${installHint}`);
+        }
       }
       /**
        * Execute a task with timeout protection.
@@ -22724,37 +22787,33 @@ var init_base_runner = __esm({
       }
       /**
        * Run all tasks in an evaluation suite.
+       *
+       * Concurrency is controlled by `options.concurrency`:
+       * - 1 = sequential (default)
+       * - 0 = unlimited
+       * - N = at most N tasks in flight
        */
       async runAll(evaluation, createLogger) {
-        if (this.options.parallel) {
-          const results2 = await Promise.allSettled(evaluation.tasks.map((task) => {
+        const limit = this.options.concurrency ?? 1;
+        const factories = evaluation.tasks.map((task) => async () => {
+          console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + "..." : task.prompt}`);
+          try {
             const logger = createLogger?.(task);
-            return this.runTaskWithTimeout(task, void 0, logger);
-          }));
-          return results2.map((result, i) => {
-            if (result.status === "fulfilled") {
-              return result.value;
+            const result = await this.runTaskWithTimeout(task, void 0, logger);
+            if (result.isError) {
+              console.error(`  Task ${task.id} ERROR: ${result.errorMessage}`);
+            } else {
+              console.log(`  Task ${task.id} done \u2014 Skills loaded: ${result.skillLoads.join(", ") || "none"}`);
+              console.log(`  Duration: ${(result.durationMs / 1e3).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
             }
-            const task = evaluation.tasks[i];
-            const errMsg = result.reason?.message || "Unknown error";
+            return result;
+          } catch (error2) {
+            const errMsg = error2 instanceof Error ? error2.message : String(error2);
             console.error(`  Task ${task.id} ERROR: ${errMsg}`);
             return this.createErrorResult(task, errMsg, 0);
-          });
-        }
-        const results = [];
-        for (const task of evaluation.tasks) {
-          console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + "..." : task.prompt}`);
-          const logger = createLogger?.(task);
-          const result = await this.runTaskWithTimeout(task, void 0, logger);
-          results.push(result);
-          if (result.isError) {
-            console.error(`  ERROR: ${result.errorMessage}`);
-          } else {
-            console.log(`  Skills loaded: ${result.skillLoads.join(", ") || "none"}`);
-            console.log(`  Duration: ${(result.durationMs / 1e3).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
           }
-        }
-        return results;
+        });
+        return withConcurrencyLimit(factories, limit);
       }
     };
   }
@@ -22886,18 +22945,6 @@ var init_vercel_ai_runner = __esm({
     execAsync = (0, import_util.promisify)(import_child_process2.exec);
     VercelAiRunner = class extends BaseRunner {
       providerName = "vercel-ai";
-      /**
-       * Dynamically import a module, throwing a helpful error if missing.
-       * Protected to allow test subclasses to inject mocks.
-       */
-      async dynamicImport(pkg, installHint) {
-        try {
-          return await Function("pkg", "return import(pkg)")(pkg);
-        } catch (err) {
-          const detail = err instanceof Error ? `: ${err.message}` : "";
-          throw new Error(`${pkg} is required${detail}. Install with: npm install ${installHint}`);
-        }
-      }
       async runTask(task, logger) {
         const importFn = this.dynamicImport.bind(this);
         const { generateText, tool: defineTool, stepCountIs } = await importFn("ai", "ai");
@@ -23282,18 +23329,6 @@ var init_copilot_sdk_runner = __esm({
         return !!(this.sdkOptions.githubToken ?? process.env.COPILOT_GITHUB_TOKEN);
       }
       /**
-       * Dynamically import a module, throwing a helpful error if missing.
-       * Protected to allow test subclasses to inject mocks.
-       */
-      async dynamicImport(pkg, installHint) {
-        try {
-          return await Function("pkg", "return import(pkg)")(pkg);
-        } catch (err) {
-          const detail = err instanceof Error ? `: ${err.message}` : "";
-          throw new Error(`${pkg} is required${detail}. Install with: npm install ${installHint}`);
-        }
-      }
-      /**
        * Get or create a lazy CopilotClient singleton.
        * Reused across tasks to avoid per-task server startup overhead.
        */
@@ -23504,6 +23539,7 @@ var path10 = __toESM(require("path"), 1);
 var fs13 = __toESM(require("fs/promises"), 1);
 
 // dist/src/utils/format.js
+var ARROW_DIRECTION_EPSILON = 1e-3;
 function formatDelta(value, decimals = 2) {
   if (value === 0)
     return decimals > 0 ? `0.${"0".repeat(decimals)}` : "0";
@@ -45763,6 +45799,7 @@ function getFeedbackForTask(feedback, taskId) {
 
 // dist/src/scorer/judge.js
 init_config();
+init_concurrency();
 var JUDGE_PROMPT_TEMPLATE = `You are an expert evaluator for AI agent skills. Score this skill evaluation result.
 
 ## Task Information
@@ -46298,20 +46335,6 @@ async function blindCompareAll(tasks, judge, options) {
   };
   return { tasks: blindTasks, aggregate };
 }
-var DEFAULT_CONCURRENCY = 5;
-async function withConcurrencyLimit(factories, limit = DEFAULT_CONCURRENCY) {
-  const results = new Array(factories.length);
-  let next = 0;
-  async function worker() {
-    while (next < factories.length) {
-      const idx = next++;
-      results[idx] = await factories[idx]();
-    }
-  }
-  const workers = Array.from({ length: Math.min(limit, factories.length) }, () => worker());
-  await Promise.all(workers);
-  return results;
-}
 function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -46694,15 +46717,6 @@ function aggregateScores(allScores) {
 
 // dist/src/report/comparison.js
 var fs10 = __toESM(require("fs/promises"), 1);
-
-// dist/src/report/format-utils.js
-var ARROW_DIRECTION_EPSILON = 1e-3;
-function formatDelta2(value, suffix = "") {
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${value.toFixed(2)}${suffix}`;
-}
-
-// dist/src/report/comparison.js
 var SIGNIFICANCE_THRESHOLD_ADHERENCE = 1;
 var SIGNIFICANCE_THRESHOLD_WEIGHTED = 0.15;
 async function loadPreviousReport(filePath) {
@@ -46844,10 +46858,10 @@ function formatComparisonMarkdown(comparison) {
   lines.push("");
   lines.push("| Metric | Previous | Current | Delta | |");
   lines.push("|--------|----------|---------|-------|-|");
-  lines.push(summaryRow("Discovery Accuracy", `${(d.previous.discoveryAccuracy * 100).toFixed(1)}%`, `${(d.current.discoveryAccuracy * 100).toFixed(1)}%`, formatDelta2(d.delta.discoveryAccuracy * 100, "%"), d.delta.discoveryAccuracy));
-  lines.push(summaryRow("Avg Adherence", `${d.previous.avgAdherence.toFixed(2)}/5`, `${d.current.avgAdherence.toFixed(2)}/5`, formatDelta2(d.delta.avgAdherence), d.delta.avgAdherence));
-  lines.push(summaryRow("Avg Output Quality", `${d.previous.avgOutputQuality.toFixed(2)}/5`, `${d.current.avgOutputQuality.toFixed(2)}/5`, formatDelta2(d.delta.avgOutputQuality), d.delta.avgOutputQuality));
-  lines.push(summaryRow("Weighted Score", d.previous.avgWeightedScore.toFixed(2), d.current.avgWeightedScore.toFixed(2), formatDelta2(d.delta.avgWeightedScore), d.delta.avgWeightedScore));
+  lines.push(summaryRow("Discovery Accuracy", `${(d.previous.discoveryAccuracy * 100).toFixed(1)}%`, `${(d.current.discoveryAccuracy * 100).toFixed(1)}%`, formatDelta(d.delta.discoveryAccuracy * 100) + "%", d.delta.discoveryAccuracy));
+  lines.push(summaryRow("Avg Adherence", `${d.previous.avgAdherence.toFixed(2)}/5`, `${d.current.avgAdherence.toFixed(2)}/5`, formatDelta(d.delta.avgAdherence), d.delta.avgAdherence));
+  lines.push(summaryRow("Avg Output Quality", `${d.previous.avgOutputQuality.toFixed(2)}/5`, `${d.current.avgOutputQuality.toFixed(2)}/5`, formatDelta(d.delta.avgOutputQuality), d.delta.avgOutputQuality));
+  lines.push(summaryRow("Weighted Score", d.previous.avgWeightedScore.toFixed(2), d.current.avgWeightedScore.toFixed(2), formatDelta(d.delta.avgWeightedScore), d.delta.avgWeightedScore));
   lines.push("");
   if (comparison.taskDeltas.length > 0) {
     lines.push("### Per-Task Changes");
@@ -46880,10 +46894,10 @@ function formatComparisonConsole(comparison) {
   lines.push("-".repeat(50));
   lines.push("  Comparison vs. Previous");
   lines.push("-".repeat(50));
-  lines.push(`  Discovery:    ${formatDelta2(d.discoveryAccuracy * 100)}%`);
-  lines.push(`  Adherence:    ${formatDelta2(d.avgAdherence)}`);
-  lines.push(`  Output:       ${formatDelta2(d.avgOutputQuality)}`);
-  lines.push(`  Weighted:     ${formatDelta2(d.avgWeightedScore)}`);
+  lines.push(`  Discovery:    ${formatDelta(d.discoveryAccuracy * 100)}%`);
+  lines.push(`  Adherence:    ${formatDelta(d.avgAdherence)}`);
+  lines.push(`  Output:       ${formatDelta(d.avgOutputQuality)}`);
+  lines.push(`  Weighted:     ${formatDelta(d.avgWeightedScore)}`);
   const improved = comparison.taskDeltas.filter((t) => t.significantChange === "improved");
   const regressed = comparison.taskDeltas.filter((t) => t.significantChange === "regressed");
   if (improved.length > 0) {
@@ -47488,7 +47502,7 @@ async function runPhase(phaseLabel, evaluation, config2, cwd2, skillsDir, numRun
   const runner = await createRunner(config2.runnerType, {
     cwd: cwd2,
     model: config2.defaultAgentModel,
-    parallel: false,
+    concurrency: config2.concurrency,
     allowedWriteDirs: config2.allowedWriteDirs,
     skillsDir
   }, config2);
@@ -47856,6 +47870,12 @@ async function run() {
     const thresholdDiscovery = parseFloat(core2.getInput("threshold-discovery") || "0.8");
     const thresholdScore = parseFloat(core2.getInput("threshold-score") || "4.0");
     const timeout = parseInt(core2.getInput("timeout") || "300000", 10);
+    const concurrencyRaw = core2.getInput("concurrency") || "1";
+    const concurrency = Number(concurrencyRaw);
+    if (!Number.isInteger(concurrency) || concurrency < 0) {
+      core2.setFailed("concurrency input must be a non-negative integer");
+      return;
+    }
     const tasksFilter = core2.getInput("tasks-filter") || void 0;
     const skillsDir = core2.getInput("skills-dir") || void 0;
     const cwd2 = core2.getInput("working-directory") || process.cwd();
@@ -47900,6 +47920,7 @@ async function run() {
       discoveryThreshold: thresholdDiscovery,
       scoreThreshold: thresholdScore,
       taskTimeoutMs: timeout,
+      concurrency,
       githubSummary: true
     };
     const result = await runPipeline({

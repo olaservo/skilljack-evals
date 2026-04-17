@@ -26,6 +26,12 @@ async function run(): Promise<void> {
     const thresholdDiscovery = parseFloat(core.getInput('threshold-discovery') || '0.8');
     const thresholdScore = parseFloat(core.getInput('threshold-score') || '4.0');
     const timeout = parseInt(core.getInput('timeout') || '300000', 10);
+    const concurrencyRaw = core.getInput('concurrency') || '1';
+    const concurrency = Number(concurrencyRaw);
+    if (!Number.isInteger(concurrency) || concurrency < 0) {
+      core.setFailed('concurrency input must be a non-negative integer');
+      return;
+    }
     const tasksFilter = core.getInput('tasks-filter') || undefined;
     const skillsDir = core.getInput('skills-dir') || undefined;
     const cwd = core.getInput('working-directory') || process.cwd();
@@ -80,6 +86,7 @@ async function run(): Promise<void> {
       discoveryThreshold: thresholdDiscovery,
       scoreThreshold: thresholdScore,
       taskTimeoutMs: timeout,
+      concurrency,
       githubSummary: true,
     };
 

@@ -18,8 +18,13 @@ import type { SessionLogger } from '../session/session-logger.js';
 export interface AgentRunnerOptions {
   /** Working directory for agent execution */
   cwd?: string;
-  /** Run tasks in parallel */
+  /**
+   * Run tasks in parallel (unlimited concurrency).
+   * @deprecated Use `concurrency: 0` for unlimited parallelism instead.
+   */
   parallel?: boolean;
+  /** Max concurrent tasks. 1 = sequential (default), 0 = unlimited, N = bounded. */
+  concurrency?: number;
   /** Model identifier (format depends on runner) */
   model?: string;
   /** Per-task timeout in ms */

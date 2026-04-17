@@ -15,6 +15,7 @@
 import yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { DEFAULT_RUNNER_CONCURRENCY } from './utils/concurrency.js';
 
 export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents' | 'copilot-sdk';
 
@@ -41,6 +42,9 @@ export interface EvalConfig {
 
   // Timeouts
   taskTimeoutMs: number;
+
+  // Concurrency
+  concurrency: number;
 
   // CI/CD behavior
   exitOnFailure: boolean;
@@ -78,6 +82,7 @@ export const DEFAULT_CONFIG: EvalConfig = {
   judgeOutputTruncation: 5000,
   reportOutputTruncation: 2000,
   taskTimeoutMs: 300000, // 5 minutes
+  concurrency: DEFAULT_RUNNER_CONCURRENCY, // sequential by default
   exitOnFailure: true,
   outputDir: './results',
   githubSummary: false,
@@ -114,6 +119,7 @@ interface RawConfigFile {
   runner?: {
     type?: string;
     timeout_ms?: number;
+    concurrency?: number;
     allowed_write_dirs?: string[];
   };
   output?: {
@@ -167,6 +173,12 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
     if (raw.thresholds?.avg_score !== undefined) config.scoreThreshold = raw.thresholds.avg_score;
 
     if (raw.runner?.timeout_ms !== undefined) config.taskTimeoutMs = raw.runner.timeout_ms;
+    if (raw.runner?.concurrency !== undefined) {
+      if (!Number.isInteger(raw.runner.concurrency) || raw.runner.concurrency < 0) {
+        throw new Error(`Invalid runner.concurrency "${raw.runner.concurrency}" in config file. Must be a non-negative integer.`);
+      }
+      config.concurrency = raw.runner.concurrency;
+    }
     if (raw.runner?.allowed_write_dirs) config.allowedWriteDirs = raw.runner.allowed_write_dirs;
 
     if (raw.output?.dir) config.outputDir = raw.output.dir;
@@ -205,6 +217,7 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
  * - EVAL_OUTPUT_TRUNCATION: Max chars to show judge (default: 5000)
  * - EVAL_REPORT_TRUNCATION: Max chars in reports (default: 2000)
  * - EVAL_TASK_TIMEOUT_MS: Per-task timeout in ms (default: 300000)
+ * - EVAL_RUNNER_CONCURRENCY: Max concurrent tasks (default: 1, 0=unlimited)
  * - EVAL_EXIT_ON_FAILURE: Exit with code 1 on failures (default: true)
  * - EVAL_OUTPUT_DIR: Directory for results (default: './results')
  * - EVAL_DISCOVERY_THRESHOLD: Min discovery rate 0-1 (default: 0.8)
@@ -235,6 +248,15 @@ function loadEnvConfig(): Partial<EvalConfig> {
 
   const timeout = parseInt(process.env.EVAL_TASK_TIMEOUT_MS || '', 10);
   if (!isNaN(timeout)) config.taskTimeoutMs = timeout;
+
+  const concurrencyRaw = process.env.EVAL_RUNNER_CONCURRENCY;
+  if (concurrencyRaw !== undefined && concurrencyRaw !== '') {
+    const concurrency = Number(concurrencyRaw);
+    if (!Number.isInteger(concurrency) || concurrency < 0) {
+      throw new Error(`Invalid EVAL_RUNNER_CONCURRENCY "${concurrencyRaw}". Must be a non-negative integer.`);
+    }
+    config.concurrency = concurrency;
+  }
 
   if (process.env.EVAL_EXIT_ON_FAILURE !== undefined) {
     config.exitOnFailure = process.env.EVAL_EXIT_ON_FAILURE !== 'false';
@@ -292,6 +314,7 @@ function mergeConfigs(...configs: Partial<EvalConfig>[]): EvalConfig {
     if (config.judgeOutputTruncation !== undefined) result.judgeOutputTruncation = config.judgeOutputTruncation;
     if (config.reportOutputTruncation !== undefined) result.reportOutputTruncation = config.reportOutputTruncation;
     if (config.taskTimeoutMs !== undefined) result.taskTimeoutMs = config.taskTimeoutMs;
+    if (config.concurrency !== undefined) result.concurrency = config.concurrency;
     if (config.exitOnFailure !== undefined) result.exitOnFailure = config.exitOnFailure;
     if (config.outputDir !== undefined) result.outputDir = config.outputDir;
     if (config.githubSummary !== undefined) result.githubSummary = config.githubSummary;

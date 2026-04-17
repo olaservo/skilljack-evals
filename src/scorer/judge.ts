@@ -28,6 +28,7 @@ import {
 } from '../types.js';
 import { getFeedbackForTask } from '../feedback.js';
 import { loadConfigSync } from '../config.js';
+import { withConcurrencyLimit, DEFAULT_CONCURRENCY } from '../utils/concurrency.js';
 
 const JUDGE_PROMPT_TEMPLATE = `You are an expert evaluator for AI agent skills. Score this skill evaluation result.
 
@@ -758,32 +759,6 @@ export async function blindCompareAll(
   };
 
   return { tasks: blindTasks, aggregate };
-}
-
-/** Default maximum number of concurrent API calls to the judge. */
-export const DEFAULT_CONCURRENCY = 5;
-
-/**
- * Run async tasks with a concurrency limit.
- */
-async function withConcurrencyLimit<T>(
-  factories: Array<() => Promise<T>>,
-  limit = DEFAULT_CONCURRENCY,
-): Promise<T[]> {
-  const results: T[] = new Array(factories.length);
-  let next = 0;
-
-  async function worker(): Promise<void> {
-    while (next < factories.length) {
-      // Safe: JS is single-threaded; `next++` is atomic relative to the event loop.
-      const idx = next++;
-      results[idx] = await factories[idx]();
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(limit, factories.length) }, () => worker());
-  await Promise.all(workers);
-  return results;
 }
 
 function capitalize(s: string): string {

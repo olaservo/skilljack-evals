@@ -64,7 +64,8 @@ export { createToolPolicy } from './runner/security.js';
 // Scorer
 export { scoreTask, scoreAll } from './scorer/scorer.js';
 export { scoreDeterministic } from './scorer/deterministic.js';
-export { SkillJudge, blindCompareAll, BLIND_BIAS_THRESHOLD, DEFAULT_CONCURRENCY } from './scorer/judge.js';
+export { SkillJudge, blindCompareAll, BLIND_BIAS_THRESHOLD } from './scorer/judge.js';
+export { DEFAULT_CONCURRENCY, DEFAULT_RUNNER_CONCURRENCY, withConcurrencyLimit } from './utils/concurrency.js';
 export type { BlindCompareOptions } from './scorer/judge.js';
 export { aggregateResults, aggregateScores, computeStddev, FLAKY_STDDEV_THRESHOLD, isFlaky } from './scorer/aggregator.js';
 
