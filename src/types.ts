@@ -14,9 +14,14 @@ export interface EvalCriteria {
 
 export interface DeterministicCheck {
   expectSkillActivation: boolean;
-  expectMarker?: string; // String or regex pattern to match in output
+  expectMarker?: string; // String to match in output (case-insensitive)
   expectToolCalls?: string[]; // Tools that should be called
   expectNoToolCalls?: string[]; // Tools that should NOT be called
+  expectContains?: string[]; // Substrings that must appear in output (case-sensitive)
+  expectNotContains?: string[]; // Substrings that must NOT appear in output (case-sensitive)
+  expectRegex?: string[]; // Regex patterns that must match output
+  expectJavascript?: string; // JS expression evaluated with `output` in scope, must return true
+  expectFileExists?: string[]; // Files that must exist (relative to cwd)
 }
 
 export interface FixtureConfig {
@@ -81,6 +86,11 @@ export interface DeterministicResult {
   markerFound: boolean | null; // null = not tested
   expectedToolsCalled: boolean | null; // null = not tested
   unexpectedToolsCalled: boolean | null; // null = not tested
+  containsCheckPassed: boolean | null; // null = not tested
+  notContainsCheckPassed: boolean | null; // null = not tested
+  regexCheckPassed: boolean | null; // null = not tested
+  javascriptCheckPassed: boolean | null; // null = not tested
+  fileExistsCheckPassed: boolean | null; // null = not tested
   passed: boolean;
   details: string[];
 }

@@ -31,6 +31,8 @@ export interface ScorerOptions {
   humanFeedback?: HumanFeedback;
   /** True for no-skill baseline evaluation — adjusts judge prompt */
   isBaseline?: boolean;
+  /** Working directory for file-based assertions (expect_file_exists) */
+  cwd?: string;
 }
 
 /**
@@ -47,7 +49,7 @@ export async function scoreTask(
   // Run deterministic scoring
   let deterministicResult: DeterministicResult | null = null;
   if (!options.noDeterministic && task.deterministic) {
-    deterministicResult = scoreDeterministic(task, result);
+    deterministicResult = scoreDeterministic(task, result, { cwd: options.cwd });
   }
 
   // Run LLM judge scoring

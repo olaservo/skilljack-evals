@@ -183,8 +183,8 @@ var require_file_command = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.prepareKeyValueMessage = exports2.issueFileCommand = void 0;
-    var crypto = __importStar(require("crypto"));
-    var fs14 = __importStar(require("fs"));
+    var crypto2 = __importStar(require("crypto"));
+    var fs17 = __importStar(require("fs"));
     var os2 = __importStar(require("os"));
     var utils_1 = require_utils();
     function issueFileCommand(command, message) {
@@ -192,16 +192,16 @@ var require_file_command = __commonJS({
       if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
       }
-      if (!fs14.existsSync(filePath)) {
+      if (!fs17.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
       }
-      fs14.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os2.EOL}`, {
+      fs17.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os2.EOL}`, {
         encoding: "utf8"
       });
     }
     exports2.issueFileCommand = issueFileCommand;
     function prepareKeyValueMessage(key, value) {
-      const delimiter = `ghadelimiter_${crypto.randomUUID()}`;
+      const delimiter = `ghadelimiter_${crypto2.randomUUID()}`;
       const convertedValue = (0, utils_1.toCommandValue)(value);
       if (key.includes(delimiter)) {
         throw new Error(`Unexpected input: name should not contain the delimiter "${delimiter}"`);
@@ -998,14 +998,14 @@ var require_util = __commonJS({
         }
         const port = url.port != null ? url.port : url.protocol === "https:" ? 443 : 80;
         let origin = url.origin != null ? url.origin : `${url.protocol}//${url.hostname}:${port}`;
-        let path11 = url.path != null ? url.path : `${url.pathname || ""}${url.search || ""}`;
+        let path14 = url.path != null ? url.path : `${url.pathname || ""}${url.search || ""}`;
         if (origin.endsWith("/")) {
           origin = origin.substring(0, origin.length - 1);
         }
-        if (path11 && !path11.startsWith("/")) {
-          path11 = `/${path11}`;
+        if (path14 && !path14.startsWith("/")) {
+          path14 = `/${path14}`;
         }
-        url = new URL(origin + path11);
+        url = new URL(origin + path14);
       }
       return url;
     }
@@ -2619,20 +2619,20 @@ var require_parseParams = __commonJS({
 var require_basename = __commonJS({
   "node_modules/@fastify/busboy/lib/utils/basename.js"(exports2, module2) {
     "use strict";
-    module2.exports = function basename2(path11) {
-      if (typeof path11 !== "string") {
+    module2.exports = function basename2(path14) {
+      if (typeof path14 !== "string") {
         return "";
       }
-      for (var i = path11.length - 1; i >= 0; --i) {
-        switch (path11.charCodeAt(i)) {
+      for (var i = path14.length - 1; i >= 0; --i) {
+        switch (path14.charCodeAt(i)) {
           case 47:
           // '/'
           case 92:
-            path11 = path11.slice(i + 1);
-            return path11 === ".." || path11 === "." ? "" : path11;
+            path14 = path14.slice(i + 1);
+            return path14 === ".." || path14 === "." ? "" : path14;
         }
       }
-      return path11 === ".." || path11 === "." ? "" : path11;
+      return path14 === ".." || path14 === "." ? "" : path14;
     };
   }
 });
@@ -3636,11 +3636,11 @@ var require_util2 = __commonJS({
     var assert2 = require("assert");
     var { isUint8Array } = require("util/types");
     var supportedHashes = [];
-    var crypto;
+    var crypto2;
     try {
-      crypto = require("crypto");
+      crypto2 = require("crypto");
       const possibleRelevantHashes = ["sha256", "sha384", "sha512"];
-      supportedHashes = crypto.getHashes().filter((hash) => possibleRelevantHashes.includes(hash));
+      supportedHashes = crypto2.getHashes().filter((hash) => possibleRelevantHashes.includes(hash));
     } catch {
     }
     function responseURL(response) {
@@ -3917,7 +3917,7 @@ var require_util2 = __commonJS({
       }
     }
     function bytesMatch(bytes, metadataList) {
-      if (crypto === void 0) {
+      if (crypto2 === void 0) {
         return true;
       }
       const parsedMetadata = parseMetadata(metadataList);
@@ -3932,7 +3932,7 @@ var require_util2 = __commonJS({
       for (const item of metadata) {
         const algorithm = item.algo;
         const expectedValue = item.hash;
-        let actualValue = crypto.createHash(algorithm).update(bytes).digest("base64");
+        let actualValue = crypto2.createHash(algorithm).update(bytes).digest("base64");
         if (actualValue[actualValue.length - 1] === "=") {
           if (actualValue[actualValue.length - 2] === "=") {
             actualValue = actualValue.slice(0, -2);
@@ -4025,8 +4025,8 @@ var require_util2 = __commonJS({
     function createDeferredPromise() {
       let res;
       let rej;
-      const promise = new Promise((resolve6, reject) => {
-        res = resolve6;
+      const promise = new Promise((resolve7, reject) => {
+        res = resolve7;
         rej = reject;
       });
       return { promise, resolve: res, reject: rej };
@@ -5278,8 +5278,8 @@ var require_body = __commonJS({
     var { parseMIMEType, serializeAMimeType } = require_dataURL();
     var random;
     try {
-      const crypto = require("node:crypto");
-      random = (max) => crypto.randomInt(0, max);
+      const crypto2 = require("node:crypto");
+      random = (max) => crypto2.randomInt(0, max);
     } catch {
       random = (max) => Math.floor(Math.random(max));
     }
@@ -5530,8 +5530,8 @@ Content-Type: ${value.type || "application/octet-stream"}\r
                 });
               }
             });
-            const busboyResolve = new Promise((resolve6, reject) => {
-              busboy.on("finish", resolve6);
+            const busboyResolve = new Promise((resolve7, reject) => {
+              busboy.on("finish", resolve7);
               busboy.on("error", (err) => reject(new TypeError(err)));
             });
             if (this.body !== null) for await (const chunk of consumeBody(this[kState].body)) busboy.write(chunk);
@@ -5662,7 +5662,7 @@ var require_request = __commonJS({
     }
     var Request = class _Request {
       constructor(origin, {
-        path: path11,
+        path: path14,
         method,
         body,
         headers,
@@ -5676,11 +5676,11 @@ var require_request = __commonJS({
         throwOnError,
         expectContinue
       }, handler) {
-        if (typeof path11 !== "string") {
+        if (typeof path14 !== "string") {
           throw new InvalidArgumentError("path must be a string");
-        } else if (path11[0] !== "/" && !(path11.startsWith("http://") || path11.startsWith("https://")) && method !== "CONNECT") {
+        } else if (path14[0] !== "/" && !(path14.startsWith("http://") || path14.startsWith("https://")) && method !== "CONNECT") {
           throw new InvalidArgumentError("path must be an absolute URL or start with a slash");
-        } else if (invalidPathRegex.exec(path11) !== null) {
+        } else if (invalidPathRegex.exec(path14) !== null) {
           throw new InvalidArgumentError("invalid request path");
         }
         if (typeof method !== "string") {
@@ -5743,7 +5743,7 @@ var require_request = __commonJS({
         this.completed = false;
         this.aborted = false;
         this.upgrade = upgrade || null;
-        this.path = query2 ? util2.buildURL(path11, query2) : path11;
+        this.path = query2 ? util2.buildURL(path14, query2) : path14;
         this.origin = origin;
         this.idempotent = idempotent == null ? method === "HEAD" || method === "GET" : idempotent;
         this.blocking = blocking == null ? false : blocking;
@@ -6065,9 +6065,9 @@ var require_dispatcher_base = __commonJS({
       }
       close(callback) {
         if (callback === void 0) {
-          return new Promise((resolve6, reject) => {
+          return new Promise((resolve7, reject) => {
             this.close((err, data) => {
-              return err ? reject(err) : resolve6(data);
+              return err ? reject(err) : resolve7(data);
             });
           });
         }
@@ -6105,12 +6105,12 @@ var require_dispatcher_base = __commonJS({
           err = null;
         }
         if (callback === void 0) {
-          return new Promise((resolve6, reject) => {
+          return new Promise((resolve7, reject) => {
             this.destroy(err, (err2, data) => {
               return err2 ? (
                 /* istanbul ignore next: should never error */
                 reject(err2)
-              ) : resolve6(data);
+              ) : resolve7(data);
             });
           });
         }
@@ -6751,9 +6751,9 @@ var require_RedirectHandler = __commonJS({
           return this.handler.onHeaders(statusCode, headers, resume, statusText);
         }
         const { origin, pathname, search } = util2.parseURL(new URL(this.location, this.opts.origin && new URL(this.opts.path, this.opts.origin)));
-        const path11 = search ? `${pathname}${search}` : pathname;
+        const path14 = search ? `${pathname}${search}` : pathname;
         this.opts.headers = cleanRequestHeaders(this.opts.headers, statusCode === 303, this.opts.origin !== origin);
-        this.opts.path = path11;
+        this.opts.path = path14;
         this.opts.origin = origin;
         this.opts.maxRedirections = 0;
         this.opts.query = null;
@@ -7170,16 +7170,16 @@ var require_client = __commonJS({
         return this[kNeedDrain] < 2;
       }
       async [kClose]() {
-        return new Promise((resolve6) => {
+        return new Promise((resolve7) => {
           if (!this[kSize]) {
-            resolve6(null);
+            resolve7(null);
           } else {
-            this[kClosedResolve] = resolve6;
+            this[kClosedResolve] = resolve7;
           }
         });
       }
       async [kDestroy](err) {
-        return new Promise((resolve6) => {
+        return new Promise((resolve7) => {
           const requests = this[kQueue].splice(this[kPendingIdx]);
           for (let i = 0; i < requests.length; i++) {
             const request = requests[i];
@@ -7190,7 +7190,7 @@ var require_client = __commonJS({
               this[kClosedResolve]();
               this[kClosedResolve] = null;
             }
-            resolve6();
+            resolve7();
           };
           if (this[kHTTP2Session] != null) {
             util2.destroy(this[kHTTP2Session], err);
@@ -7770,7 +7770,7 @@ var require_client = __commonJS({
         });
       }
       try {
-        const socket = await new Promise((resolve6, reject) => {
+        const socket = await new Promise((resolve7, reject) => {
           client[kConnector]({
             host,
             hostname: hostname2,
@@ -7782,7 +7782,7 @@ var require_client = __commonJS({
             if (err) {
               reject(err);
             } else {
-              resolve6(socket2);
+              resolve7(socket2);
             }
           });
         });
@@ -7993,7 +7993,7 @@ var require_client = __commonJS({
         writeH2(client, client[kHTTP2Session], request);
         return;
       }
-      const { body, method, path: path11, host, upgrade, headers, blocking, reset } = request;
+      const { body, method, path: path14, host, upgrade, headers, blocking, reset } = request;
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body && typeof body.read === "function") {
         body.read(0);
@@ -8043,7 +8043,7 @@ var require_client = __commonJS({
       if (blocking) {
         socket[kBlocking] = true;
       }
-      let header = `${method} ${path11} HTTP/1.1\r
+      let header = `${method} ${path14} HTTP/1.1\r
 `;
       if (typeof host === "string") {
         header += `host: ${host}\r
@@ -8106,7 +8106,7 @@ upgrade: ${upgrade}\r
       return true;
     }
     function writeH2(client, session, request) {
-      const { body, method, path: path11, host, upgrade, expectContinue, signal, headers: reqHeaders } = request;
+      const { body, method, path: path14, host, upgrade, expectContinue, signal, headers: reqHeaders } = request;
       let headers;
       if (typeof reqHeaders === "string") headers = Request[kHTTP2CopyHeaders](reqHeaders.trim());
       else headers = reqHeaders;
@@ -8149,7 +8149,7 @@ upgrade: ${upgrade}\r
         });
         return true;
       }
-      headers[HTTP2_HEADER_PATH] = path11;
+      headers[HTTP2_HEADER_PATH] = path14;
       headers[HTTP2_HEADER_SCHEME] = "https";
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body && typeof body.read === "function") {
@@ -8406,12 +8406,12 @@ upgrade: ${upgrade}\r
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve6, reject) => {
+      const waitForDrain = () => new Promise((resolve7, reject) => {
         assert2(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve6;
+          callback = resolve7;
         }
       });
       if (client[kHTTPConnVersion] === "h2") {
@@ -8756,8 +8756,8 @@ var require_pool_base = __commonJS({
         if (this[kQueue].isEmpty()) {
           return Promise.all(this[kClients].map((c) => c.close()));
         } else {
-          return new Promise((resolve6) => {
-            this[kClosedResolve] = resolve6;
+          return new Promise((resolve7) => {
+            this[kClosedResolve] = resolve7;
           });
         }
       }
@@ -9335,7 +9335,7 @@ var require_readable = __commonJS({
         if (this.closed) {
           return Promise.resolve(null);
         }
-        return new Promise((resolve6, reject) => {
+        return new Promise((resolve7, reject) => {
           const signalListenerCleanup = signal ? util2.addAbortListener(signal, () => {
             this.destroy();
           }) : noop;
@@ -9344,7 +9344,7 @@ var require_readable = __commonJS({
             if (signal && signal.aborted) {
               reject(signal.reason || Object.assign(new Error("The operation was aborted"), { name: "AbortError" }));
             } else {
-              resolve6(null);
+              resolve7(null);
             }
           }).on("error", noop).on("data", function(chunk) {
             limit -= chunk.length;
@@ -9366,11 +9366,11 @@ var require_readable = __commonJS({
         throw new TypeError("unusable");
       }
       assert2(!stream[kConsume]);
-      return new Promise((resolve6, reject) => {
+      return new Promise((resolve7, reject) => {
         stream[kConsume] = {
           type: type2,
           stream,
-          resolve: resolve6,
+          resolve: resolve7,
           reject,
           length: 0,
           body: []
@@ -9405,12 +9405,12 @@ var require_readable = __commonJS({
       }
     }
     function consumeEnd(consume2) {
-      const { type: type2, body, resolve: resolve6, stream, length } = consume2;
+      const { type: type2, body, resolve: resolve7, stream, length } = consume2;
       try {
         if (type2 === "text") {
-          resolve6(toUSVString(Buffer.concat(body)));
+          resolve7(toUSVString(Buffer.concat(body)));
         } else if (type2 === "json") {
-          resolve6(JSON.parse(Buffer.concat(body)));
+          resolve7(JSON.parse(Buffer.concat(body)));
         } else if (type2 === "arrayBuffer") {
           const dst = new Uint8Array(length);
           let pos = 0;
@@ -9418,12 +9418,12 @@ var require_readable = __commonJS({
             dst.set(buf, pos);
             pos += buf.byteLength;
           }
-          resolve6(dst.buffer);
+          resolve7(dst.buffer);
         } else if (type2 === "blob") {
           if (!Blob2) {
             Blob2 = require("buffer").Blob;
           }
-          resolve6(new Blob2(body, { type: stream[kContentType] }));
+          resolve7(new Blob2(body, { type: stream[kContentType] }));
         }
         consumeFinish(consume2);
       } catch (err) {
@@ -9678,9 +9678,9 @@ var require_api_request = __commonJS({
     };
     function request(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve6, reject) => {
+        return new Promise((resolve7, reject) => {
           request.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve6(data);
+            return err ? reject(err) : resolve7(data);
           });
         });
       }
@@ -9853,9 +9853,9 @@ var require_api_stream = __commonJS({
     };
     function stream(opts, factory, callback) {
       if (callback === void 0) {
-        return new Promise((resolve6, reject) => {
+        return new Promise((resolve7, reject) => {
           stream.call(this, opts, factory, (err, data) => {
-            return err ? reject(err) : resolve6(data);
+            return err ? reject(err) : resolve7(data);
           });
         });
       }
@@ -10136,9 +10136,9 @@ var require_api_upgrade = __commonJS({
     };
     function upgrade(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve6, reject) => {
+        return new Promise((resolve7, reject) => {
           upgrade.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve6(data);
+            return err ? reject(err) : resolve7(data);
           });
         });
       }
@@ -10227,9 +10227,9 @@ var require_api_connect = __commonJS({
     };
     function connect(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve6, reject) => {
+        return new Promise((resolve7, reject) => {
           connect.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve6(data);
+            return err ? reject(err) : resolve7(data);
           });
         });
       }
@@ -10389,20 +10389,20 @@ var require_mock_utils = __commonJS({
       }
       return true;
     }
-    function safeUrl(path11) {
-      if (typeof path11 !== "string") {
-        return path11;
+    function safeUrl(path14) {
+      if (typeof path14 !== "string") {
+        return path14;
       }
-      const pathSegments = path11.split("?");
+      const pathSegments = path14.split("?");
       if (pathSegments.length !== 2) {
-        return path11;
+        return path14;
       }
       const qp = new URLSearchParams(pathSegments.pop());
       qp.sort();
       return [...pathSegments, qp.toString()].join("?");
     }
-    function matchKey(mockDispatch2, { path: path11, method, body, headers }) {
-      const pathMatch = matchValue(mockDispatch2.path, path11);
+    function matchKey(mockDispatch2, { path: path14, method, body, headers }) {
+      const pathMatch = matchValue(mockDispatch2.path, path14);
       const methodMatch = matchValue(mockDispatch2.method, method);
       const bodyMatch = typeof mockDispatch2.body !== "undefined" ? matchValue(mockDispatch2.body, body) : true;
       const headersMatch = matchHeaders(mockDispatch2, headers);
@@ -10420,7 +10420,7 @@ var require_mock_utils = __commonJS({
     function getMockDispatch(mockDispatches, key) {
       const basePath = key.query ? buildURL(key.path, key.query) : key.path;
       const resolvedPath = typeof basePath === "string" ? safeUrl(basePath) : basePath;
-      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path11 }) => matchValue(safeUrl(path11), resolvedPath));
+      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path14 }) => matchValue(safeUrl(path14), resolvedPath));
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for path '${resolvedPath}'`);
       }
@@ -10457,9 +10457,9 @@ var require_mock_utils = __commonJS({
       }
     }
     function buildKey(opts) {
-      const { path: path11, method, body, headers, query: query2 } = opts;
+      const { path: path14, method, body, headers, query: query2 } = opts;
       return {
-        path: path11,
+        path: path14,
         method,
         body,
         headers,
@@ -10908,10 +10908,10 @@ var require_pending_interceptors_formatter = __commonJS({
       }
       format(pendingInterceptors) {
         const withPrettyHeaders = pendingInterceptors.map(
-          ({ method, path: path11, data: { statusCode }, persist, times, timesInvoked, origin }) => ({
+          ({ method, path: path14, data: { statusCode }, persist, times, timesInvoked, origin }) => ({
             Method: method,
             Origin: origin,
-            Path: path11,
+            Path: path14,
             "Status code": statusCode,
             Persistent: persist ? "\u2705" : "\u274C",
             Invocations: timesInvoked,
@@ -13851,7 +13851,7 @@ var require_fetch = __commonJS({
       async function dispatch({ body }) {
         const url = requestCurrentURL(request);
         const agent = fetchParams.controller.dispatcher;
-        return new Promise((resolve6, reject) => agent.dispatch(
+        return new Promise((resolve7, reject) => agent.dispatch(
           {
             path: url.pathname + url.search,
             origin: url.origin,
@@ -13927,7 +13927,7 @@ var require_fetch = __commonJS({
                   }
                 }
               }
-              resolve6({
+              resolve7({
                 status,
                 statusText,
                 headersList: headers[kHeadersList],
@@ -13970,7 +13970,7 @@ var require_fetch = __commonJS({
                 const val = headersList[n + 1].toString("latin1");
                 headers[kHeadersList].append(key, val);
               }
-              resolve6({
+              resolve7({
                 status,
                 statusText: STATUS_CODES[status],
                 headersList: headers[kHeadersList],
@@ -15531,8 +15531,8 @@ var require_util6 = __commonJS({
         }
       }
     }
-    function validateCookiePath(path11) {
-      for (const char of path11) {
+    function validateCookiePath(path14) {
+      for (const char of path14) {
         const code = char.charCodeAt(0);
         if (code < 33 || char === ";") {
           throw new Error("Invalid cookie path");
@@ -16329,9 +16329,9 @@ var require_connection = __commonJS({
     channels.open = diagnosticsChannel.channel("undici:websocket:open");
     channels.close = diagnosticsChannel.channel("undici:websocket:close");
     channels.socketError = diagnosticsChannel.channel("undici:websocket:socket_error");
-    var crypto;
+    var crypto2;
     try {
-      crypto = require("crypto");
+      crypto2 = require("crypto");
     } catch {
     }
     function establishWebSocketConnection(url, protocols, ws, onEstablish, options) {
@@ -16350,7 +16350,7 @@ var require_connection = __commonJS({
         const headersList = new Headers(options.headers)[kHeadersList];
         request.headersList = headersList;
       }
-      const keyValue = crypto.randomBytes(16).toString("base64");
+      const keyValue = crypto2.randomBytes(16).toString("base64");
       request.headersList.append("sec-websocket-key", keyValue);
       request.headersList.append("sec-websocket-version", "13");
       for (const protocol of protocols) {
@@ -16379,7 +16379,7 @@ var require_connection = __commonJS({
             return;
           }
           const secWSAccept = response.headersList.get("Sec-WebSocket-Accept");
-          const digest = crypto.createHash("sha1").update(keyValue + uid).digest("base64");
+          const digest = crypto2.createHash("sha1").update(keyValue + uid).digest("base64");
           if (secWSAccept !== digest) {
             failWebsocketConnection(ws, "Incorrect hash received in Sec-WebSocket-Accept header.");
             return;
@@ -16459,9 +16459,9 @@ var require_frame = __commonJS({
   "node_modules/undici/lib/websocket/frame.js"(exports2, module2) {
     "use strict";
     var { maxUnsigned16Bit } = require_constants5();
-    var crypto;
+    var crypto2;
     try {
-      crypto = require("crypto");
+      crypto2 = require("crypto");
     } catch {
     }
     var WebsocketFrameSend = class {
@@ -16470,7 +16470,7 @@ var require_frame = __commonJS({
        */
       constructor(data) {
         this.frameData = data;
-        this.maskKey = crypto.randomBytes(4);
+        this.maskKey = crypto2.randomBytes(4);
       }
       createFrame(opcode) {
         const bodyLength = this.frameData?.byteLength ?? 0;
@@ -17212,11 +17212,11 @@ var require_undici = __commonJS({
           if (typeof opts.path !== "string") {
             throw new InvalidArgumentError("invalid opts.path");
           }
-          let path11 = opts.path;
+          let path14 = opts.path;
           if (!opts.path.startsWith("/")) {
-            path11 = `/${path11}`;
+            path14 = `/${path14}`;
           }
-          url = new URL(util2.parseOrigin(url).origin + path11);
+          url = new URL(util2.parseOrigin(url).origin + path14);
         } else {
           if (!opts) {
             opts = typeof url === "object" ? url : {};
@@ -17324,11 +17324,11 @@ var require_lib = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
-        return value instanceof P ? value : new P(function(resolve6) {
-          resolve6(value);
+        return value instanceof P ? value : new P(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P || (P = Promise))(function(resolve6, reject) {
+      return new (P || (P = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -17344,7 +17344,7 @@ var require_lib = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -17430,26 +17430,26 @@ var require_lib = __commonJS({
       }
       readBody() {
         return __awaiter(this, void 0, void 0, function* () {
-          return new Promise((resolve6) => __awaiter(this, void 0, void 0, function* () {
+          return new Promise((resolve7) => __awaiter(this, void 0, void 0, function* () {
             let output = Buffer.alloc(0);
             this.message.on("data", (chunk) => {
               output = Buffer.concat([output, chunk]);
             });
             this.message.on("end", () => {
-              resolve6(output.toString());
+              resolve7(output.toString());
             });
           }));
         });
       }
       readBodyBuffer() {
         return __awaiter(this, void 0, void 0, function* () {
-          return new Promise((resolve6) => __awaiter(this, void 0, void 0, function* () {
+          return new Promise((resolve7) => __awaiter(this, void 0, void 0, function* () {
             const chunks = [];
             this.message.on("data", (chunk) => {
               chunks.push(chunk);
             });
             this.message.on("end", () => {
-              resolve6(Buffer.concat(chunks));
+              resolve7(Buffer.concat(chunks));
             });
           }));
         });
@@ -17658,14 +17658,14 @@ var require_lib = __commonJS({
        */
       requestRaw(info, data) {
         return __awaiter(this, void 0, void 0, function* () {
-          return new Promise((resolve6, reject) => {
+          return new Promise((resolve7, reject) => {
             function callbackForResult(err, res) {
               if (err) {
                 reject(err);
               } else if (!res) {
                 reject(new Error("Unknown error"));
               } else {
-                resolve6(res);
+                resolve7(res);
               }
             }
             this.requestRawWithCallback(info, data, callbackForResult);
@@ -17847,12 +17847,12 @@ var require_lib = __commonJS({
         return __awaiter(this, void 0, void 0, function* () {
           retryNumber = Math.min(ExponentialBackoffCeiling, retryNumber);
           const ms = ExponentialBackoffTimeSlice * Math.pow(2, retryNumber);
-          return new Promise((resolve6) => setTimeout(() => resolve6(), ms));
+          return new Promise((resolve7) => setTimeout(() => resolve7(), ms));
         });
       }
       _processResponse(res, options) {
         return __awaiter(this, void 0, void 0, function* () {
-          return new Promise((resolve6, reject) => __awaiter(this, void 0, void 0, function* () {
+          return new Promise((resolve7, reject) => __awaiter(this, void 0, void 0, function* () {
             const statusCode = res.message.statusCode || 0;
             const response = {
               statusCode,
@@ -17860,7 +17860,7 @@ var require_lib = __commonJS({
               headers: {}
             };
             if (statusCode === HttpCodes.NotFound) {
-              resolve6(response);
+              resolve7(response);
             }
             function dateTimeDeserializer(key, value) {
               if (typeof value === "string") {
@@ -17899,7 +17899,7 @@ var require_lib = __commonJS({
               err.result = response.result;
               reject(err);
             } else {
-              resolve6(response);
+              resolve7(response);
             }
           }));
         });
@@ -17916,11 +17916,11 @@ var require_auth = __commonJS({
     "use strict";
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
-        return value instanceof P ? value : new P(function(resolve6) {
-          resolve6(value);
+        return value instanceof P ? value : new P(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P || (P = Promise))(function(resolve6, reject) {
+      return new (P || (P = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -17936,7 +17936,7 @@ var require_auth = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18020,11 +18020,11 @@ var require_oidc_utils = __commonJS({
     "use strict";
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
-        return value instanceof P ? value : new P(function(resolve6) {
-          resolve6(value);
+        return value instanceof P ? value : new P(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P || (P = Promise))(function(resolve6, reject) {
+      return new (P || (P = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -18040,7 +18040,7 @@ var require_oidc_utils = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18118,11 +18118,11 @@ var require_summary = __commonJS({
     "use strict";
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
-        return value instanceof P ? value : new P(function(resolve6) {
-          resolve6(value);
+        return value instanceof P ? value : new P(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P || (P = Promise))(function(resolve6, reject) {
+      return new (P || (P = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -18138,7 +18138,7 @@ var require_summary = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18147,7 +18147,7 @@ var require_summary = __commonJS({
     exports2.summary = exports2.markdownSummary = exports2.SUMMARY_DOCS_URL = exports2.SUMMARY_ENV_VAR = void 0;
     var os_1 = require("os");
     var fs_1 = require("fs");
-    var { access, appendFile: appendFile2, writeFile: writeFile5 } = fs_1.promises;
+    var { access, appendFile: appendFile2, writeFile: writeFile7 } = fs_1.promises;
     exports2.SUMMARY_ENV_VAR = "GITHUB_STEP_SUMMARY";
     exports2.SUMMARY_DOCS_URL = "https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary";
     var Summary = class {
@@ -18205,7 +18205,7 @@ var require_summary = __commonJS({
         return __awaiter(this, void 0, void 0, function* () {
           const overwrite = !!(options === null || options === void 0 ? void 0 : options.overwrite);
           const filePath = yield this.filePath();
-          const writeFunc = overwrite ? writeFile5 : appendFile2;
+          const writeFunc = overwrite ? writeFile7 : appendFile2;
           yield writeFunc(filePath, this._buffer, { encoding: "utf8" });
           return this.emptyBuffer();
         });
@@ -18439,7 +18439,7 @@ var require_path_utils = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.toPlatformPath = exports2.toWin32Path = exports2.toPosixPath = void 0;
-    var path11 = __importStar(require("path"));
+    var path14 = __importStar(require("path"));
     function toPosixPath(pth) {
       return pth.replace(/[\\]/g, "/");
     }
@@ -18449,7 +18449,7 @@ var require_path_utils = __commonJS({
     }
     exports2.toWin32Path = toWin32Path;
     function toPlatformPath(pth) {
-      return pth.replace(/[/\\]/g, path11.sep);
+      return pth.replace(/[/\\]/g, path14.sep);
     }
     exports2.toPlatformPath = toPlatformPath;
   }
@@ -18484,11 +18484,11 @@ var require_io_util = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
-        return value instanceof P ? value : new P(function(resolve6) {
-          resolve6(value);
+        return value instanceof P ? value : new P(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P || (P = Promise))(function(resolve6, reject) {
+      return new (P || (P = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -18504,7 +18504,7 @@ var require_io_util = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18512,12 +18512,12 @@ var require_io_util = __commonJS({
     var _a;
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getCmdPath = exports2.tryGetExecutablePath = exports2.isRooted = exports2.isDirectory = exports2.exists = exports2.READONLY = exports2.UV_FS_O_EXLOCK = exports2.IS_WINDOWS = exports2.unlink = exports2.symlink = exports2.stat = exports2.rmdir = exports2.rm = exports2.rename = exports2.readlink = exports2.readdir = exports2.open = exports2.mkdir = exports2.lstat = exports2.copyFile = exports2.chmod = void 0;
-    var fs14 = __importStar(require("fs"));
-    var path11 = __importStar(require("path"));
-    _a = fs14.promises, exports2.chmod = _a.chmod, exports2.copyFile = _a.copyFile, exports2.lstat = _a.lstat, exports2.mkdir = _a.mkdir, exports2.open = _a.open, exports2.readdir = _a.readdir, exports2.readlink = _a.readlink, exports2.rename = _a.rename, exports2.rm = _a.rm, exports2.rmdir = _a.rmdir, exports2.stat = _a.stat, exports2.symlink = _a.symlink, exports2.unlink = _a.unlink;
+    var fs17 = __importStar(require("fs"));
+    var path14 = __importStar(require("path"));
+    _a = fs17.promises, exports2.chmod = _a.chmod, exports2.copyFile = _a.copyFile, exports2.lstat = _a.lstat, exports2.mkdir = _a.mkdir, exports2.open = _a.open, exports2.readdir = _a.readdir, exports2.readlink = _a.readlink, exports2.rename = _a.rename, exports2.rm = _a.rm, exports2.rmdir = _a.rmdir, exports2.stat = _a.stat, exports2.symlink = _a.symlink, exports2.unlink = _a.unlink;
     exports2.IS_WINDOWS = process.platform === "win32";
     exports2.UV_FS_O_EXLOCK = 268435456;
-    exports2.READONLY = fs14.constants.O_RDONLY;
+    exports2.READONLY = fs17.constants.O_RDONLY;
     function exists(fsPath) {
       return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -18562,7 +18562,7 @@ var require_io_util = __commonJS({
         }
         if (stats && stats.isFile()) {
           if (exports2.IS_WINDOWS) {
-            const upperExt = path11.extname(filePath).toUpperCase();
+            const upperExt = path14.extname(filePath).toUpperCase();
             if (extensions.some((validExt) => validExt.toUpperCase() === upperExt)) {
               return filePath;
             }
@@ -18586,11 +18586,11 @@ var require_io_util = __commonJS({
           if (stats && stats.isFile()) {
             if (exports2.IS_WINDOWS) {
               try {
-                const directory = path11.dirname(filePath);
-                const upperName = path11.basename(filePath).toUpperCase();
+                const directory = path14.dirname(filePath);
+                const upperName = path14.basename(filePath).toUpperCase();
                 for (const actualName of yield exports2.readdir(directory)) {
                   if (upperName === actualName.toUpperCase()) {
-                    filePath = path11.join(directory, actualName);
+                    filePath = path14.join(directory, actualName);
                     break;
                   }
                 }
@@ -18657,11 +18657,11 @@ var require_io = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
-        return value instanceof P ? value : new P(function(resolve6) {
-          resolve6(value);
+        return value instanceof P ? value : new P(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P || (P = Promise))(function(resolve6, reject) {
+      return new (P || (P = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -18677,7 +18677,7 @@ var require_io = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18685,7 +18685,7 @@ var require_io = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.findInPath = exports2.which = exports2.mkdirP = exports2.rmRF = exports2.mv = exports2.cp = void 0;
     var assert_1 = require("assert");
-    var path11 = __importStar(require("path"));
+    var path14 = __importStar(require("path"));
     var ioUtil = __importStar(require_io_util());
     function cp(source, dest, options = {}) {
       return __awaiter(this, void 0, void 0, function* () {
@@ -18694,7 +18694,7 @@ var require_io = __commonJS({
         if (destStat && destStat.isFile() && !force) {
           return;
         }
-        const newDest = destStat && destStat.isDirectory() && copySourceDirectory ? path11.join(dest, path11.basename(source)) : dest;
+        const newDest = destStat && destStat.isDirectory() && copySourceDirectory ? path14.join(dest, path14.basename(source)) : dest;
         if (!(yield ioUtil.exists(source))) {
           throw new Error(`no such file or directory: ${source}`);
         }
@@ -18706,7 +18706,7 @@ var require_io = __commonJS({
             yield cpDirRecursive(source, newDest, 0, force);
           }
         } else {
-          if (path11.relative(source, newDest) === "") {
+          if (path14.relative(source, newDest) === "") {
             throw new Error(`'${newDest}' and '${source}' are the same file`);
           }
           yield copyFile2(source, newDest, force);
@@ -18719,7 +18719,7 @@ var require_io = __commonJS({
         if (yield ioUtil.exists(dest)) {
           let destExists = true;
           if (yield ioUtil.isDirectory(dest)) {
-            dest = path11.join(dest, path11.basename(source));
+            dest = path14.join(dest, path14.basename(source));
             destExists = yield ioUtil.exists(dest);
           }
           if (destExists) {
@@ -18730,7 +18730,7 @@ var require_io = __commonJS({
             }
           }
         }
-        yield mkdirP(path11.dirname(dest));
+        yield mkdirP(path14.dirname(dest));
         yield ioUtil.rename(source, dest);
       });
     }
@@ -18793,7 +18793,7 @@ var require_io = __commonJS({
         }
         const extensions = [];
         if (ioUtil.IS_WINDOWS && process.env["PATHEXT"]) {
-          for (const extension of process.env["PATHEXT"].split(path11.delimiter)) {
+          for (const extension of process.env["PATHEXT"].split(path14.delimiter)) {
             if (extension) {
               extensions.push(extension);
             }
@@ -18806,12 +18806,12 @@ var require_io = __commonJS({
           }
           return [];
         }
-        if (tool.includes(path11.sep)) {
+        if (tool.includes(path14.sep)) {
           return [];
         }
         const directories = [];
         if (process.env.PATH) {
-          for (const p of process.env.PATH.split(path11.delimiter)) {
+          for (const p of process.env.PATH.split(path14.delimiter)) {
             if (p) {
               directories.push(p);
             }
@@ -18819,7 +18819,7 @@ var require_io = __commonJS({
         }
         const matches = [];
         for (const directory of directories) {
-          const filePath = yield ioUtil.tryGetExecutablePath(path11.join(directory, tool), extensions);
+          const filePath = yield ioUtil.tryGetExecutablePath(path14.join(directory, tool), extensions);
           if (filePath) {
             matches.push(filePath);
           }
@@ -18905,11 +18905,11 @@ var require_toolrunner = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
-        return value instanceof P ? value : new P(function(resolve6) {
-          resolve6(value);
+        return value instanceof P ? value : new P(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P || (P = Promise))(function(resolve6, reject) {
+      return new (P || (P = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -18925,7 +18925,7 @@ var require_toolrunner = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18935,7 +18935,7 @@ var require_toolrunner = __commonJS({
     var os2 = __importStar(require("os"));
     var events = __importStar(require("events"));
     var child = __importStar(require("child_process"));
-    var path11 = __importStar(require("path"));
+    var path14 = __importStar(require("path"));
     var io = __importStar(require_io());
     var ioUtil = __importStar(require_io_util());
     var timers_1 = require("timers");
@@ -19150,10 +19150,10 @@ var require_toolrunner = __commonJS({
       exec() {
         return __awaiter(this, void 0, void 0, function* () {
           if (!ioUtil.isRooted(this.toolPath) && (this.toolPath.includes("/") || IS_WINDOWS && this.toolPath.includes("\\"))) {
-            this.toolPath = path11.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
+            this.toolPath = path14.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
           }
           this.toolPath = yield io.which(this.toolPath, true);
-          return new Promise((resolve6, reject) => __awaiter(this, void 0, void 0, function* () {
+          return new Promise((resolve7, reject) => __awaiter(this, void 0, void 0, function* () {
             this._debug(`exec tool: ${this.toolPath}`);
             this._debug("arguments:");
             for (const arg of this.args) {
@@ -19236,7 +19236,7 @@ var require_toolrunner = __commonJS({
               if (error2) {
                 reject(error2);
               } else {
-                resolve6(exitCode);
+                resolve7(exitCode);
               }
             });
             if (this.options.input) {
@@ -19389,11 +19389,11 @@ var require_exec = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
-        return value instanceof P ? value : new P(function(resolve6) {
-          resolve6(value);
+        return value instanceof P ? value : new P(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P || (P = Promise))(function(resolve6, reject) {
+      return new (P || (P = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -19409,7 +19409,7 @@ var require_exec = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -19500,11 +19500,11 @@ var require_platform = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
-        return value instanceof P ? value : new P(function(resolve6) {
-          resolve6(value);
+        return value instanceof P ? value : new P(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P || (P = Promise))(function(resolve6, reject) {
+      return new (P || (P = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -19520,7 +19520,7 @@ var require_platform = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -19619,11 +19619,11 @@ var require_core = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
-        return value instanceof P ? value : new P(function(resolve6) {
-          resolve6(value);
+        return value instanceof P ? value : new P(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P || (P = Promise))(function(resolve6, reject) {
+      return new (P || (P = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -19639,7 +19639,7 @@ var require_core = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -19650,7 +19650,7 @@ var require_core = __commonJS({
     var file_command_1 = require_file_command();
     var utils_1 = require_utils();
     var os2 = __importStar(require("os"));
-    var path11 = __importStar(require("path"));
+    var path14 = __importStar(require("path"));
     var oidc_utils_1 = require_oidc_utils();
     var ExitCode;
     (function(ExitCode2) {
@@ -19678,7 +19678,7 @@ var require_core = __commonJS({
       } else {
         (0, command_1.issueCommand)("add-path", {}, inputPath);
       }
-      process.env["PATH"] = `${inputPath}${path11.delimiter}${process.env["PATH"]}`;
+      process.env["PATH"] = `${inputPath}${path14.delimiter}${process.env["PATH"]}`;
     }
     exports2.addPath = addPath;
     function getInput2(name, options) {
@@ -22562,6 +22562,15 @@ async function loadConfigFile(configPath) {
       config2.exitOnFailure = raw.ci.exit_on_failure;
     if (raw.ci?.github_summary !== void 0)
       config2.githubSummary = raw.ci.github_summary;
+    if (raw.ci?.html_report !== void 0)
+      config2.htmlReport = raw.ci.html_report;
+    if (raw.cache) {
+      config2.cache = {
+        enabled: raw.cache.enabled ?? DEFAULT_CONFIG.cache.enabled,
+        dir: raw.cache.dir ?? DEFAULT_CONFIG.cache.dir,
+        ttlHours: raw.cache.ttl_hours ?? DEFAULT_CONFIG.cache.ttlHours
+      };
+    }
     return config2;
   } catch (err) {
     if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
@@ -22613,6 +22622,24 @@ function loadEnvConfig() {
   if (process.env.EVAL_GITHUB_SUMMARY !== void 0) {
     config2.githubSummary = process.env.EVAL_GITHUB_SUMMARY === "true";
   }
+  if (process.env.EVAL_HTML_REPORT !== void 0) {
+    config2.htmlReport = process.env.EVAL_HTML_REPORT.toLowerCase() !== "false";
+  }
+  const cacheTtl = parseInt(process.env.EVAL_CACHE_TTL_HOURS || "", 10);
+  const hasAnyCacheEnv = process.env.EVAL_CACHE_ENABLED !== void 0 || process.env.EVAL_CACHE_DIR || !isNaN(cacheTtl);
+  if (hasAnyCacheEnv) {
+    const cacheOverrides = {};
+    if (process.env.EVAL_CACHE_ENABLED !== void 0) {
+      cacheOverrides.enabled = process.env.EVAL_CACHE_ENABLED !== "false";
+    }
+    if (process.env.EVAL_CACHE_DIR) {
+      cacheOverrides.dir = process.env.EVAL_CACHE_DIR;
+    }
+    if (!isNaN(cacheTtl)) {
+      cacheOverrides.ttlHours = cacheTtl;
+    }
+    config2.cache = Object.fromEntries(Object.entries(cacheOverrides).filter(([, v]) => v !== void 0));
+  }
   return config2;
 }
 function mergeConfigs(...configs) {
@@ -22640,12 +22667,16 @@ function mergeConfigs(...configs) {
       result.outputDir = config2.outputDir;
     if (config2.githubSummary !== void 0)
       result.githubSummary = config2.githubSummary;
+    if (config2.htmlReport !== void 0)
+      result.htmlReport = config2.htmlReport;
     if (config2.discoveryThreshold !== void 0)
       result.discoveryThreshold = config2.discoveryThreshold;
     if (config2.scoreThreshold !== void 0)
       result.scoreThreshold = config2.scoreThreshold;
     if (config2.allowedWriteDirs !== void 0)
       result.allowedWriteDirs = config2.allowedWriteDirs;
+    if (config2.cache !== void 0)
+      result.cache = { ...result.cache, ...config2.cache };
   }
   return result;
 }
@@ -22693,9 +22724,15 @@ var init_config = __esm({
       exitOnFailure: true,
       outputDir: "./results",
       githubSummary: false,
+      htmlReport: true,
       discoveryThreshold: 0.8,
       scoreThreshold: 4,
-      allowedWriteDirs: ["./results/", "./fixtures/"]
+      allowedWriteDirs: ["./results/", "./fixtures/"],
+      cache: {
+        enabled: true,
+        dir: "./results/.cache",
+        ttlHours: 168
+      }
     };
   }
 });
@@ -23535,8 +23572,8 @@ var init_copilot_sdk_runner = __esm({
 var core2 = __toESM(require_core(), 1);
 
 // dist/src/pipeline.js
-var path10 = __toESM(require("path"), 1);
-var fs13 = __toESM(require("fs/promises"), 1);
+var path13 = __toESM(require("path"), 1);
+var fs16 = __toESM(require("fs/promises"), 1);
 
 // dist/src/utils/format.js
 var ARROW_DIRECTION_EPSILON = 1e-3;
@@ -23617,7 +23654,12 @@ function parseTask(raw, defaults) {
       expectSkillActivation: raw.deterministic.expect_skill_activation ?? true,
       expectMarker: raw.deterministic.expect_marker,
       expectToolCalls: raw.deterministic.expect_tool_calls,
-      expectNoToolCalls: raw.deterministic.expect_no_tool_calls
+      expectNoToolCalls: raw.deterministic.expect_no_tool_calls,
+      expectContains: raw.deterministic.expect_contains,
+      expectNotContains: raw.deterministic.expect_not_contains,
+      expectRegex: raw.deterministic.expect_regex,
+      expectJavascript: raw.deterministic.expect_javascript,
+      expectFileExists: raw.deterministic.expect_file_exists
     };
   }
   let fixture;
@@ -26545,7 +26587,7 @@ var require_compile = __commonJS2((exports2) => {
     const schOrFunc = root2.refs[ref];
     if (schOrFunc)
       return schOrFunc;
-    let _sch = resolve6.call(this, root2, ref);
+    let _sch = resolve7.call(this, root2, ref);
     if (_sch === void 0) {
       const schema2 = (_a = root2.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
       const { schemaId } = this.opts;
@@ -26572,7 +26614,7 @@ var require_compile = __commonJS2((exports2) => {
   function sameSchemaEnv(s1, s2) {
     return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
   }
-  function resolve6(root2, ref) {
+  function resolve7(root2, ref) {
     let sch;
     while (typeof (sch = this.refs[ref]) == "string")
       ref = sch;
@@ -26956,8 +26998,8 @@ var require_schemes = __commonJS2((exports2, module2) => {
       wsComponents.secure = void 0;
     }
     if (wsComponents.resourceName) {
-      const [path11, query2] = wsComponents.resourceName.split("?");
-      wsComponents.path = path11 && path11 !== "/" ? path11 : void 0;
+      const [path14, query2] = wsComponents.resourceName.split("?");
+      wsComponents.path = path14 && path14 !== "/" ? path14 : void 0;
       wsComponents.query = query2;
       wsComponents.resourceName = void 0;
     }
@@ -27070,54 +27112,54 @@ var require_fast_uri = __commonJS2((exports2, module2) => {
     }
     return uri;
   }
-  function resolve6(baseURI, relativeURI, options) {
+  function resolve7(baseURI, relativeURI, options) {
     const schemelessOptions = Object.assign({ scheme: "null" }, options);
     const resolved = resolveComponents(parse6(baseURI, schemelessOptions), parse6(relativeURI, schemelessOptions), schemelessOptions, true);
     return serialize(resolved, { ...schemelessOptions, skipEscape: true });
   }
-  function resolveComponents(base, relative, options, skipNormalization) {
+  function resolveComponents(base, relative2, options, skipNormalization) {
     const target = {};
     if (!skipNormalization) {
       base = parse6(serialize(base, options), options);
-      relative = parse6(serialize(relative, options), options);
+      relative2 = parse6(serialize(relative2, options), options);
     }
     options = options || {};
-    if (!options.tolerant && relative.scheme) {
-      target.scheme = relative.scheme;
-      target.userinfo = relative.userinfo;
-      target.host = relative.host;
-      target.port = relative.port;
-      target.path = removeDotSegments(relative.path || "");
-      target.query = relative.query;
+    if (!options.tolerant && relative2.scheme) {
+      target.scheme = relative2.scheme;
+      target.userinfo = relative2.userinfo;
+      target.host = relative2.host;
+      target.port = relative2.port;
+      target.path = removeDotSegments(relative2.path || "");
+      target.query = relative2.query;
     } else {
-      if (relative.userinfo !== void 0 || relative.host !== void 0 || relative.port !== void 0) {
-        target.userinfo = relative.userinfo;
-        target.host = relative.host;
-        target.port = relative.port;
-        target.path = removeDotSegments(relative.path || "");
-        target.query = relative.query;
+      if (relative2.userinfo !== void 0 || relative2.host !== void 0 || relative2.port !== void 0) {
+        target.userinfo = relative2.userinfo;
+        target.host = relative2.host;
+        target.port = relative2.port;
+        target.path = removeDotSegments(relative2.path || "");
+        target.query = relative2.query;
       } else {
-        if (!relative.path) {
+        if (!relative2.path) {
           target.path = base.path;
-          if (relative.query !== void 0) {
-            target.query = relative.query;
+          if (relative2.query !== void 0) {
+            target.query = relative2.query;
           } else {
             target.query = base.query;
           }
         } else {
-          if (relative.path.charAt(0) === "/") {
-            target.path = removeDotSegments(relative.path);
+          if (relative2.path.charAt(0) === "/") {
+            target.path = removeDotSegments(relative2.path);
           } else {
             if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-              target.path = "/" + relative.path;
+              target.path = "/" + relative2.path;
             } else if (!base.path) {
-              target.path = relative.path;
+              target.path = relative2.path;
             } else {
-              target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative.path;
+              target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative2.path;
             }
             target.path = removeDotSegments(target.path);
           }
-          target.query = relative.query;
+          target.query = relative2.query;
         }
         target.userinfo = base.userinfo;
         target.host = base.host;
@@ -27125,7 +27167,7 @@ var require_fast_uri = __commonJS2((exports2, module2) => {
       }
       target.scheme = base.scheme;
     }
-    target.fragment = relative.fragment;
+    target.fragment = relative2.fragment;
     return target;
   }
   function equal(uriA, uriB, options) {
@@ -27303,7 +27345,7 @@ var require_fast_uri = __commonJS2((exports2, module2) => {
   var fastUri = {
     SCHEMES,
     normalize: normalize2,
-    resolve: resolve6,
+    resolve: resolve7,
     resolveComponents,
     equal,
     serialize,
@@ -32672,7 +32714,7 @@ var require_compile2 = __commonJS2((exports2) => {
     const schOrFunc = root2.refs[ref];
     if (schOrFunc)
       return schOrFunc;
-    let _sch = resolve6.call(this, root2, ref);
+    let _sch = resolve7.call(this, root2, ref);
     if (_sch === void 0) {
       const schema2 = (_a = root2.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
       const { schemaId } = this.opts;
@@ -32699,7 +32741,7 @@ var require_compile2 = __commonJS2((exports2) => {
   function sameSchemaEnv(s1, s2) {
     return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
   }
-  function resolve6(root2, ref) {
+  function resolve7(root2, ref) {
     let sch;
     while (typeof (sch = this.refs[ref]) == "string")
       ref = sch;
@@ -35909,11 +35951,11 @@ function getDebugWriter() {
   if (!debugWriter) {
     debugWriter = createBufferedWriter({
       writeFn: (content) => {
-        const path11 = getDebugLogPath();
-        if (!getFsImplementation().existsSync((0, import_path3.dirname)(path11))) {
-          getFsImplementation().mkdirSync((0, import_path3.dirname)(path11));
+        const path14 = getDebugLogPath();
+        if (!getFsImplementation().existsSync((0, import_path3.dirname)(path14))) {
+          getFsImplementation().mkdirSync((0, import_path3.dirname)(path14));
         }
-        getFsImplementation().appendFileSync(path11, content);
+        getFsImplementation().appendFileSync(path14, content);
         updateLatestDebugLogSymlink();
       },
       flushIntervalMs: 1e3,
@@ -36043,41 +36085,41 @@ var NodeFsOperations = {
       }
     });
   },
-  appendFileSync(path11, data, options) {
+  appendFileSync(path14, data, options) {
     return withSlowLogging("appendFileSync", () => {
-      if (!fs3.existsSync(path11)) {
+      if (!fs3.existsSync(path14)) {
         const mode = options?.mode ?? 384;
-        const fd = fs3.openSync(path11, "a", mode);
+        const fd = fs3.openSync(path14, "a", mode);
         try {
           fs3.appendFileSync(fd, data);
         } finally {
           fs3.closeSync(fd);
         }
       } else {
-        fs3.appendFileSync(path11, data);
+        fs3.appendFileSync(path14, data);
       }
     });
   },
   copyFileSync(src, dest) {
     return withSlowLogging("copyFileSync", () => fs3.copyFileSync(src, dest));
   },
-  unlinkSync(path11) {
-    return withSlowLogging("unlinkSync", () => fs3.unlinkSync(path11));
+  unlinkSync(path14) {
+    return withSlowLogging("unlinkSync", () => fs3.unlinkSync(path14));
   },
   renameSync(oldPath, newPath) {
     return withSlowLogging("renameSync", () => fs3.renameSync(oldPath, newPath));
   },
-  linkSync(target, path11) {
-    return withSlowLogging("linkSync", () => fs3.linkSync(target, path11));
+  linkSync(target, path14) {
+    return withSlowLogging("linkSync", () => fs3.linkSync(target, path14));
   },
-  symlinkSync(target, path11) {
-    return withSlowLogging("symlinkSync", () => fs3.symlinkSync(target, path11));
+  symlinkSync(target, path14) {
+    return withSlowLogging("symlinkSync", () => fs3.symlinkSync(target, path14));
   },
-  readlinkSync(path11) {
-    return withSlowLogging("readlinkSync", () => fs3.readlinkSync(path11));
+  readlinkSync(path14) {
+    return withSlowLogging("readlinkSync", () => fs3.readlinkSync(path14));
   },
-  realpathSync(path11) {
-    return withSlowLogging("realpathSync", () => fs3.realpathSync(path11));
+  realpathSync(path14) {
+    return withSlowLogging("realpathSync", () => fs3.realpathSync(path14));
   },
   mkdirSync(dirPath) {
     return withSlowLogging("mkdirSync", () => {
@@ -36101,11 +36143,11 @@ var NodeFsOperations = {
   rmdirSync(dirPath) {
     return withSlowLogging("rmdirSync", () => fs3.rmdirSync(dirPath));
   },
-  rmSync(path11, options) {
-    return withSlowLogging("rmSync", () => fs3.rmSync(path11, options));
+  rmSync(path14, options) {
+    return withSlowLogging("rmSync", () => fs3.rmSync(path14, options));
   },
-  createWriteStream(path11) {
-    return fs3.createWriteStream(path11);
+  createWriteStream(path14) {
+    return fs3.createWriteStream(path14);
   }
 };
 var activeFs = NodeFsOperations;
@@ -36137,14 +36179,14 @@ function getOrCreateDebugFile() {
   return debugFilePath;
 }
 function logForSdkDebugging(message) {
-  const path11 = getOrCreateDebugFile();
-  if (!path11) {
+  const path14 = getOrCreateDebugFile();
+  if (!path14) {
     return;
   }
   const timestamp2 = (/* @__PURE__ */ new Date()).toISOString();
   const output = `${timestamp2} ${message}
 `;
-  (0, import_fs2.appendFileSync)(path11, output);
+  (0, import_fs2.appendFileSync)(path14, output);
 }
 function mergeSandboxIntoExtraArgs(extraArgs, sandbox) {
   const effectiveExtraArgs = { ...extraArgs };
@@ -36547,7 +36589,7 @@ var ProcessTransport = class {
       }
       return;
     }
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       const exitHandler = (code, signal) => {
         if (this.abortController.signal.aborted) {
           reject(new AbortError("Operation aborted"));
@@ -36557,7 +36599,7 @@ var ProcessTransport = class {
         if (error2) {
           reject(error2);
         } else {
-          resolve6();
+          resolve7();
         }
       };
       this.process.once("exit", exitHandler);
@@ -36607,17 +36649,17 @@ var Stream = class {
     if (this.hasError) {
       return Promise.reject(this.hasError);
     }
-    return new Promise((resolve6, reject) => {
-      this.readResolve = resolve6;
+    return new Promise((resolve7, reject) => {
+      this.readResolve = resolve7;
       this.readReject = reject;
     });
   }
   enqueue(value) {
     if (this.readResolve) {
-      const resolve6 = this.readResolve;
+      const resolve7 = this.readResolve;
       this.readResolve = void 0;
       this.readReject = void 0;
-      resolve6({ done: false, value });
+      resolve7({ done: false, value });
     } else {
       this.queue.push(value);
     }
@@ -36625,10 +36667,10 @@ var Stream = class {
   done() {
     this.isDone = true;
     if (this.readResolve) {
-      const resolve6 = this.readResolve;
+      const resolve7 = this.readResolve;
       this.readResolve = void 0;
       this.readReject = void 0;
-      resolve6({ done: true, value: void 0 });
+      resolve7({ done: true, value: void 0 });
     }
   }
   error(error2) {
@@ -36959,10 +37001,10 @@ var Query = class {
       type: "control_request",
       request
     };
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       this.pendingControlResponses.set(requestId, (response) => {
         if (response.subtype === "success") {
-          resolve6(response);
+          resolve7(response);
         } else {
           reject(new Error(response.error));
           if (response.pending_permission_requests) {
@@ -37052,15 +37094,15 @@ var Query = class {
       logForDebugging(`[Query.waitForFirstResult] Result already received, returning immediately`);
       return Promise.resolve();
     }
-    return new Promise((resolve6) => {
+    return new Promise((resolve7) => {
       if (this.abortController?.signal.aborted) {
-        resolve6();
+        resolve7();
         return;
       }
-      this.abortController?.signal.addEventListener("abort", () => resolve6(), {
+      this.abortController?.signal.addEventListener("abort", () => resolve7(), {
         once: true
       });
-      this.firstResultReceivedResolve = resolve6;
+      this.firstResultReceivedResolve = resolve7;
     });
   }
   handleHookCallbacks(callbackId, input, toolUseID, abortSignal) {
@@ -37111,13 +37153,13 @@ var Query = class {
   handleMcpControlRequest(serverName, mcpRequest, transport) {
     const messageId = "id" in mcpRequest.message ? mcpRequest.message.id : null;
     const key = `${serverName}:${messageId}`;
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       const cleanup = () => {
         this.pendingMcpResponses.delete(key);
       };
       const resolveAndCleanup = (response) => {
         cleanup();
-        resolve6(response);
+        resolve7(response);
       };
       const rejectAndCleanup = (error2) => {
         cleanup();
@@ -37486,8 +37528,8 @@ function getErrorMap() {
   return overrideErrorMap;
 }
 var makeIssue = (params) => {
-  const { data, path: path11, errorMaps, issueData } = params;
-  const fullPath = [...path11, ...issueData.path || []];
+  const { data, path: path14, errorMaps, issueData } = params;
+  const fullPath = [...path14, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -37594,11 +37636,11 @@ var errorUtil;
   errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
 })(errorUtil || (errorUtil = {}));
 var ParseInputLazyPath = class {
-  constructor(parent, value, path11, key) {
+  constructor(parent, value, path14, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path11;
+    this._path = path14;
     this._key = key;
   }
   get path() {
@@ -41089,10 +41131,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path11) {
-  if (!path11)
+function getElementAtPath(obj, path14) {
+  if (!path14)
     return obj;
-  return path11.reduce((acc, key) => acc?.[key], obj);
+  return path14.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -41409,11 +41451,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path11, issues) {
+function prefixIssues(path14, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path11);
+    iss.path.unshift(path14);
     return iss;
   });
 }
@@ -45639,6 +45681,9 @@ async function createRunner(type2, options, config2) {
 }
 
 // dist/src/scorer/deterministic.js
+var fs8 = __toESM(require("fs"), 1);
+var path7 = __toESM(require("path"), 1);
+var vm = __toESM(require("vm"), 1);
 function isSkillTool(toolName) {
   return toolName === "Skill" || toolName.includes("skill") && !toolName.includes("skill-resource");
 }
@@ -45648,7 +45693,7 @@ function extractSkillName(input) {
   const obj = input;
   return obj.skill || obj.skill_name || obj.name || void 0;
 }
-function scoreDeterministic(task, result) {
+function scoreDeterministic(task, result, options) {
   const check2 = task.deterministic;
   if (!check2)
     return null;
@@ -45703,7 +45748,7 @@ function scoreDeterministic(task, result) {
     details.push(markerFound ? `Marker found: "${check2.expectMarker}"` : `Marker not found: "${check2.expectMarker}"`);
   }
   let expectedToolsCalled = null;
-  if (check2.expectToolCalls && check2.expectToolCalls.length > 0) {
+  if (Array.isArray(check2.expectToolCalls) && check2.expectToolCalls.length > 0) {
     const calledTools = new Set(result.toolCalls.map((c) => c.tool));
     const missing = check2.expectToolCalls.filter((t) => !calledTools.has(t));
     expectedToolsCalled = missing.length === 0;
@@ -45714,7 +45759,7 @@ function scoreDeterministic(task, result) {
     }
   }
   let unexpectedToolsCalled = null;
-  if (check2.expectNoToolCalls && check2.expectNoToolCalls.length > 0) {
+  if (Array.isArray(check2.expectNoToolCalls) && check2.expectNoToolCalls.length > 0) {
     const calledTools = new Set(result.toolCalls.map((c) => c.tool));
     const forbidden = check2.expectNoToolCalls.filter((t) => calledTools.has(t));
     unexpectedToolsCalled = forbidden.length > 0;
@@ -45722,6 +45767,111 @@ function scoreDeterministic(task, result) {
       details.push(`Forbidden tools were called: ${forbidden.join(", ")}`);
     } else {
       details.push(`No forbidden tools called`);
+    }
+  }
+  let containsCheckPassed = null;
+  if (Array.isArray(check2.expectContains) && check2.expectContains.length > 0) {
+    const missing = check2.expectContains.filter((s) => !result.output.includes(s));
+    containsCheckPassed = missing.length === 0;
+    if (containsCheckPassed) {
+      details.push("All expected substrings found in output");
+    } else {
+      details.push(`Expected substrings not found: ${missing.map((s) => `"${s}"`).join(", ")}`);
+    }
+  }
+  let notContainsCheckPassed = null;
+  if (Array.isArray(check2.expectNotContains) && check2.expectNotContains.length > 0) {
+    const found = check2.expectNotContains.filter((s) => result.output.includes(s));
+    notContainsCheckPassed = found.length === 0;
+    if (notContainsCheckPassed) {
+      details.push("No forbidden substrings found in output");
+    } else {
+      details.push(`Forbidden substrings found: ${found.map((s) => `"${s}"`).join(", ")}`);
+    }
+  }
+  let regexCheckPassed = null;
+  if (Array.isArray(check2.expectRegex) && check2.expectRegex.length > 0) {
+    const failures = [];
+    for (const pattern of check2.expectRegex) {
+      try {
+        const sandbox = { pattern, output: result.output, result: false };
+        vm.runInNewContext("result = new RegExp(pattern).test(output)", sandbox, { timeout: 5e3 });
+        if (!sandbox.result) {
+          failures.push(`/${pattern}/`);
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.includes("timed out")) {
+          failures.push(`/${pattern}/ (timed out \u2014 possible ReDoS)`);
+        } else {
+          failures.push(`/${pattern}/ (invalid regex)`);
+        }
+      }
+    }
+    regexCheckPassed = failures.length === 0;
+    if (regexCheckPassed) {
+      details.push("All regex patterns matched");
+    } else {
+      details.push(`Regex patterns not matched: ${failures.join(", ")}`);
+    }
+  }
+  let javascriptCheckPassed = null;
+  if (check2.expectJavascript) {
+    try {
+      const sandbox = {
+        output: result.output,
+        JSON,
+        Math,
+        parseInt,
+        parseFloat,
+        String,
+        Number,
+        Boolean,
+        Array,
+        Object,
+        RegExp,
+        Date,
+        isNaN,
+        isFinite
+      };
+      const value = vm.runInNewContext(`(${check2.expectJavascript})`, sandbox, { timeout: 5e3 });
+      if (value === true) {
+        javascriptCheckPassed = true;
+        details.push("JavaScript assertion passed");
+      } else {
+        javascriptCheckPassed = false;
+        details.push(`JavaScript assertion returned ${JSON.stringify(value)} (expected true)`);
+      }
+    } catch (e) {
+      javascriptCheckPassed = false;
+      details.push(`JavaScript assertion error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  let fileExistsCheckPassed = null;
+  if (Array.isArray(check2.expectFileExists) && check2.expectFileExists.length > 0) {
+    const cwd2 = options?.cwd ?? process.cwd();
+    const resolvedCwd = path7.resolve(cwd2);
+    if (!fs8.existsSync(resolvedCwd)) {
+      fileExistsCheckPassed = false;
+      details.push(`Working directory does not exist: ${resolvedCwd}`);
+    } else {
+      const cwdPrefix = resolvedCwd.endsWith(path7.sep) ? resolvedCwd : resolvedCwd + path7.sep;
+      const missing = [];
+      for (const filePath of check2.expectFileExists) {
+        const resolved = path7.resolve(cwd2, filePath);
+        if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
+          missing.push(`${filePath} (outside working directory)`);
+          continue;
+        }
+        if (!fs8.existsSync(resolved)) {
+          missing.push(filePath);
+        }
+      }
+      fileExistsCheckPassed = missing.length === 0;
+      if (fileExistsCheckPassed) {
+        details.push("All expected files exist");
+      } else {
+        details.push(`Expected files not found: ${missing.join(", ")}`);
+      }
     }
   }
   let passed;
@@ -45733,8 +45883,22 @@ function scoreDeterministic(task, result) {
       passed = passed && expectedToolsCalled;
     if (unexpectedToolsCalled !== null)
       passed = passed && !unexpectedToolsCalled;
+    if (containsCheckPassed !== null)
+      passed = passed && containsCheckPassed;
+    if (notContainsCheckPassed !== null)
+      passed = passed && notContainsCheckPassed;
+    if (regexCheckPassed !== null)
+      passed = passed && regexCheckPassed;
+    if (javascriptCheckPassed !== null)
+      passed = passed && javascriptCheckPassed;
+    if (fileExistsCheckPassed !== null)
+      passed = passed && fileExistsCheckPassed;
   } else {
     passed = !skillActivated;
+    const hasOtherAssertions = containsCheckPassed !== null || notContainsCheckPassed !== null || regexCheckPassed !== null || javascriptCheckPassed !== null || fileExistsCheckPassed !== null;
+    if (hasOtherAssertions) {
+      details.push("Note: non-activation assertions were evaluated but do not affect pass/fail for negative tests");
+    }
   }
   return {
     skillActivated,
@@ -45742,14 +45906,19 @@ function scoreDeterministic(task, result) {
     markerFound,
     expectedToolsCalled,
     unexpectedToolsCalled,
+    containsCheckPassed,
+    notContainsCheckPassed,
+    regexCheckPassed,
+    javascriptCheckPassed,
+    fileExistsCheckPassed,
     passed,
     details
   };
 }
 
 // dist/src/feedback.js
-var fs8 = __toESM(require("fs/promises"), 1);
-var path7 = __toESM(require("path"), 1);
+var fs9 = __toESM(require("fs/promises"), 1);
+var path8 = __toESM(require("path"), 1);
 function generateFeedbackTemplate(tasks) {
   const template = {};
   for (const task of tasks) {
@@ -45759,11 +45928,11 @@ function generateFeedbackTemplate(tasks) {
 }
 async function writeFeedbackTemplate(tasks, outputPath) {
   const template = generateFeedbackTemplate(tasks);
-  await fs8.mkdir(path7.dirname(outputPath), { recursive: true });
-  await fs8.writeFile(outputPath, JSON.stringify(template, null, 2) + "\n");
+  await fs9.mkdir(path8.dirname(outputPath), { recursive: true });
+  await fs9.writeFile(outputPath, JSON.stringify(template, null, 2) + "\n");
 }
 async function loadFeedback(feedbackPath, taskIds) {
-  const content = await fs8.readFile(feedbackPath, "utf-8");
+  const content = await fs9.readFile(feedbackPath, "utf-8");
   const raw = JSON.parse(content);
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new Error("Invalid feedback file: expected a JSON object with task IDs as keys");
@@ -46346,7 +46515,7 @@ async function scoreTask(task, result, options = {}) {
   const weights = getDefaultWeights(config2);
   let deterministicResult = null;
   if (!options.noDeterministic && task.deterministic) {
-    deterministicResult = scoreDeterministic(task, result);
+    deterministicResult = scoreDeterministic(task, result, { cwd: options.cwd });
   }
   let judgeResult = null;
   if (!options.noJudge && task.criteria.length > 0) {
@@ -46459,8 +46628,8 @@ function mergeScores(taskId, det, judge, weights, isNegativeTest = false) {
 }
 
 // dist/src/session/session-logger.js
-var fs9 = __toESM(require("fs/promises"), 1);
-var path8 = __toESM(require("path"), 1);
+var fs10 = __toESM(require("fs/promises"), 1);
+var path9 = __toESM(require("path"), 1);
 var SessionLogger = class {
   log;
   logDir;
@@ -46512,13 +46681,13 @@ var SessionLogger = class {
    */
   async save() {
     this.log.endTime = (/* @__PURE__ */ new Date()).toISOString();
-    await fs9.mkdir(this.logDir, { recursive: true });
+    await fs10.mkdir(this.logDir, { recursive: true });
     const prefix = this.log.status === "error" ? "FAILED__" : "";
     const baseName = `${prefix}${this.log.sessionId}`;
-    const jsonPath = path8.join(this.logDir, `${baseName}.json`);
-    const mdPath = path8.join(this.logDir, `${baseName}.md`);
-    await fs9.writeFile(jsonPath, JSON.stringify(this.log, null, 2));
-    await fs9.writeFile(mdPath, this.generateReadableLog());
+    const jsonPath = path9.join(this.logDir, `${baseName}.json`);
+    const mdPath = path9.join(this.logDir, `${baseName}.md`);
+    await fs10.writeFile(jsonPath, JSON.stringify(this.log, null, 2));
+    await fs10.writeFile(mdPath, this.generateReadableLog());
     return { jsonPath, mdPath };
   }
   generateReadableLog() {
@@ -46610,12 +46779,15 @@ function formatDuration(ms) {
 }
 
 // dist/src/report/report.js
-var fs11 = __toESM(require("fs/promises"), 1);
-var path9 = __toESM(require("path"), 1);
+var fs12 = __toESM(require("fs/promises"), 1);
+var path10 = __toESM(require("path"), 1);
 init_config();
 
 // dist/src/scorer/aggregator.js
 var FLAKY_STDDEV_THRESHOLD = 1;
+function isFlaky(stddev) {
+  return !!(stddev && (stddev.adherence > FLAKY_STDDEV_THRESHOLD || stddev.outputQuality > FLAKY_STDDEV_THRESHOLD));
+}
 function computeStddev(values, mean) {
   if (values.length < 2)
     return 0;
@@ -46716,13 +46888,13 @@ function aggregateScores(allScores) {
 }
 
 // dist/src/report/comparison.js
-var fs10 = __toESM(require("fs/promises"), 1);
+var fs11 = __toESM(require("fs/promises"), 1);
 var SIGNIFICANCE_THRESHOLD_ADHERENCE = 1;
 var SIGNIFICANCE_THRESHOLD_WEIGHTED = 0.15;
 async function loadPreviousReport(filePath) {
   let raw;
   try {
-    raw = await fs10.readFile(filePath, "utf-8");
+    raw = await fs11.readFile(filePath, "utf-8");
   } catch (err) {
     if (err.code === "ENOENT") {
       throw new Error(`Comparison file not found: ${filePath}`);
@@ -47043,7 +47215,7 @@ ${metaSection}
 | Adherence | ${score.adherence.toFixed(1)}/5${score.stddev ? ` \xB1 ${score.stddev.adherence.toFixed(1)}` : ""} | ${score.adherence >= 4 ? "PASS" : "FAIL"} |
 | Output Quality | ${score.outputQuality.toFixed(1)}/5${score.stddev ? ` \xB1 ${score.stddev.outputQuality.toFixed(1)}` : ""} | ${score.outputQuality >= 4 ? "PASS" : "FAIL"} |
 | **Weighted** | **${score.weightedScore.toFixed(2)}${score.stddev ? ` \xB1 ${score.stddev.weightedScore.toFixed(2)}` : ""}** | |
-${score.stddev && (score.stddev.adherence > FLAKY_STDDEV_THRESHOLD || score.stddev.outputQuality > FLAKY_STDDEV_THRESHOLD) ? `
+${isFlaky(score.stddev) ? `
 > **Warning: Potentially Flaky** \u2014 High variance across runs (adherence \u03C3=${score.stddev.adherence.toFixed(2)}, output \u03C3=${score.stddev.outputQuality.toFixed(2)})
 > _Only adherence and output quality are checked: discovery (0/1) and weighted score (0-1) cannot exceed the threshold._
 ` : ""}
@@ -47123,8 +47295,8 @@ ${result.output.slice(0, config2.reportOutputTruncation) || "(no output)"}
 `;
   }
   if (outputPath) {
-    await fs11.mkdir(path9.dirname(outputPath), { recursive: true });
-    await fs11.writeFile(outputPath, report);
+    await fs12.mkdir(path10.dirname(outputPath), { recursive: true });
+    await fs12.writeFile(outputPath, report);
     console.log(`Report saved to: ${outputPath}`);
   }
   return report;
@@ -47176,8 +47348,8 @@ async function generateJsonResults(options) {
     crossIterationComparison
   };
   if (outputPath) {
-    await fs11.mkdir(path9.dirname(outputPath), { recursive: true });
-    await fs11.writeFile(outputPath, JSON.stringify(report, null, 2));
+    await fs12.mkdir(path10.dirname(outputPath), { recursive: true });
+    await fs12.writeFile(outputPath, JSON.stringify(report, null, 2));
     console.log(`JSON results saved to: ${outputPath}`);
   }
   return report;
@@ -47329,8 +47501,795 @@ Assignment shows the label order: with-skill / without-skill (e.g. A/B means A =
   return section;
 }
 
+// dist/src/report/html-report.js
+var fs13 = __toESM(require("fs/promises"), 1);
+var path11 = __toESM(require("path"), 1);
+init_config();
+function escapeHtml(str2) {
+  return str2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+async function generateHtmlReport(options) {
+  const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, blindComparison, crossIterationComparison } = options;
+  const numRuns = options.numRuns ?? 1;
+  const config2 = options.config ?? loadConfigSync();
+  const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
+  if (results.length !== evaluation.tasks.length || scores.length !== evaluation.tasks.length) {
+    throw new Error(`Mismatched array lengths: ${evaluation.tasks.length} tasks, ${results.length} results, ${scores.length} scores`);
+  }
+  const summary2 = computeSummary(results, scores, numRuns);
+  const failureBreakdown = computeFailureBreakdown(scores);
+  const discoveryPassed = summary2.discoveryAccuracy >= config2.discoveryThreshold;
+  const scorePassed = summary2.avgAdherence >= config2.scoreThreshold && summary2.avgOutputQuality >= config2.scoreThreshold;
+  const passed = discoveryPassed && scorePassed;
+  const tasks = evaluation.tasks.map((task, i) => ({
+    index: i,
+    task,
+    result: results[i],
+    score: scores[i],
+    runDetails: runDetails?.[i]
+  }));
+  const clientData = tasks.map((t) => ({
+    taskId: t.task.id,
+    prompt: t.task.prompt,
+    discovery: t.score.discovery,
+    adherence: t.score.adherence,
+    outputQuality: t.score.outputQuality,
+    weightedScore: t.score.weightedScore,
+    failureCategory: t.score.failureCategory,
+    isFlaky: isFlaky(t.score.stddev)
+  }));
+  const regressedTaskIds = new Set(crossIterationComparison?.taskDeltas.filter((d) => d.significantChange === "regressed").map((d) => d.taskId) ?? []);
+  const clientDataWithRegression = clientData.map((d) => ({
+    ...d,
+    isRegressed: regressedTaskIds.has(d.taskId)
+  }));
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Evaluation: ${escapeHtml(evaluation.skillName)}</title>
+${renderStyles()}
+</head>
+<body>
+<div class="container">
+${renderHeader(evaluation.skillName, passed, metadata, numRuns, comparison)}
+${renderDashboard(summary2, config2)}
+${renderFailureAnalysis(failureBreakdown)}
+${renderControls(!!crossIterationComparison)}
+${renderTaskTable(tasks, config2, humanFeedback)}
+${comparison ? renderComparisonSection(comparison) : ""}
+${blindComparison ? renderBlindComparisonSection(blindComparison) : ""}
+${crossIterationComparison ? renderCrossIterationSection(crossIterationComparison) : ""}
+${humanFeedback && Object.keys(humanFeedback).length > 0 ? renderHumanFeedbackSection(humanFeedback, scores) : ""}
+<footer>
+  <p>Generated by <strong>skilljack-evals</strong> on ${escapeHtml(generatedAt)}</p>
+</footer>
+</div>
+<script>
+window.__REPORT_DATA__ = ${JSON.stringify(clientDataWithRegression).replace(/<\//g, "<\\/")};
+${renderScript()}
+</script>
+</body>
+</html>`;
+  if (outputPath) {
+    await fs13.mkdir(path11.dirname(outputPath), { recursive: true });
+    await fs13.writeFile(outputPath, html);
+    console.log(`HTML report saved to: ${outputPath}`);
+  }
+  return html;
+}
+function renderHeader(skillName, passed, metadata, numRuns, comparison) {
+  const metaItems = [];
+  if (metadata) {
+    if (metadata.gitCommit)
+      metaItems.push(`<span>Git: ${escapeHtml(metadata.gitBranch ?? "")}@${escapeHtml(metadata.gitCommit.slice(0, 7))}</span>`);
+    if (metadata.runnerType)
+      metaItems.push(`<span>Runner: ${escapeHtml(metadata.runnerType)}</span>`);
+    if (metadata.agentModel)
+      metaItems.push(`<span>Agent: ${escapeHtml(metadata.agentModel)}</span>`);
+    if (metadata.judgeModel)
+      metaItems.push(`<span>Judge: ${escapeHtml(metadata.judgeModel)}</span>`);
+  }
+  if (numRuns > 1)
+    metaItems.push(`<span>Runs: ${numRuns}</span>`);
+  if (comparison)
+    metaItems.push(`<span>Mode: Comparison vs ${escapeHtml(comparison.summary.baselineLabel)}</span>`);
+  return `
+<header>
+  <div class="header-top">
+    <h1>Skill Evaluation: ${escapeHtml(skillName)}</h1>
+    <span class="badge ${passed ? "badge-pass" : "badge-fail"}">${passed ? "PASS" : "FAIL"}</span>
+  </div>
+  ${metaItems.length > 0 ? `<div class="metadata">${metaItems.join(" ")}</div>` : ""}
+</header>`;
+}
+function renderGauge(label, value, max, threshold, format) {
+  const pctValue = max > 0 ? Math.min(value / max, 1) : 0;
+  const pctThreshold = max > 0 ? Math.min(threshold / max, 1) : 0;
+  const passed = value >= threshold;
+  const radius = 60;
+  const circumference = Math.PI * radius;
+  const offset = circumference * (1 - pctValue);
+  const thresholdAngle = 180 * pctThreshold;
+  return `
+<div class="gauge">
+  <svg viewBox="0 0 140 80" class="gauge-svg">
+    <path d="M 10 75 A 60 60 0 0 1 130 75" fill="none" stroke="var(--color-border)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M 10 75 A 60 60 0 0 1 130 75" fill="none" stroke="${passed ? "var(--color-pass)" : "var(--color-fail)"}" stroke-width="10" stroke-linecap="round"
+      stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" class="gauge-fill"/>
+    <line x1="70" y1="75" x2="${70 + radius * Math.cos(Math.PI - thresholdAngle * Math.PI / 180)}" y2="${75 - radius * Math.sin(Math.PI - thresholdAngle * Math.PI / 180)}"
+      stroke="var(--color-text-muted)" stroke-width="1.5" stroke-dasharray="3,2"/>
+  </svg>
+  <div class="gauge-value">${format(value)}</div>
+  <div class="gauge-label">${label}</div>
+  <div class="gauge-threshold">Threshold: ${format(threshold)}</div>
+</div>`;
+}
+function renderDashboard(summary2, config2) {
+  return `
+<section id="dashboard">
+  <div class="gauges">
+    ${renderGauge("Discovery", summary2.discoveryAccuracy * 100, 100, config2.discoveryThreshold * 100, (v) => v.toFixed(1) + "%")}
+    ${renderGauge("Adherence", summary2.avgAdherence, 5, config2.scoreThreshold, (v) => v.toFixed(2) + "/5")}
+    ${renderGauge("Output Quality", summary2.avgOutputQuality, 5, config2.scoreThreshold, (v) => v.toFixed(2) + "/5")}
+  </div>
+  <div class="stats-row">
+    <div class="stat">
+      <div class="stat-value">${summary2.avgWeightedScore.toFixed(2)}${summary2.stddev ? ` <span class="stddev">&plusmn; ${summary2.stddev.weightedScore.toFixed(2)}</span>` : ""}</div>
+      <div class="stat-label">Weighted Score</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${summary2.totalTasks}</div>
+      <div class="stat-label">Tasks</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${(summary2.totalDurationMs / 1e3).toFixed(1)}s</div>
+      <div class="stat-label">Duration</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">$${summary2.totalCostUsd.toFixed(4)}</div>
+      <div class="stat-label">Cost</div>
+    </div>
+  </div>
+</section>`;
+}
+function renderFailureAnalysis(breakdown) {
+  if (breakdown.length === 0)
+    return "";
+  const maxCount = Math.max(...breakdown.map((b) => b.count));
+  const bars = breakdown.map((b) => {
+    const width = maxCount > 0 ? b.count / maxCount * 100 : 0;
+    const label = b.category === "none" ? "No Failure" : formatCategory(b.category);
+    const colorClass = b.category === "none" ? "bar-pass" : "bar-fail";
+    return `
+    <div class="bar-row">
+      <div class="bar-label">${escapeHtml(label)}</div>
+      <div class="bar-track">
+        <div class="bar-fill ${colorClass}" style="width: ${width}%"></div>
+      </div>
+      <div class="bar-count">${b.count} (${b.percentage.toFixed(0)}%)</div>
+    </div>`;
+  }).join("");
+  return `
+<section id="failure-analysis">
+  <h2>Failure Analysis</h2>
+  <div class="bar-chart">${bars}</div>
+</section>`;
+}
+function renderControls(hasRegression) {
+  return `
+<section id="controls">
+  <input type="text" id="search" placeholder="Search by task ID or prompt..." autocomplete="off"/>
+  <div class="filter-toggles">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="failed">Failed</button>
+    <button class="filter-btn" data-filter="flaky">Flaky</button>
+    ${hasRegression ? '<button class="filter-btn" data-filter="regressed">Regressed</button>' : ""}
+  </div>
+  <span id="visible-count"></span>
+</section>`;
+}
+function renderTaskTable(tasks, config2, humanFeedback) {
+  let rows = "";
+  for (const t of tasks) {
+    const isFailed = t.score.failureCategory !== "none";
+    const flaky = isFlaky(t.score.stddev);
+    const statusClass = isFailed ? "status-fail" : flaky ? "status-flaky" : "status-pass";
+    const statusLabel = isFailed ? "FAIL" : flaky ? "FLAKY" : "PASS";
+    rows += `
+    <tr class="task-row" data-task-id="${escapeHtml(t.task.id)}" data-index="${t.index}">
+      <td>${t.index + 1}</td>
+      <td class="task-id-cell">${escapeHtml(t.task.id)}</td>
+      <td>${t.score.discovery >= 1 ? "1" : t.score.discovery.toFixed(2)}</td>
+      <td>${t.score.adherence.toFixed(1)}</td>
+      <td>${t.score.outputQuality.toFixed(1)}</td>
+      <td>${t.score.weightedScore.toFixed(2)}</td>
+      <td>${escapeHtml(formatCategory(t.score.failureCategory))}</td>
+      <td><span class="status ${statusClass}">${statusLabel}</span></td>
+    </tr>
+    <tr class="detail-row" data-task-id="${escapeHtml(t.task.id)}">
+      <td colspan="8">
+        ${renderTaskDetail(t, config2, humanFeedback)}
+      </td>
+    </tr>`;
+  }
+  return `
+<section id="task-table">
+  <h2>Task Results</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="sortable" data-col="index">#</th>
+          <th class="sortable" data-col="taskId">Task ID</th>
+          <th class="sortable" data-col="discovery">Discovery</th>
+          <th class="sortable" data-col="adherence">Adherence</th>
+          <th class="sortable" data-col="outputQuality">Output Quality</th>
+          <th class="sortable" data-col="weightedScore">Weighted</th>
+          <th class="sortable" data-col="failureCategory">Failure</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows}
+      </tbody>
+    </table>
+  </div>
+</section>`;
+}
+function renderTaskDetail(t, config2, humanFeedback) {
+  const loadedSkills = t.result.skillLoads.length > 0 ? t.result.skillLoads.map((s) => `<code>${escapeHtml(s)}</code>`).join(", ") : "None";
+  let detail = `
+<div class="task-detail">
+  <div class="detail-grid">
+    <div class="detail-section">
+      <h4>Prompt</h4>
+      <p>${escapeHtml(t.task.prompt)}</p>
+    </div>
+    <div class="detail-section">
+      <h4>Skills</h4>
+      <p><strong>Expected:</strong> <code>${escapeHtml(t.task.expectedSkillLoad)}</code></p>
+      <p><strong>Loaded:</strong> ${loadedSkills}</p>
+    </div>
+  </div>`;
+  if (t.score.stddev) {
+    detail += `
+  <div class="detail-section">
+    <h4>Score Variance</h4>
+    <p>Discovery: ${(t.score.discovery * 100).toFixed(0)}% &plusmn; ${(t.score.stddev.discovery * 100).toFixed(0)}% |
+       Adherence: ${t.score.adherence.toFixed(1)} &plusmn; ${t.score.stddev.adherence.toFixed(1)} |
+       Output: ${t.score.outputQuality.toFixed(1)} &plusmn; ${t.score.stddev.outputQuality.toFixed(1)} |
+       Weighted: ${t.score.weightedScore.toFixed(2)} &plusmn; ${t.score.stddev.weightedScore.toFixed(2)}</p>
+  </div>`;
+  }
+  if (t.score.checklistResults && t.score.checklistResults.length > 0) {
+    const passed = t.score.checklistResults.filter((c) => c.passed).length;
+    const items = t.score.checklistResults.map((c) => {
+      const icon = c.passed ? '<span class="check-pass">&#10003;</span>' : '<span class="check-fail">&#10007;</span>';
+      const evidence = c.evidence?.trim() ? `<div class="check-evidence">${escapeHtml(c.evidence.trim())}</div>` : "";
+      return `<li>${icon} ${escapeHtml(c.item)}${evidence}</li>`;
+    }).join("");
+    detail += `
+  <div class="detail-section">
+    <h4>Checklist (${passed}/${t.score.checklistResults.length})</h4>
+    <ul class="checklist">${items}</ul>
+  </div>`;
+  }
+  if (t.score.deterministic) {
+    detail += `
+  <div class="detail-section">
+    <h4>Deterministic Check: ${t.score.deterministic.passed ? '<span class="check-pass">PASS</span>' : '<span class="check-fail">FAIL</span>'}</h4>
+    <ul>${t.score.deterministic.details.map((d) => `<li>${escapeHtml(d)}</li>`).join("")}</ul>
+  </div>`;
+  }
+  if (humanFeedback && humanFeedback[t.task.id]) {
+    const addressed = t.score.judge?.feedbackAddressed === true ? "Yes" : t.score.judge?.feedbackAddressed === false ? "No" : "N/A";
+    detail += `
+  <div class="detail-section">
+    <h4>Human Feedback (Addressed: ${addressed})</h4>
+    <blockquote>${escapeHtml(humanFeedback[t.task.id])}</blockquote>
+  </div>`;
+  }
+  detail += `
+  <div class="detail-section">
+    <h4>Reasoning</h4>
+    <p>${escapeHtml(t.score.reasoning || "No reasoning provided")}</p>
+  </div>`;
+  const truncatedOutput = t.result.output.slice(0, config2.reportOutputTruncation) || "(no output)";
+  detail += `
+  <div class="detail-section">
+    <h4>Agent Output</h4>
+    <pre class="agent-output">${escapeHtml(truncatedOutput)}</pre>
+    <p class="metrics">Duration: ${(t.result.durationMs / 1e3).toFixed(1)}s | Turns: ${t.result.numTurns} | Cost: $${t.result.costUsd.toFixed(4)}</p>
+  </div>`;
+  if (t.runDetails && t.runDetails.length > 1) {
+    let runRows = "";
+    for (let r = 0; r < t.runDetails.length; r++) {
+      const rd = t.runDetails[r];
+      const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(", ") : "none";
+      runRows += `<tr>
+        <td>${r + 1}</td>
+        <td>${rd.score.discovery}</td>
+        <td>${rd.score.adherence}/5</td>
+        <td>${rd.score.outputQuality}/5</td>
+        <td>${rd.score.weightedScore.toFixed(2)}</td>
+        <td>${escapeHtml(skills)}</td>
+      </tr>`;
+    }
+    detail += `
+  <div class="detail-section">
+    <h4>Per-Run Breakdown (${t.runDetails.length} runs)</h4>
+    <table class="run-table">
+      <thead><tr><th>Run</th><th>Discovery</th><th>Adherence</th><th>Output</th><th>Weighted</th><th>Skills</th></tr></thead>
+      <tbody>${runRows}</tbody>
+    </table>
+  </div>`;
+  }
+  detail += "</div>";
+  return detail;
+}
+function renderComparisonSection(comparison) {
+  const { summary: summary2, tasks } = comparison;
+  const ws = summary2.withSkill;
+  const bs = summary2.withoutSkill;
+  const d = summary2.delta;
+  let taskRows = "";
+  for (const t of tasks) {
+    const w = t.withSkill.score;
+    const b = t.withoutSkill.score;
+    taskRows += `<tr>
+      <td>${escapeHtml(t.taskId)}</td>
+      <td>${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.adherenceDelta, 1))}</span></td>
+      <td>${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.outputQualityDelta, 1))}</span></td>
+      <td>${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / <span class="delta">${escapeHtml(formatDelta(t.delta.weightedScoreDelta))}</span></td>
+    </tr>`;
+  }
+  return `
+<section id="comparison">
+  <h2>Skill Impact Analysis</h2>
+  <p>Baseline: <strong>${escapeHtml(summary2.baselineLabel)}</strong></p>
+  <table>
+    <thead><tr><th>Metric</th><th>With Skill</th><th>Baseline</th><th>Delta</th></tr></thead>
+    <tbody>
+      <tr><td>Discovery</td><td>${(ws.discoveryAccuracy * 100).toFixed(0)}%</td><td>${(bs.discoveryAccuracy * 100).toFixed(0)}%</td><td class="delta">${escapeHtml(formatDelta(d.discoveryAccuracyDelta * 100, 0))}%</td></tr>
+      <tr><td>Adherence</td><td>${ws.avgAdherence.toFixed(2)}/5</td><td>${bs.avgAdherence.toFixed(2)}/5</td><td class="delta">${escapeHtml(formatDelta(d.avgAdherenceDelta))}</td></tr>
+      <tr><td>Output Quality</td><td>${ws.avgOutputQuality.toFixed(2)}/5</td><td>${bs.avgOutputQuality.toFixed(2)}/5</td><td class="delta">${escapeHtml(formatDelta(d.avgOutputQualityDelta))}</td></tr>
+      <tr><td>Weighted Score</td><td>${ws.avgWeightedScore.toFixed(2)}</td><td>${bs.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(d.avgWeightedScoreDelta))}</td></tr>
+      <tr><td>Duration</td><td>${(ws.totalDurationMs / 1e3).toFixed(1)}s</td><td>${(bs.totalDurationMs / 1e3).toFixed(1)}s</td><td class="delta">${escapeHtml(formatDelta(d.totalDurationDeltaMs / 1e3, 1))}s</td></tr>
+      <tr><td>Cost</td><td>$${ws.totalCostUsd.toFixed(4)}</td><td>$${bs.totalCostUsd.toFixed(4)}</td><td class="delta">$${escapeHtml(formatDelta(d.totalCostDeltaUsd, 4))}</td></tr>
+    </tbody>
+  </table>
+  <h3>Per-Task Comparison</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Task</th><th>Adherence (W / B / Delta)</th><th>Output (W / B / Delta)</th><th>Weighted (W / B / Delta)</th></tr></thead>
+      <tbody>${taskRows}</tbody>
+    </table>
+  </div>
+</section>`;
+}
+function renderBlindComparisonSection(blind) {
+  const a = blind.aggregate;
+  const evaluated = blind.tasks.length - a.failedCount;
+  let taskRows = "";
+  for (const t of blind.tasks) {
+    const labels = t.withSkillLabel === "A" ? "A/B" : "B/A";
+    const aInstr = t.failed || !t.outputA ? "N/A" : `${t.outputA.instructionFollowing}/5`;
+    const aOut = t.failed || !t.outputA ? "N/A" : `${t.outputA.outputQuality}/5`;
+    const bInstr = t.failed || !t.outputB ? "N/A" : `${t.outputB.instructionFollowing}/5`;
+    const bOut = t.failed || !t.outputB ? "N/A" : `${t.outputB.outputQuality}/5`;
+    taskRows += `<tr>
+      <td>${escapeHtml(t.taskId)}</td>
+      <td>${labels}</td>
+      <td>${aInstr}</td><td>${aOut}</td>
+      <td>${bInstr}</td><td>${bOut}</td>
+      <td>${escapeHtml(t.preferred)}</td>
+      <td>${escapeHtml(t.preferredCondition)}</td>
+      <td>${t.biasSignal ? '<span class="check-fail">Yes</span>' : "No"}</td>
+    </tr>`;
+  }
+  let alerts = "";
+  if (a.biasSignalCount > 0) {
+    alerts += `<p class="alert alert-warn">Bias Alert: ${a.biasSignalCount} task(s) show bias signals where the blind comparison disagrees with standard scoring.</p>`;
+  }
+  if (a.failedCount > 0) {
+    alerts += `<p class="alert alert-warn">${a.failedCount} blind judge call(s) failed and were excluded.</p>`;
+  }
+  return `
+<section id="blind-comparison">
+  <h2>Blind A/B Comparison</h2>
+  <p>The judge evaluated both outputs without knowing which used the skill.</p>
+  <table>
+    <thead><tr><th>Preference</th><th>Count</th><th>Percentage</th></tr></thead>
+    <tbody>
+      <tr><td>With-skill preferred</td><td>${a.withSkillPreferred}</td><td>${pct(a.withSkillPreferred, evaluated)}%</td></tr>
+      <tr><td>Without-skill preferred</td><td>${a.withoutSkillPreferred}</td><td>${pct(a.withoutSkillPreferred, evaluated)}%</td></tr>
+      <tr><td>Tie</td><td>${a.ties}</td><td>${pct(a.ties, evaluated)}%</td></tr>
+    </tbody>
+  </table>
+  <h3>Per-Task Blind Results</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Task</th><th>Assignment</th><th>A Instr.</th><th>A Output</th><th>B Instr.</th><th>B Output</th><th>Preferred</th><th>Condition</th><th>Bias?</th></tr></thead>
+      <tbody>${taskRows}</tbody>
+    </table>
+  </div>
+  ${alerts}
+</section>`;
+}
+function renderCrossIterationSection(comparison) {
+  const sd = comparison.summaryDelta;
+  let taskRows = "";
+  for (const td of comparison.taskDeltas) {
+    const changeClass = td.significantChange === "improved" ? "delta-positive" : td.significantChange === "regressed" ? "delta-negative" : "";
+    taskRows += `<tr class="${changeClass}">
+      <td>${escapeHtml(td.taskId)}</td>
+      <td>${td.previous.adherence.toFixed(1)} &rarr; ${td.current.adherence.toFixed(1)} (${escapeHtml(formatDelta(td.delta.adherence, 1))})</td>
+      <td>${td.previous.outputQuality.toFixed(1)} &rarr; ${td.current.outputQuality.toFixed(1)} (${escapeHtml(formatDelta(td.delta.outputQuality, 1))})</td>
+      <td>${td.previous.weightedScore.toFixed(2)} &rarr; ${td.current.weightedScore.toFixed(2)} (${escapeHtml(formatDelta(td.delta.weightedScore))})</td>
+      <td><span class="status ${td.significantChange === "improved" ? "status-pass" : td.significantChange === "regressed" ? "status-fail" : "status-neutral"}">${td.significantChange}</span></td>
+    </tr>`;
+  }
+  let extras = "";
+  if (comparison.tasksOnlyInCurrent.length > 0) {
+    extras += `<p><strong>New tasks:</strong> ${comparison.tasksOnlyInCurrent.map(escapeHtml).join(", ")}</p>`;
+  }
+  if (comparison.tasksOnlyInPrevious.length > 0) {
+    extras += `<p><strong>Removed tasks:</strong> ${comparison.tasksOnlyInPrevious.map(escapeHtml).join(", ")}</p>`;
+  }
+  return `
+<section id="cross-iteration">
+  <h2>Cross-Iteration Comparison</h2>
+  <p>vs ${escapeHtml(comparison.previousSkillName)} (${escapeHtml(comparison.previousTimestamp)})</p>
+  <table>
+    <thead><tr><th>Metric</th><th>Previous</th><th>Current</th><th>Delta</th></tr></thead>
+    <tbody>
+      <tr><td>Discovery</td><td>${(sd.previous.discoveryAccuracy * 100).toFixed(1)}%</td><td>${(sd.current.discoveryAccuracy * 100).toFixed(1)}%</td><td class="delta">${escapeHtml(formatDelta(sd.delta.discoveryAccuracy * 100, 1))}%</td></tr>
+      <tr><td>Adherence</td><td>${sd.previous.avgAdherence.toFixed(2)}</td><td>${sd.current.avgAdherence.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd.delta.avgAdherence))}</td></tr>
+      <tr><td>Output Quality</td><td>${sd.previous.avgOutputQuality.toFixed(2)}</td><td>${sd.current.avgOutputQuality.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd.delta.avgOutputQuality))}</td></tr>
+      <tr><td>Weighted Score</td><td>${sd.previous.avgWeightedScore.toFixed(2)}</td><td>${sd.current.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd.delta.avgWeightedScore))}</td></tr>
+    </tbody>
+  </table>
+  <h3>Per-Task Changes</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Task</th><th>Adherence</th><th>Output Quality</th><th>Weighted Score</th><th>Change</th></tr></thead>
+      <tbody>${taskRows}</tbody>
+    </table>
+  </div>
+  ${extras}
+</section>`;
+}
+function renderHumanFeedbackSection(feedback, scores) {
+  let rows = "";
+  for (const [taskId, text] of Object.entries(feedback)) {
+    const score = scores.find((s) => s.taskId === taskId);
+    const addressed = score?.judge?.feedbackAddressed === true ? "Yes" : score?.judge?.feedbackAddressed === false ? "No" : "N/A";
+    rows += `<tr>
+      <td>${escapeHtml(taskId)}</td>
+      <td>${escapeHtml(text)}</td>
+      <td>${addressed}</td>
+    </tr>`;
+  }
+  return `
+<section id="human-feedback">
+  <h2>Human Review</h2>
+  <table>
+    <thead><tr><th>Task</th><th>Feedback</th><th>Addressed</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</section>`;
+}
+function renderStyles() {
+  return `<style>
+:root {
+  --color-bg: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-border: #dee2e6;
+  --color-text: #212529;
+  --color-text-muted: #6c757d;
+  --color-pass: #198754;
+  --color-fail: #dc3545;
+  --color-flaky: #fd7e14;
+  --color-neutral: #6c757d;
+  --color-hover: #f1f3f5;
+  --color-detail-bg: #f8f9fa;
+  --color-positive: #198754;
+  --color-negative: #dc3545;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  margin: 0;
+  padding: 0;
+  line-height: 1.5;
+}
+.container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+header { margin-bottom: 2rem; }
+.header-top { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 1.5rem; }
+h2 { margin: 1.5rem 0 0.75rem; font-size: 1.25rem; border-bottom: 2px solid var(--color-border); padding-bottom: 0.5rem; }
+h3 { margin: 1rem 0 0.5rem; font-size: 1.1rem; }
+h4 { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--color-text-muted); }
+.badge {
+  display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px;
+  font-weight: 700; font-size: 0.875rem; text-transform: uppercase;
+}
+.badge-pass { background: var(--color-pass); color: #fff; }
+.badge-fail { background: var(--color-fail); color: #fff; }
+.metadata { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; color: var(--color-text-muted); font-size: 0.875rem; }
+.metadata span::before { content: "\\2022 "; }
+.metadata span:first-child::before { content: ""; }
+
+/* Dashboard */
+#dashboard { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+.gauges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; }
+.gauge { text-align: center; }
+.gauge-svg { width: 140px; height: 80px; }
+.gauge-value { font-size: 1.25rem; font-weight: 700; margin-top: -0.25rem; }
+.gauge-label { font-size: 0.875rem; color: var(--color-text-muted); }
+.gauge-threshold { font-size: 0.75rem; color: var(--color-text-muted); }
+.stddev { font-size: 0.8em; color: var(--color-text-muted); font-weight: 400; }
+.stats-row { display: flex; justify-content: space-around; border-top: 1px solid var(--color-border); padding-top: 1rem; }
+.stat { text-align: center; }
+.stat-value { font-size: 1.1rem; font-weight: 700; }
+.stat-label { font-size: 0.8rem; color: var(--color-text-muted); }
+
+/* Failure Analysis */
+.bar-chart { margin: 0.5rem 0; }
+.bar-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.35rem 0; }
+.bar-label { width: 160px; font-size: 0.875rem; text-align: right; flex-shrink: 0; }
+.bar-track { flex: 1; height: 20px; background: var(--color-border); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+.bar-pass { background: var(--color-pass); }
+.bar-fail { background: var(--color-fail); }
+.bar-count { width: 80px; font-size: 0.8rem; color: var(--color-text-muted); }
+
+/* Controls */
+#controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+#search {
+  flex: 1; min-width: 200px; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border);
+  border-radius: 4px; font-size: 0.875rem; outline: none;
+}
+#search:focus { border-color: #80bdff; box-shadow: 0 0 0 2px rgba(0,123,255,.15); }
+.filter-toggles { display: flex; gap: 0.25rem; }
+.filter-btn {
+  padding: 0.35rem 0.75rem; border: 1px solid var(--color-border); border-radius: 4px;
+  background: var(--color-surface); cursor: pointer; font-size: 0.8rem;
+}
+.filter-btn:hover { background: var(--color-hover); }
+.filter-btn.active { background: var(--color-text); color: #fff; border-color: var(--color-text); }
+#visible-count { font-size: 0.8rem; color: var(--color-text-muted); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; }
+th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--color-border); }
+th { background: var(--color-bg); font-weight: 600; position: sticky; top: 0; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable::after { content: " \\2195"; color: var(--color-text-muted); font-size: 0.75em; }
+th.sortable.sort-asc::after { content: " \\2191"; color: var(--color-text); }
+th.sortable.sort-desc::after { content: " \\2193"; color: var(--color-text); }
+.task-row { cursor: pointer; }
+.task-row:hover { background: var(--color-hover); }
+.detail-row { display: none; }
+.detail-row.open { display: table-row; }
+.detail-row td { padding: 0; background: var(--color-detail-bg); }
+
+/* Status badges */
+.status { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.75rem; font-weight: 600; }
+.status-pass { background: #d1e7dd; color: var(--color-pass); }
+.status-fail { background: #f8d7da; color: var(--color-fail); }
+.status-flaky { background: #fff3cd; color: #664d03; }
+.status-neutral { background: #e2e3e5; color: var(--color-neutral); }
+
+/* Task detail panel */
+.task-detail { padding: 1rem 1.5rem; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.detail-section { margin-bottom: 1rem; }
+.checklist { list-style: none; padding: 0; margin: 0; }
+.checklist li { padding: 0.25rem 0; }
+.check-pass { color: var(--color-pass); font-weight: 700; }
+.check-fail { color: var(--color-fail); font-weight: 700; }
+.check-evidence { font-size: 0.8rem; color: var(--color-text-muted); margin-left: 1.5rem; }
+.agent-output { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 4px; overflow-x: auto; font-size: 0.8rem; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+.metrics { font-size: 0.8rem; color: var(--color-text-muted); margin-top: 0.5rem; }
+blockquote { border-left: 3px solid var(--color-border); padding-left: 1rem; margin: 0.5rem 0; color: var(--color-text-muted); }
+.run-table { font-size: 0.8rem; }
+
+/* Deltas */
+.delta { font-weight: 600; }
+.delta-positive { background: #d1e7dd; }
+.delta-negative { background: #f8d7da; }
+
+/* Alerts */
+.alert { padding: 0.75rem 1rem; border-radius: 4px; margin-top: 0.75rem; font-size: 0.875rem; }
+.alert-warn { background: #fff3cd; color: #664d03; border: 1px solid #ffecb5; }
+
+/* Sections */
+section { margin-bottom: 1.5rem; }
+footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--color-border); font-size: 0.8rem; color: var(--color-text-muted); text-align: center; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .gauges { grid-template-columns: 1fr; }
+  .stats-row { flex-wrap: wrap; gap: 1rem; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .bar-label { width: 100px; }
+  #controls { flex-direction: column; align-items: stretch; }
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1a1a2e;
+    --color-surface: #16213e;
+    --color-border: #0f3460;
+    --color-text: #e2e2e2;
+    --color-text-muted: #a0a0a0;
+    --color-pass: #2dd4bf;
+    --color-fail: #f87171;
+    --color-flaky: #fbbf24;
+    --color-neutral: #9ca3af;
+    --color-hover: #1e2a4a;
+    --color-detail-bg: #1a1a2e;
+    --color-positive: #2dd4bf;
+    --color-negative: #f87171;
+  }
+  .badge-pass { background: #065f46; color: #d1fae5; }
+  .badge-fail { background: #991b1b; color: #fee2e2; }
+  .status-pass { background: #064e3b; color: var(--color-pass); }
+  .status-fail { background: #7f1d1d; color: var(--color-fail); }
+  .status-flaky { background: #78350f; color: var(--color-flaky); }
+  .status-neutral { background: #374151; color: var(--color-neutral); }
+  .agent-output { background: #0d1117; color: #c9d1d9; }
+  .alert-warn { background: #78350f; color: #fef3c7; border-color: #92400e; }
+  #search { background: var(--color-surface); color: var(--color-text); }
+  #search:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.25); }
+  .filter-btn { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
+  .filter-btn:hover { background: var(--color-hover); }
+  .filter-btn.active { background: #e2e2e2; color: #1a1a2e; border-color: #e2e2e2; }
+  .delta-positive { background: #064e3b; }
+  .delta-negative { background: #7f1d1d; }
+}
+</style>`;
+}
+function renderScript() {
+  return `
+(function() {
+  const data = window.__REPORT_DATA__;
+  let currentFilter = 'all';
+  let currentSearch = '';
+  let sortCol = 'index';
+  let sortAsc = true;
+
+  // Sorting
+  const headers = document.querySelectorAll('th.sortable');
+  headers.forEach(function(th) {
+    th.addEventListener('click', function() {
+      const col = th.getAttribute('data-col');
+      if (sortCol === col) {
+        sortAsc = !sortAsc;
+      } else {
+        sortCol = col;
+        sortAsc = true;
+      }
+      headers.forEach(function(h) { h.classList.remove('sort-asc', 'sort-desc'); });
+      th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+      sortTable();
+    });
+  });
+
+  function sortTable() {
+    const tbody = document.querySelector('#task-table tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr.task-row'));
+    rows.sort(function(a, b) {
+      const idxA = parseInt(a.getAttribute('data-index'));
+      const idxB = parseInt(b.getAttribute('data-index'));
+      const dA = data[idxA];
+      const dB = data[idxB];
+      let valA, valB;
+      if (sortCol === 'index') { valA = idxA; valB = idxB; }
+      else if (sortCol === 'taskId') { valA = dA.taskId.toLowerCase(); valB = dB.taskId.toLowerCase(); }
+      else if (sortCol === 'failureCategory') { valA = dA.failureCategory; valB = dB.failureCategory; }
+      else { valA = dA[sortCol]; valB = dB[sortCol]; }
+      if (valA < valB) return sortAsc ? -1 : 1;
+      if (valA > valB) return sortAsc ? 1 : -1;
+      return 0;
+    });
+    rows.forEach(function(row) {
+      const detailRow = row.nextElementSibling;
+      tbody.appendChild(row);
+      tbody.appendChild(detailRow);
+    });
+    applyFilters();
+  }
+
+  // Collapsible details
+  document.querySelector('#task-table tbody').addEventListener('click', function(e) {
+    const row = e.target.closest('tr.task-row');
+    if (!row) return;
+    const detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('detail-row')) {
+      detail.classList.toggle('open');
+    }
+  });
+
+  // Search
+  const searchInput = document.getElementById('search');
+  searchInput.addEventListener('input', function() {
+    currentSearch = searchInput.value.toLowerCase();
+    applyFilters();
+  });
+
+  // Filter toggles
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  filterBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      filterBtns.forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentFilter = btn.getAttribute('data-filter');
+      applyFilters();
+    });
+  });
+
+  function applyFilters() {
+    const rows = document.querySelectorAll('#task-table tbody tr.task-row');
+    let visible = 0;
+    rows.forEach(function(row) {
+      const idx = parseInt(row.getAttribute('data-index'));
+      const d = data[idx];
+      let show = true;
+
+      // Search filter
+      if (currentSearch && d.taskId.toLowerCase().indexOf(currentSearch) === -1
+          && d.prompt.toLowerCase().indexOf(currentSearch) === -1) {
+        show = false;
+      }
+
+      // Category filter
+      if (show && currentFilter === 'failed' && d.failureCategory === 'none') show = false;
+      if (show && currentFilter === 'flaky' && !d.isFlaky) show = false;
+      if (show && currentFilter === 'regressed' && !d.isRegressed) show = false;
+
+      row.style.display = show ? '' : 'none';
+      // Also hide detail row
+      const detail = row.nextElementSibling;
+      if (detail && detail.classList.contains('detail-row')) {
+        if (!show) {
+          detail.style.display = 'none';
+          detail.classList.remove('open');
+        } else {
+          detail.style.display = '';
+        }
+      }
+      if (show) visible++;
+    });
+
+    const countEl = document.getElementById('visible-count');
+    countEl.textContent = visible + ' of ' + data.length + ' tasks';
+  }
+
+  // Gauge animation
+  document.querySelectorAll('.gauge-fill').forEach(function(el) {
+    const target = el.getAttribute('stroke-dashoffset');
+    const dasharray = parseFloat(el.getAttribute('stroke-dasharray'));
+    el.setAttribute('stroke-dashoffset', String(dasharray));
+    requestAnimationFrame(function() {
+      el.style.transition = 'stroke-dashoffset 0.6s ease-out';
+      el.setAttribute('stroke-dashoffset', target);
+    });
+  });
+
+  // Initialize count
+  applyFilters();
+})();`;
+}
+
 // dist/src/report/github-summary.js
-var fs12 = __toESM(require("fs/promises"), 1);
+var fs14 = __toESM(require("fs/promises"), 1);
 init_config();
 function generateGitHubSummary(report, config2) {
   const resolvedConfig = config2 ?? loadConfigSync();
@@ -47406,7 +48365,7 @@ function generateGitHubSummary(report, config2) {
     const status = s.failureCategory === "none" ? "PASS" : "FAIL";
     const taskId = t.task.id.replace(/\|/g, "\\|");
     if (isMultiRun) {
-      const varianceLabel = s.stddev ? s.stddev.adherence > FLAKY_STDDEV_THRESHOLD || s.stddev.outputQuality > FLAKY_STDDEV_THRESHOLD ? ":warning: High" : "Low" : "N/A";
+      const varianceLabel = s.stddev ? isFlaky(s.stddev) ? ":warning: High" : "Low" : "N/A";
       lines.push(`| ${taskId} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
     } else {
       lines.push(`| ${taskId} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
@@ -47475,12 +48434,155 @@ async function writeGitHubSummary(report, config2) {
   if (!summaryPath)
     return false;
   const summary2 = generateGitHubSummary(report, config2);
-  await fs12.appendFile(summaryPath, summary2 + "\n");
+  await fs14.appendFile(summaryPath, summary2 + "\n");
   return true;
 }
 
 // dist/src/pipeline.js
 init_config();
+
+// dist/src/cache/response-cache.js
+var crypto = __toESM(require("crypto"), 1);
+var fs15 = __toESM(require("fs/promises"), 1);
+var path12 = __toESM(require("path"), 1);
+var ResponseCache = class {
+  config;
+  constructor(config2) {
+    if (config2.ttlHours <= 0) {
+      throw new Error("Cache TTL must be a positive number of hours");
+    }
+    this.config = config2;
+  }
+  /**
+   * Look up a cached TaskResult by key. Returns null on miss, expiry, or error.
+   */
+  async get(key) {
+    if (!this.config.enabled)
+      return null;
+    if (!/^[a-f0-9]{64}$/.test(key)) {
+      return null;
+    }
+    try {
+      const filePath = path12.join(this.config.dir, `${key}.json`);
+      const content = await fs15.readFile(filePath, "utf-8");
+      const entry = JSON.parse(content);
+      if (!entry?.taskResult?.taskId || !entry?.cachedAt) {
+        return null;
+      }
+      const age = Date.now() - new Date(entry.cachedAt).getTime();
+      if (age > this.config.ttlHours * 3600 * 1e3) {
+        return null;
+      }
+      return entry.taskResult;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * Store a TaskResult in the cache.
+   */
+  async set(key, result, keyInputs) {
+    if (!this.config.enabled)
+      return;
+    if (!/^[a-f0-9]{64}$/.test(key)) {
+      return;
+    }
+    try {
+      await fs15.mkdir(this.config.dir, { recursive: true });
+      const entry = {
+        taskResult: result,
+        cachedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        cacheKeyInputs: keyInputs
+      };
+      const filePath = path12.join(this.config.dir, `${key}.json`);
+      const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+      await fs15.writeFile(tmpPath, JSON.stringify(entry, null, 2));
+      await fs15.rename(tmpPath, filePath);
+    } catch (err) {
+      console.warn(`Cache write failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  /**
+   * Remove all cached entries. Returns the count of deleted files.
+   */
+  async clear() {
+    try {
+      const entries = await fs15.readdir(this.config.dir);
+      const cacheFiles = entries.filter((e) => /^[a-f0-9]{64}\.json$/.test(e));
+      await Promise.all(cacheFiles.map((f) => fs15.unlink(path12.join(this.config.dir, f))));
+      return { deletedCount: cacheFiles.length };
+    } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
+        return { deletedCount: 0 };
+      }
+      throw err;
+    }
+  }
+  /**
+   * Compute a deterministic SHA-256 cache key from execution-affecting params.
+   */
+  static computeCacheKey(params) {
+    const canonical = {
+      taskId: params.taskId,
+      prompt: params.prompt,
+      model: params.model,
+      runnerType: params.runnerType,
+      skillsHash: params.skillsHash,
+      taskTimeoutMs: params.taskTimeoutMs,
+      allowedWriteDirs: [...params.allowedWriteDirs].sort()
+    };
+    if (params.runIndex !== void 0) {
+      canonical.runIndex = params.runIndex;
+    }
+    const json2 = JSON.stringify(canonical);
+    return crypto.createHash("sha256").update(json2).digest("hex");
+  }
+  /**
+   * Compute a content hash of all files in a skills directory.
+   *
+   * Hashes file paths (relative, sorted) and contents for determinism.
+   * Returns 'no-skills' when skillsDir is undefined or missing.
+   */
+  static async hashSkillsDir(skillsDir) {
+    if (!skillsDir)
+      return "no-skills";
+    try {
+      const files = await collectFiles(skillsDir);
+      if (files.length === 0)
+        return "no-skills";
+      const relativePaths = files.map((f) => path12.relative(skillsDir, f).split(path12.sep).join("/"));
+      relativePaths.sort();
+      const hash = crypto.createHash("sha256");
+      for (const relPath of relativePaths) {
+        const content = await fs15.readFile(path12.join(skillsDir, relPath));
+        hash.update(relPath);
+        hash.update("\0");
+        hash.update(content);
+      }
+      return hash.digest("hex");
+    } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
+        return "no-skills";
+      }
+      throw err;
+    }
+  }
+};
+async function collectFiles(dir) {
+  const results = [];
+  const entries = await fs15.readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path12.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...await collectFiles(fullPath));
+    } else {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
+// dist/src/pipeline.js
 async function loadHumanFeedback(feedbackPath, tasks) {
   if (!feedbackPath)
     return void 0;
@@ -47495,10 +48597,10 @@ async function loadHumanFeedback(feedbackPath, tasks) {
   return feedback;
 }
 function smartLabel(skillPath) {
-  const parts = path10.normalize(skillPath).split(path10.sep).filter(Boolean);
+  const parts = path13.normalize(skillPath).split(path13.sep).filter(Boolean);
   return parts.length >= 2 ? parts.slice(-2).join("/") : parts[parts.length - 1] || skillPath;
 }
-async function runPhase(phaseLabel, evaluation, config2, cwd2, skillsDir, numRuns, scorerOptions, logBaseDir) {
+async function runPhase(phaseLabel, evaluation, config2, cwd2, skillsDir, numRuns, scorerOptions, logBaseDir, cacheOptions) {
   const runner = await createRunner(config2.runnerType, {
     cwd: cwd2,
     model: config2.defaultAgentModel,
@@ -47518,8 +48620,54 @@ async function runPhase(phaseLabel, evaluation, config2, cwd2, skillsDir, numRun
 --- ${phaseLabel}: Running Tasks (${config2.runnerType}) ---
 `);
     }
-    const runLogDir = numRuns > 1 ? path10.join(logBaseDir, `run-${run2 + 1}`) : logBaseDir;
-    const results2 = await runner.runAll(evaluation, (task) => new SessionLogger(task.id, runLogDir));
+    const runLogDir = numRuns > 1 ? path13.join(logBaseDir, `run-${run2 + 1}`) : logBaseDir;
+    const results2 = [];
+    let cacheHits = 0;
+    for (const task of evaluation.tasks) {
+      const cacheKey = cacheOptions ? ResponseCache.computeCacheKey({
+        taskId: task.id,
+        prompt: task.prompt,
+        model: config2.defaultAgentModel,
+        runnerType: config2.runnerType,
+        skillsHash: cacheOptions.skillsHash,
+        taskTimeoutMs: config2.taskTimeoutMs,
+        allowedWriteDirs: config2.allowedWriteDirs,
+        runIndex: numRuns > 1 ? run2 : void 0
+      }) : null;
+      let result = null;
+      if (cacheKey && cacheOptions && !cacheOptions.skipCache) {
+        result = await cacheOptions.cache.get(cacheKey);
+        if (result) {
+          console.log(`Task ${task.id}: cache hit (hash ${cacheKey.substring(0, 8)})`);
+          cacheHits++;
+        }
+      }
+      if (!result) {
+        console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + "..." : task.prompt}`);
+        const logger = new SessionLogger(task.id, runLogDir);
+        result = await runner.runTaskWithTimeout(task, void 0, logger);
+        if (result.isError) {
+          console.error(`  ERROR: ${result.errorMessage}`);
+        } else {
+          console.log(`  Skills loaded: ${result.skillLoads.join(", ") || "none"}`);
+          console.log(`  Duration: ${(result.durationMs / 1e3).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
+        }
+        if (cacheKey && cacheOptions && !result.isError) {
+          await cacheOptions.cache.set(cacheKey, result, {
+            taskId: task.id,
+            cacheKeyPrefix: cacheKey.substring(0, 8),
+            modelId: config2.defaultAgentModel,
+            runnerType: config2.runnerType,
+            skillsHash: cacheOptions.skillsHash
+          });
+        }
+      }
+      results2.push(result);
+    }
+    if (cacheOptions && cacheHits > 0) {
+      console.log(`
+${cacheHits} of ${evaluation.tasks.length} task(s) served from cache`);
+    }
     allResults.push(results2);
     if (numRuns > 1) {
       console.log(`
@@ -47639,10 +48787,10 @@ async function runPipeline(options) {
   }
   let skillsDir = options.skillsDir;
   if (!skillsDir) {
-    const tasksDir = path10.dirname(path10.resolve(options.tasksFile));
-    const autoSkillsDir = path10.join(tasksDir, "skills");
+    const tasksDir = path13.dirname(path13.resolve(options.tasksFile));
+    const autoSkillsDir = path13.join(tasksDir, "skills");
     try {
-      const stat3 = await fs13.stat(autoSkillsDir);
+      const stat3 = await fs16.stat(autoSkillsDir);
       if (stat3.isDirectory()) {
         skillsDir = autoSkillsDir;
       }
@@ -47652,7 +48800,7 @@ async function runPipeline(options) {
   if (options.compareSkillPath) {
     let stat3;
     try {
-      stat3 = await fs13.stat(options.compareSkillPath);
+      stat3 = await fs16.stat(options.compareSkillPath);
     } catch (err) {
       if (err.code === "ENOENT") {
         throw new Error(`--compare-skill path not found: ${options.compareSkillPath}`);
@@ -47667,13 +48815,18 @@ async function runPipeline(options) {
     throw new Error("--compare requires a skills directory but none was found. Provide a skill via the evaluation YAML or use --compare-skill to specify a baseline skill path.");
   }
   const numRuns = options.numRuns ?? 3;
-  const logDir = path10.join(config2.outputDir, "logs");
+  const logDir = path13.join(config2.outputDir, "logs");
   const scorerOptions = {
     noDeterministic: options.noDeterministic,
     noJudge: options.noJudge,
     judgeOptions: { model: config2.defaultJudgeModel },
-    humanFeedback
+    humanFeedback,
+    cwd: cwd2
   };
+  const cacheEnabled = config2.cache.enabled && !options.bustCache;
+  const cache = cacheEnabled ? new ResponseCache(config2.cache) : null;
+  const skillsHash = cache ? await ResponseCache.hashSkillsDir(skillsDir) : "";
+  const cacheOpts = cache ? { cache, skillsHash, skipCache: options.skipCache } : void 0;
   let primaryPhase;
   let comparison;
   let blindComparison;
@@ -47689,7 +48842,7 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
 `);
       console.log("=== Phase 1/2: With Skill ===");
       needsCleanup = await setupSkills(skillsDir, config2, cwd2);
-      const withPhase = await runPhase("With Skill", evaluation, config2, cwd2, skillsDir, numRuns, scorerOptions, path10.join(logDir, "with-skill"));
+      const withPhase = await runPhase("With Skill", evaluation, config2, cwd2, skillsDir, numRuns, scorerOptions, path13.join(logDir, "with-skill"), cacheOpts);
       if (needsCleanup) {
         await cleanupLocalSkills(cwd2);
         needsCleanup = false;
@@ -47706,7 +48859,8 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
         noDeterministic: isNoSkillBaseline ? true : scorerOptions.noDeterministic,
         isBaseline: isNoSkillBaseline
       };
-      const basePhase = await runPhase(baselineLabel, evaluation, config2, cwd2, baseSkillsDir, numRuns, baselineScorerOptions, path10.join(logDir, "baseline"));
+      const baseCacheOpts = cache ? { cache, skillsHash: await ResponseCache.hashSkillsDir(baseSkillsDir), skipCache: options.skipCache } : void 0;
+      const basePhase = await runPhase(baselineLabel, evaluation, config2, cwd2, baseSkillsDir, numRuns, baselineScorerOptions, path13.join(logDir, "baseline"), baseCacheOpts);
       console.log("\n=== Computing Comparison Deltas ===\n");
       comparison = computeComparison(withPhase, basePhase, baselineLabel, evaluation.tasks, options.compareSkillPath);
       if (options.blindCompare) {
@@ -47717,7 +48871,7 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
       primaryPhase = withPhase;
     } else {
       needsCleanup = await setupSkills(skillsDir, config2, cwd2);
-      primaryPhase = await runPhase("Evaluation", evaluation, config2, cwd2, skillsDir, numRuns, scorerOptions, logDir);
+      primaryPhase = await runPhase("Evaluation", evaluation, config2, cwd2, skillsDir, numRuns, scorerOptions, logDir, cacheOpts);
     }
     if (previousReport) {
       console.log("\n--- Comparing with Previous Results ---\n");
@@ -47745,8 +48899,8 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
   const timestamp2 = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
   const suffix = comparison ? "comparison" : "";
   const reportBaseName = [evaluation.skillName, suffix, timestamp2].filter(Boolean).join("-");
-  const reportPath = path10.join(config2.outputDir, `${reportBaseName}.md`);
-  const jsonPath = path10.join(config2.outputDir, `${reportBaseName}.json`);
+  const reportPath = path13.join(config2.outputDir, `${reportBaseName}.md`);
+  const jsonPath = path13.join(config2.outputDir, `${reportBaseName}.json`);
   const metadata = {
     skillPath: options.tasksFile,
     runnerType: config2.runnerType,
@@ -47767,6 +48921,7 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
   };
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
+  const htmlPath = await maybeGenerateHtmlReport(config2, reportBaseName, reportOptions);
   if (config2.githubSummary) {
     const wrote = await writeGitHubSummary(report, config2);
     if (wrote) {
@@ -47798,6 +48953,18 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
     blindComparison,
     crossIterationComparison
   };
+}
+async function maybeGenerateHtmlReport(config2, reportBaseName, reportOptions) {
+  if (!config2.htmlReport)
+    return void 0;
+  try {
+    const htmlPath = path13.join(config2.outputDir, `${reportBaseName}.html`);
+    await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
+    return htmlPath;
+  } catch (err) {
+    console.warn(`Warning: HTML report generation failed: ${err instanceof Error ? err.message : String(err)}`);
+    return void 0;
+  }
 }
 function printSummary(report) {
   const s = report.summary;

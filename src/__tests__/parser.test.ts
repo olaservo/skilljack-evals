@@ -3,7 +3,7 @@ import * as yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { createEvalTemplate, validateEvalFile } from '../parser.js';
+import { createEvalTemplate, validateEvalFile, parseEvalFile } from '../parser.js';
 
 describe('createEvalTemplate', () => {
   const tmpFiles: string[] = [];
@@ -76,5 +76,101 @@ describe('createEvalTemplate', () => {
     const errors = await validateEvalFile(tmpFile);
 
     expect(errors).toEqual([]);
+  });
+});
+
+describe('parseEvalFile — deterministic assertion fields', () => {
+  const tmpFiles: string[] = [];
+
+  afterEach(async () => {
+    for (const f of tmpFiles) {
+      await fs.rm(f, { force: true }).catch(() => {});
+    }
+    tmpFiles.length = 0;
+  });
+
+  async function writeAndParse(yamlContent: string) {
+    const tmpFile = path.join(os.tmpdir(), `parser-det-${Date.now()}.yaml`);
+    tmpFiles.push(tmpFile);
+    await fs.writeFile(tmpFile, yamlContent);
+    return parseEvalFile(tmpFile);
+  }
+
+  it('parses expect_contains and expect_not_contains', async () => {
+    const eval_ = await writeAndParse(`
+skill: test
+tasks:
+  - id: t1
+    prompt: test
+    deterministic:
+      expect_contains:
+        - "hello"
+        - "world"
+      expect_not_contains:
+        - "error"
+`);
+    const det = eval_.tasks[0].deterministic!;
+    expect(det.expectContains).toEqual(['hello', 'world']);
+    expect(det.expectNotContains).toEqual(['error']);
+  });
+
+  it('parses expect_regex', async () => {
+    const eval_ = await writeAndParse(`
+skill: test
+tasks:
+  - id: t1
+    prompt: test
+    deterministic:
+      expect_regex:
+        - "\\\\d{4}-\\\\d{2}-\\\\d{2}"
+        - "^hello"
+`);
+    const det = eval_.tasks[0].deterministic!;
+    expect(det.expectRegex).toHaveLength(2);
+  });
+
+  it('parses expect_javascript', async () => {
+    const eval_ = await writeAndParse(`
+skill: test
+tasks:
+  - id: t1
+    prompt: test
+    deterministic:
+      expect_javascript: "output.length > 10"
+`);
+    const det = eval_.tasks[0].deterministic!;
+    expect(det.expectJavascript).toBe('output.length > 10');
+  });
+
+  it('parses expect_file_exists', async () => {
+    const eval_ = await writeAndParse(`
+skill: test
+tasks:
+  - id: t1
+    prompt: test
+    deterministic:
+      expect_file_exists:
+        - "./output.json"
+        - "./report.md"
+`);
+    const det = eval_.tasks[0].deterministic!;
+    expect(det.expectFileExists).toEqual(['./output.json', './report.md']);
+  });
+
+  it('leaves new fields undefined when not specified', async () => {
+    const eval_ = await writeAndParse(`
+skill: test
+tasks:
+  - id: t1
+    prompt: test
+    deterministic:
+      expect_skill_activation: true
+`);
+    const det = eval_.tasks[0].deterministic!;
+    expect(det.expectContains).toBeUndefined();
+    expect(det.expectNotContains).toBeUndefined();
+    expect(det.expectRegex).toBeUndefined();
+    expect(det.expectJavascript).toBeUndefined();
+    expect(det.expectFileExists).toBeUndefined();
   });
 });

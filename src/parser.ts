@@ -62,6 +62,11 @@ interface RawDeterministic {
   expect_marker?: string;
   expect_tool_calls?: string[];
   expect_no_tool_calls?: string[];
+  expect_contains?: string[];
+  expect_not_contains?: string[];
+  expect_regex?: string[];
+  expect_javascript?: string;
+  expect_file_exists?: string[];
 }
 
 interface RawFixture {
@@ -156,6 +161,11 @@ function parseTask(raw: RawTask, defaults?: EvalDefaults): EvalTask {
       expectMarker: raw.deterministic.expect_marker,
       expectToolCalls: raw.deterministic.expect_tool_calls,
       expectNoToolCalls: raw.deterministic.expect_no_tool_calls,
+      expectContains: raw.deterministic.expect_contains,
+      expectNotContains: raw.deterministic.expect_not_contains,
+      expectRegex: raw.deterministic.expect_regex,
+      expectJavascript: raw.deterministic.expect_javascript,
+      expectFileExists: raw.deterministic.expect_file_exists,
     };
   }
 
@@ -270,6 +280,11 @@ export function createEvalTemplate(skillName: string, numTasks = 5): string {
     deterministic:
       expect_skill_activation: true
       # expect_marker: "OPTIONAL_MARKER_TEXT"
+      # expect_contains: ["expected substring"]
+      # expect_not_contains: ["ERROR", "FIXME"]
+      # expect_regex: ["\\\\d{4}-\\\\d{2}-\\\\d{2}"]
+      # expect_javascript: "output.length > 10"
+      # expect_file_exists: ["output.json"]
     criteria:
       discovery: { weight: 0.3, description: "Should load ${skillName} based on task context" }
       adherence: { weight: 0.4, description: "Should follow ${skillName} instructions" }

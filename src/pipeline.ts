@@ -121,7 +121,6 @@ export interface PipelineResult {
   report: EvaluationReport;
   reportPath?: string;
   jsonPath?: string;
-  htmlPath?: string;
   markdownSummary: string;
   feedbackTemplatePath?: string;
   comparison?: ComparisonData;
@@ -449,6 +448,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     noJudge: options.noJudge,
     judgeOptions: { model: config.defaultJudgeModel },
     humanFeedback,
+    cwd,
   };
 
   // 2b. Set up response cache
@@ -623,7 +623,6 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     report,
     reportPath,
     jsonPath,
-    htmlPath,
     markdownSummary,
     comparison,
     blindComparison,
@@ -698,7 +697,6 @@ export async function scorePipeline(
     report,
     reportPath,
     jsonPath,
-    htmlPath,
     markdownSummary,
   };
 }
