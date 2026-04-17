@@ -77,6 +77,97 @@ describe('createEvalTemplate', () => {
 
     expect(errors).toEqual([]);
   });
+
+  it('template includes commented examples of new assertion types', () => {
+    const template = createEvalTemplate('my-skill', 3);
+    expect(template).toContain('# expect_contains:');
+    expect(template).toContain('# expect_not_contains:');
+    expect(template).toContain('# expect_regex:');
+    expect(template).toContain('# expect_javascript:');
+    expect(template).toContain('# expect_file_exists:');
+  });
+});
+
+describe('validateEvalFile — deterministic assertions', () => {
+  const tmpFiles: string[] = [];
+
+  afterEach(async () => {
+    for (const f of tmpFiles) {
+      await fs.rm(f, { force: true }).catch(() => {});
+    }
+    tmpFiles.length = 0;
+  });
+
+  it('accepts valid expect_regex patterns', async () => {
+    const yamlContent = `
+skill: test-skill
+tasks:
+  - id: t-001
+    prompt: "test"
+    deterministic:
+      expect_regex:
+        - "\\\\d{4}-\\\\d{2}-\\\\d{2}"
+        - "hello.*world"
+`;
+    const tmpFile = path.join(os.tmpdir(), `parser-regex-valid-${Date.now()}.yaml`);
+    tmpFiles.push(tmpFile);
+    await fs.writeFile(tmpFile, yamlContent);
+    const errors = await validateEvalFile(tmpFile);
+    expect(errors.filter(e => e.includes('expect_regex'))).toEqual([]);
+  });
+
+  it('rejects invalid expect_regex patterns', async () => {
+    const yamlContent = `
+skill: test-skill
+tasks:
+  - id: t-001
+    prompt: "test"
+    deterministic:
+      expect_regex:
+        - "[invalid"
+`;
+    const tmpFile = path.join(os.tmpdir(), `parser-regex-invalid-${Date.now()}.yaml`);
+    tmpFiles.push(tmpFile);
+    await fs.writeFile(tmpFile, yamlContent);
+    const errors = await validateEvalFile(tmpFile);
+    expect(errors.some(e => e.includes('Invalid regex') && e.includes('[invalid'))).toBe(true);
+  });
+
+  it('parses new deterministic fields from YAML', async () => {
+    const yamlContent = `
+skill: test-skill
+tasks:
+  - id: t-001
+    prompt: "test"
+    deterministic:
+      expect_contains:
+        - "hello"
+        - "world"
+      expect_not_contains:
+        - "error"
+      expect_regex:
+        - "hello.*world"
+      expect_javascript: "output.length > 10"
+      expect_file_exists:
+        - "results/output.json"
+`;
+    const tmpFile = path.join(os.tmpdir(), `parser-new-fields-${Date.now()}.yaml`);
+    tmpFiles.push(tmpFile);
+    await fs.writeFile(tmpFile, yamlContent);
+
+    // Validate — should have no errors related to the new fields
+    const errors = await validateEvalFile(tmpFile);
+    expect(errors.filter(e => e.includes('expect_'))).toEqual([]);
+
+    // Parse and verify fields are mapped correctly
+    const evaluation = await parseEvalFile(tmpFile);
+    const det = evaluation.tasks[0].deterministic!;
+    expect(det.expectContains).toEqual(['hello', 'world']);
+    expect(det.expectNotContains).toEqual(['error']);
+    expect(det.expectRegex).toEqual(['hello.*world']);
+    expect(det.expectJavascript).toBe('output.length > 10');
+    expect(det.expectFileExists).toEqual(['results/output.json']);
+  });
 });
 
 describe('parseEvalFile — deterministic assertion fields', () => {

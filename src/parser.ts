@@ -244,6 +244,30 @@ export async function validateEvalFile(filePath: string): Promise<string[]> {
       errors.push(`${prefix}: Missing 'prompt'`);
     }
 
+    // Warn if output-assertion checks are used on negative tests (they have no effect on pass/fail)
+    if (task.deterministic?.expect_skill_activation === false) {
+      const hasOutputAssertions =
+        task.deterministic.expect_contains ||
+        task.deterministic.expect_not_contains ||
+        task.deterministic.expect_regex ||
+        task.deterministic.expect_javascript ||
+        task.deterministic.expect_file_exists;
+      if (hasOutputAssertions) {
+        errors.push(`${prefix}: Warning: output assertions (expect_contains, expect_regex, etc.) have no effect on pass/fail when expect_skill_activation is false`);
+      }
+    }
+
+    // Validate regex patterns are syntactically valid
+    if (task.deterministic?.expect_regex) {
+      for (const pattern of task.deterministic.expect_regex) {
+        try {
+          new RegExp(pattern);
+        } catch (e) {
+          errors.push(`${prefix}: Invalid regex in expect_regex: "${pattern}" — ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+
     // Validate criteria weights sum roughly to 1
     if (task.criteria) {
       const weights = Object.values(task.criteria)
