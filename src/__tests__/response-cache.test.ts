@@ -341,6 +341,19 @@ describe('ResponseCache get/set', () => {
     expect(retrieved).toEqual(taskResult);
   });
 
+  it('round-trips tokens on a TaskResult', async () => {
+    const cache = makeCache();
+    const taskResult = makeTaskResult({
+      tokens: { input: 1234, output: 567, cacheRead: 89, cacheCreation: 12, total: 1902 },
+    });
+
+    await cache.set(hexKey1, taskResult, keyInputs);
+    const retrieved = await cache.get(hexKey1);
+
+    expect(retrieved).not.toBeNull();
+    expect(retrieved!.tokens).toEqual(taskResult.tokens);
+  });
+
   it('returns null for expired entries', async () => {
     const cache = makeCache({ ttlHours: 1 });
     const taskResult = makeTaskResult();

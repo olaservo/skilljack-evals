@@ -39,6 +39,7 @@ export function generateGitHubSummary(report: EvaluationReport, config?: EvalCon
   lines.push(`| Weighted Score | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | | |`);
   lines.push(`| Duration | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |`);
   lines.push(`| Cost | $${summary.totalCostUsd.toFixed(4)} | | |`);
+  lines.push(`| Tokens | ${summary.totalTokens !== undefined ? summary.totalTokens.toLocaleString() : 'n/a'} | | |`);
   lines.push('');
 
   // Failures
@@ -153,6 +154,11 @@ export function generateGitHubSummary(report: EvaluationReport, config?: EvalCon
     lines.push(`| Adherence | ${ws.avgAdherence.toFixed(1)}/5 | ${bs.avgAdherence.toFixed(1)}/5 | **${formatDelta(d.avgAdherenceDelta)}** |`);
     lines.push(`| Output Quality | ${ws.avgOutputQuality.toFixed(1)}/5 | ${bs.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
     lines.push(`| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
+    if (d.totalTokensDelta !== undefined) {
+      const wsTokens = ws.totalTokens !== undefined ? ws.totalTokens.toLocaleString() : 'n/a';
+      const bsTokens = bs.totalTokens !== undefined ? bs.totalTokens.toLocaleString() : 'n/a';
+      lines.push(`| Tokens | ${wsTokens} | ${bsTokens} | **${formatDelta(d.totalTokensDelta, 0)}** |`);
+    }
     lines.push('');
   }
 

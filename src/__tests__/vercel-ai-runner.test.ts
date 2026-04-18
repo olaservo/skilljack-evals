@@ -125,6 +125,23 @@ describe('VercelAiRunner', () => {
     expect(result.costUsd).toBeGreaterThan(0);
   });
 
+  it('populates tokens from generateText usage (cache fields default to 0)', async () => {
+    const result = await runner.runTask(mockTask);
+    expect(result.tokens).toEqual({
+      input: 100,
+      output: 50,
+      cacheRead: 0,
+      cacheCreation: 0,
+      total: 150,
+    });
+  });
+
+  it('leaves tokens undefined when generateText does not return usage', async () => {
+    mockAi.generateText.mockImplementation(async () => ({ text: 'Hello!' }));
+    const result = await runner.runTask(mockTask);
+    expect(result.tokens).toBeUndefined();
+  });
+
   it('does NOT detect skill via readFile when countReadAsFallback is false', async () => {
     mockAi.generateText.mockImplementation(async (opts: any) => {
       opts.onStepFinish?.({

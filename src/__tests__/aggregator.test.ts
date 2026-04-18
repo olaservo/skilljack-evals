@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeStddev, aggregateScores, FLAKY_STDDEV_THRESHOLD, isFlaky } from '../scorer/aggregator.js';
+import { computeStddev, aggregateScores, aggregateResults, FLAKY_STDDEV_THRESHOLD, isFlaky } from '../scorer/aggregator.js';
 import { computeSummary } from '../report/report.js';
 import { makeScore, makeResult } from './fixtures/test-helpers.js';
 
@@ -170,5 +170,52 @@ describe('computeSummary', () => {
     const scores = [makeScore()]; // no stddev property
     const summary = computeSummary(results, scores, 2);
     expect(summary.stddev).toBeUndefined();
+  });
+
+  it('sums totalTokens across tasks when every result has tokens', () => {
+    const tokensA = { input: 100, output: 50, cacheRead: 0, cacheCreation: 0, total: 150 };
+    const tokensB = { input: 200, output: 75, cacheRead: 25, cacheCreation: 10, total: 310 };
+    const results = [
+      makeResult({ taskId: 't1', tokens: tokensA }),
+      makeResult({ taskId: 't2', tokens: tokensB }),
+    ];
+    const scores = [makeScore({ taskId: 't1' }), makeScore({ taskId: 't2' })];
+    const summary = computeSummary(results, scores, 1);
+    expect(summary.totalTokens).toBe(460);
+  });
+
+  it('leaves totalTokens undefined when any task lacks tokens', () => {
+    const results = [
+      makeResult({ taskId: 't1', tokens: { input: 10, output: 5, cacheRead: 0, cacheCreation: 0, total: 15 } }),
+      makeResult({ taskId: 't2' }), // no tokens
+    ];
+    const scores = [makeScore({ taskId: 't1' }), makeScore({ taskId: 't2' })];
+    const summary = computeSummary(results, scores, 1);
+    expect(summary.totalTokens).toBeUndefined();
+  });
+});
+
+describe('aggregateResults token sum', () => {
+  it('sums tokens across runs when every run reports them', () => {
+    const run1 = [makeResult({ taskId: 't1', tokens: { input: 100, output: 50, cacheRead: 10, cacheCreation: 5, total: 165 } })];
+    const run2 = [makeResult({ taskId: 't1', tokens: { input: 120, output: 60, cacheRead: 20, cacheCreation: 0, total: 200 } })];
+    const run3 = [makeResult({ taskId: 't1', tokens: { input: 80, output: 40, cacheRead: 0, cacheCreation: 0, total: 120 } })];
+    const scores = [[makeScore({ taskId: 't1' })], [makeScore({ taskId: 't1' })], [makeScore({ taskId: 't1' })]];
+    const result = aggregateResults([run1, run2, run3], scores);
+    expect(result[0].tokens).toEqual({
+      input: 300,
+      output: 150,
+      cacheRead: 30,
+      cacheCreation: 5,
+      total: 485,
+    });
+  });
+
+  it('leaves tokens undefined when any run lacks them', () => {
+    const run1 = [makeResult({ taskId: 't1', tokens: { input: 100, output: 50, cacheRead: 0, cacheCreation: 0, total: 150 } })];
+    const run2 = [makeResult({ taskId: 't1' })]; // no tokens
+    const scores = [[makeScore({ taskId: 't1' })], [makeScore({ taskId: 't1' })]];
+    const result = aggregateResults([run1, run2], scores);
+    expect(result[0].tokens).toBeUndefined();
   });
 });

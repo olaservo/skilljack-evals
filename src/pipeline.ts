@@ -329,6 +329,10 @@ function computeComparison(
         weightedScoreDelta: w.score.weightedScore - b.score.weightedScore,
         durationDeltaMs: w.result.durationMs - b.result.durationMs,
         costDeltaUsd: w.result.costUsd - b.result.costUsd,
+        totalTokensDelta:
+          w.result.tokens && b.result.tokens
+            ? w.result.tokens.total - b.result.tokens.total
+            : undefined,
       },
     });
   }
@@ -343,6 +347,10 @@ function computeComparison(
       avgWeightedScoreDelta: withPhase.summary.avgWeightedScore - basePhase.summary.avgWeightedScore,
       totalDurationDeltaMs: withPhase.summary.totalDurationMs - basePhase.summary.totalDurationMs,
       totalCostDeltaUsd: withPhase.summary.totalCostUsd - basePhase.summary.totalCostUsd,
+      totalTokensDelta:
+        withPhase.summary.totalTokens !== undefined && basePhase.summary.totalTokens !== undefined
+          ? withPhase.summary.totalTokens - basePhase.summary.totalTokens
+          : undefined,
     },
     baselineLabel,
   };
