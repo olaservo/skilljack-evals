@@ -4,7 +4,7 @@ CLI for evaluating [Agent Skills](https://agentskills.io/home) - a format for ex
 
 ## Key Files
 
-- `src/cli.ts` - CLI entry point (run, score, report, validate, create-eval, parse)
+- `src/cli.ts` - CLI entry point (run, score, report, validate, create-eval, parse, cache)
 - `src/types.ts` - TypeScript interfaces
 - `src/config.ts` - Centralized config (file + env + CLI precedence)
 - `src/parser.ts` - YAML parsing, validation, template generation
@@ -13,15 +13,19 @@ CLI for evaluating [Agent Skills](https://agentskills.io/home) - a format for ex
 - `src/runner/vercel-ai-runner.ts` - Vercel AI SDK runner
 - `src/runner/openai-agents-runner.ts` - OpenAI Agents SDK runner
 - `src/runner/copilot-sdk-runner.ts` - GitHub Copilot SDK runner
-- `src/runner/base-runner.ts` - Shared runner base class
+- `src/runner/base-runner.ts` - Shared runner base class (timeout, fixture setup/teardown)
 - `src/runner/runner-factory.ts` - Runner selection factory
 - `src/runner/skill-setup.ts` - Copy/cleanup skills in .claude/skills/
+- `src/runner/fixture-runner.ts` - Execute per-task fixture setup/teardown scripts
 - `src/runner/security.ts` - canUseTool write restrictions
 - `src/scorer/scorer.ts` - Score orchestrator (deterministic + judge merge)
-- `src/scorer/deterministic.ts` - Marker/tool-call checks (free, fast)
+- `src/scorer/deterministic.ts` - Activation/marker/tool-call/contains/regex/js/file-exists checks
 - `src/scorer/judge.ts` - LLM-as-judge scoring (SkillJudge)
+- `src/cache/response-cache.ts` - Content-addressed cache of TaskResult by execution inputs
+- `src/utils/concurrency.ts` - Bounded-concurrency helper used by runner + judge
 - `src/session/session-logger.ts` - Event capture and session logging
 - `src/report/report.ts` - Markdown + JSON report generation
+- `src/report/html-report.ts` - Interactive static HTML report
 - `src/report/github-summary.ts` - Condensed GitHub Actions summary
 - `src/index.ts` - Public API exports
 - `action/action.yml` + `action/index.ts` - GitHub Action entry point
@@ -55,10 +59,19 @@ Four runners selected via `--runner` flag:
 ## Scoring
 
 Two methods, run independently or together:
-- **Deterministic** (free): skill activation, marker strings, tool call checks
+- **Deterministic** (free): skill activation, `expect_marker`, `expect_tool_calls` / `expect_no_tool_calls`, `expect_contains` / `expect_not_contains`, `expect_regex`, `expect_javascript` (sandboxed expression), `expect_file_exists`
 - **LLM Judge** (~$0.001/task): discovery (0/1), adherence (1-5), output quality (1-5)
 - **Weighted Score** (0-1): `w_d * discovery + w_a * ((adherence-1)/4) + w_o * ((output-1)/4)`
 - **Blind A/B Comparison** (`--blind-compare`, requires `--compare`): anonymized judge evaluation to detect scoring bias
+
+## Fixtures
+
+Tasks may declare `fixture.setup` / `fixture.teardown` scripts (paths relative to `cwd`). Setup runs before the agent, teardown always runs after (even on setup failure). Fixture scripts are executed via `execFile` — eval authors are trusted. Tasks with a `fixture` or `expect_file_exists` check bypass the response cache because their outcome depends on current filesystem state.
+
+## Concurrency and caching
+
+- `--concurrency N` / `EVAL_RUNNER_CONCURRENCY` / `runner.concurrency`: max tasks in flight (1=sequential default, 0=unlimited). Applied by the pipeline's `runPhase` via `withConcurrencyLimit`.
+- Response cache: TaskResult keyed by SHA-256 of `{taskId, prompt, model, runnerType, skillsHash, fixturesHash, timeout, allowedWriteDirs, runIndex}`. Skill and fixture hashes invalidate on content change. Manage with `skilljack-evals cache clear`; bypass with `--skip-cache` (read-only skip) or `--bust-cache` (disable fully).
 
 ## Failure Categories
 

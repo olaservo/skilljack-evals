@@ -39,7 +39,8 @@ import type {
 } from './types.js';
 import { loadFeedback, writeFeedbackTemplate } from './feedback.js';
 import { SkillJudge, blindCompareAll } from './scorer/judge.js';
-import { ResponseCache } from './cache/response-cache.js';
+import { ResponseCache, isTaskCacheable } from './cache/response-cache.js';
+import { withConcurrencyLimit } from './utils/concurrency.js';
 
 /**
  * Load human feedback from a file, validating against known task IDs.
@@ -183,62 +184,64 @@ async function runPhase(
 
     const runLogDir = numRuns > 1 ? path.join(logBaseDir, `run-${run + 1}`) : logBaseDir;
 
-    // Per-task execution with cache support.
-    // Tasks run sequentially (not via runAll) so each result can be cached individually.
-    const results: TaskResult[] = [];
+    // Per-task execution with optional cache support, bounded by config.concurrency.
+    // Tasks with fixtures or expectFileExists bypass the cache entirely: their
+    // success depends on filesystem state that a cached TaskResult cannot represent.
     let cacheHits = 0;
-    for (const task of evaluation.tasks) {
-      // Compute cache key if caching is available
-      const cacheKey = cacheOptions
-        ? ResponseCache.computeCacheKey({
-            taskId: task.id,
-            prompt: task.prompt,
-            model: config.defaultAgentModel,
-            runnerType: config.runnerType,
-            skillsHash: cacheOptions.skillsHash,
-            taskTimeoutMs: config.taskTimeoutMs,
-            allowedWriteDirs: config.allowedWriteDirs,
-            runIndex: numRuns > 1 ? run : undefined,
-          })
-        : null;
+    const cacheConcurrent = config.concurrency ?? 1;
 
-      // Attempt cache read
-      let result: TaskResult | null = null;
-      if (cacheKey && cacheOptions && !cacheOptions.skipCache) {
-        result = await cacheOptions.cache.get(cacheKey);
-        if (result) {
-          console.log(`Task ${task.id}: cache hit (hash ${cacheKey.substring(0, 8)})`);
-          cacheHits++;
+    const factories = evaluation.tasks.map((task) => async (): Promise<TaskResult> => {
+      const cacheable = cacheOptions && isTaskCacheable(task);
+
+      let cacheKey: string | null = null;
+      if (cacheable && cacheOptions) {
+        const fixturesHash = await ResponseCache.hashFixtures(task.fixture, cwd);
+        cacheKey = ResponseCache.computeCacheKey({
+          taskId: task.id,
+          prompt: task.prompt,
+          model: config.defaultAgentModel,
+          runnerType: config.runnerType,
+          skillsHash: cacheOptions.skillsHash,
+          fixturesHash,
+          taskTimeoutMs: config.taskTimeoutMs,
+          allowedWriteDirs: config.allowedWriteDirs,
+          runIndex: numRuns > 1 ? run : undefined,
+        });
+
+        if (!cacheOptions.skipCache) {
+          const cached = await cacheOptions.cache.get(cacheKey);
+          if (cached) {
+            console.log(`Task ${task.id}: cache hit (hash ${cacheKey.substring(0, 8)})`);
+            cacheHits++;
+            return cached;
+          }
         }
       }
 
-      // Cache miss: run the task
-      if (!result) {
-        console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
-        const logger = new SessionLogger(task.id, runLogDir);
-        result = await runner.runTaskWithTimeout(task, undefined, logger);
+      console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
+      const logger = new SessionLogger(task.id, runLogDir);
+      const result = await runner.runTaskWithTimeout(task, undefined, logger);
 
-        if (result.isError) {
-          console.error(`  ERROR: ${result.errorMessage}`);
-        } else {
-          console.log(`  Skills loaded: ${result.skillLoads.join(', ') || 'none'}`);
-          console.log(`  Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
-        }
-
-        // Write to cache (skip for errors)
-        if (cacheKey && cacheOptions && !result.isError) {
-          await cacheOptions.cache.set(cacheKey, result, {
-            taskId: task.id,
-            cacheKeyPrefix: cacheKey.substring(0, 8),
-            modelId: config.defaultAgentModel,
-            runnerType: config.runnerType,
-            skillsHash: cacheOptions.skillsHash,
-          });
-        }
+      if (result.isError) {
+        console.error(`  Task ${task.id} ERROR: ${result.errorMessage}`);
+      } else {
+        console.log(`  Task ${task.id}: Skills loaded: ${result.skillLoads.join(', ') || 'none'} | Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
       }
 
-      results.push(result);
-    }
+      if (cacheKey && cacheOptions && !result.isError) {
+        await cacheOptions.cache.set(cacheKey, result, {
+          taskId: task.id,
+          cacheKeyPrefix: cacheKey.substring(0, 8),
+          modelId: config.defaultAgentModel,
+          runnerType: config.runnerType,
+          skillsHash: cacheOptions.skillsHash,
+        });
+      }
+
+      return result;
+    });
+
+    const results = await withConcurrencyLimit(factories, cacheConcurrent);
 
     if (cacheOptions && cacheHits > 0) {
       console.log(`\n${cacheHits} of ${evaluation.tasks.length} task(s) served from cache`);

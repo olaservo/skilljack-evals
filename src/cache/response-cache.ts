@@ -9,8 +9,22 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { TaskResult } from '../types.js';
+import type { EvalTask, FixtureConfig, TaskResult } from '../types.js';
 import type { RunnerType } from '../config.js';
+
+/**
+ * Tasks whose outcome depends on filesystem state (fixtures or file-exists
+ * assertions) can't be safely cached: a cached TaskResult doesn't represent
+ * the current filesystem, so replaying it alongside fresh deterministic
+ * scoring would produce wrong scores.
+ */
+export function isTaskCacheable(task: EvalTask): boolean {
+  if (task.fixture) return false;
+  if (task.deterministic?.expectFileExists && task.deterministic.expectFileExists.length > 0) {
+    return false;
+  }
+  return true;
+}
 
 export interface CacheConfig {
   enabled: boolean;
@@ -24,6 +38,8 @@ export interface CacheKeyParams {
   model: string;
   runnerType: RunnerType;
   skillsHash: string;
+  /** Hash of fixture setup/teardown script contents. 'no-fixture' when task has no fixture. */
+  fixturesHash: string;
   taskTimeoutMs: number;
   allowedWriteDirs: string[];
   runIndex?: number;
@@ -139,6 +155,7 @@ export class ResponseCache {
       model: params.model,
       runnerType: params.runnerType,
       skillsHash: params.skillsHash,
+      fixturesHash: params.fixturesHash,
       taskTimeoutMs: params.taskTimeoutMs,
       allowedWriteDirs: [...params.allowedWriteDirs].sort(),
     };
@@ -147,6 +164,37 @@ export class ResponseCache {
     }
     const json = JSON.stringify(canonical);
     return crypto.createHash('sha256').update(json).digest('hex');
+  }
+
+  /**
+   * Compute a content hash of a task's fixture setup/teardown scripts.
+   *
+   * Script paths are resolved relative to `cwd` (same resolution the runner uses).
+   * Missing files produce a stable "missing" marker so cache behavior is deterministic.
+   * Returns 'no-fixture' when the task has no fixture.
+   */
+  static async hashFixtures(
+    fixture: FixtureConfig | undefined,
+    cwd: string,
+  ): Promise<string> {
+    if (!fixture?.setup && !fixture?.teardown) return 'no-fixture';
+
+    const hash = crypto.createHash('sha256');
+    for (const [label, scriptPath] of [['setup', fixture.setup], ['teardown', fixture.teardown]] as const) {
+      if (!scriptPath) continue;
+      hash.update(label);
+      hash.update('\0');
+      hash.update(scriptPath);
+      hash.update('\0');
+      try {
+        const content = await fs.readFile(path.resolve(cwd, scriptPath));
+        hash.update(content);
+      } catch {
+        hash.update('<missing>');
+      }
+      hash.update('\0');
+    }
+    return hash.digest('hex');
   }
 
   /**

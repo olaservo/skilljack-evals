@@ -2,9 +2,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
-import { ResponseCache } from '../cache/response-cache.js';
+import { ResponseCache, isTaskCacheable } from '../cache/response-cache.js';
 import type { CacheConfig, CacheKeyParams } from '../cache/response-cache.js';
-import type { TaskResult } from '../types.js';
+import type { EvalTask, TaskResult } from '../types.js';
 
 function makeTmpDir(): string {
   return path.join(os.tmpdir(), `eval-cache-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -37,6 +37,7 @@ function makeKeyParams(overrides: Partial<CacheKeyParams> = {}): CacheKeyParams 
     model: 'sonnet',
     runnerType: 'claude-sdk',
     skillsHash: 'abc123',
+    fixturesHash: 'no-fixture',
     taskTimeoutMs: 300000,
     allowedWriteDirs: ['./results/', './fixtures/'],
     ...overrides,
@@ -81,6 +82,12 @@ describe('ResponseCache.computeCacheKey', () => {
   it('produces different hashes when skills hash changes', () => {
     const key1 = ResponseCache.computeCacheKey(makeKeyParams({ skillsHash: 'hash-a' }));
     const key2 = ResponseCache.computeCacheKey(makeKeyParams({ skillsHash: 'hash-b' }));
+    expect(key1).not.toBe(key2);
+  });
+
+  it('produces different hashes when fixtures hash changes', () => {
+    const key1 = ResponseCache.computeCacheKey(makeKeyParams({ fixturesHash: 'fx-a' }));
+    const key2 = ResponseCache.computeCacheKey(makeKeyParams({ fixturesHash: 'fx-b' }));
     expect(key1).not.toBe(key2);
   });
 
@@ -173,6 +180,126 @@ describe('ResponseCache.hashSkillsDir', () => {
     const hash2 = await ResponseCache.hashSkillsDir(dir);
 
     expect(hash1).not.toBe(hash2);
+  });
+});
+
+describe('isTaskCacheable', () => {
+  function makeTask(overrides: Partial<EvalTask> = {}): EvalTask {
+    return {
+      id: 't1',
+      prompt: 'p',
+      expectedSkillLoad: 'none',
+      criteria: [],
+      goldenChecklist: [],
+      ...overrides,
+    };
+  }
+
+  it('caches a plain task with no fixture or file checks', () => {
+    expect(isTaskCacheable(makeTask())).toBe(true);
+  });
+
+  it('does not cache tasks with a fixture', () => {
+    expect(isTaskCacheable(makeTask({ fixture: { state: 'dirty', setup: 'setup.sh' } }))).toBe(false);
+  });
+
+  it('does not cache tasks with fixture.state only (still fs-stateful by author claim)', () => {
+    expect(isTaskCacheable(makeTask({ fixture: { state: 'clean' } }))).toBe(false);
+  });
+
+  it('does not cache tasks with expectFileExists assertions', () => {
+    expect(isTaskCacheable(makeTask({
+      deterministic: { expectSkillActivation: true, expectFileExists: ['./out.txt'] },
+    }))).toBe(false);
+  });
+
+  it('caches tasks with other deterministic checks but no file-exists', () => {
+    expect(isTaskCacheable(makeTask({
+      deterministic: { expectSkillActivation: true, expectMarker: 'DONE' },
+    }))).toBe(true);
+  });
+
+  it('caches tasks with an empty expectFileExists array', () => {
+    expect(isTaskCacheable(makeTask({
+      deterministic: { expectSkillActivation: true, expectFileExists: [] },
+    }))).toBe(true);
+  });
+});
+
+describe('ResponseCache.hashFixtures', () => {
+  const tmpDirs: string[] = [];
+
+  afterEach(async () => {
+    for (const dir of tmpDirs) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    tmpDirs.length = 0;
+  });
+
+  it('returns sentinel when fixture is undefined', async () => {
+    expect(await ResponseCache.hashFixtures(undefined, process.cwd())).toBe('no-fixture');
+  });
+
+  it('returns sentinel when fixture has only a state marker (no scripts)', async () => {
+    expect(await ResponseCache.hashFixtures({ state: 'clean' }, process.cwd())).toBe('no-fixture');
+  });
+
+  it('produces a stable hash for the same script contents', async () => {
+    const dir = makeTmpDir();
+    tmpDirs.push(dir);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'setup.sh'), '#!/bin/sh\necho hi');
+
+    const h1 = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
+    const h2 = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
+    expect(h1).toBe(h2);
+    expect(h1).toHaveLength(64);
+  });
+
+  it('changes hash when setup script contents change', async () => {
+    const dir = makeTmpDir();
+    tmpDirs.push(dir);
+    await fs.mkdir(dir, { recursive: true });
+
+    await fs.writeFile(path.join(dir, 'setup.sh'), 'v1');
+    const h1 = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
+
+    await fs.writeFile(path.join(dir, 'setup.sh'), 'v2');
+    const h2 = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
+
+    expect(h1).not.toBe(h2);
+  });
+
+  it('changes hash when teardown script contents change', async () => {
+    const dir = makeTmpDir();
+    tmpDirs.push(dir);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'setup.sh'), 'setup');
+
+    await fs.writeFile(path.join(dir, 'teardown.sh'), 't1');
+    const h1 = await ResponseCache.hashFixtures(
+      { state: 's', setup: 'setup.sh', teardown: 'teardown.sh' }, dir,
+    );
+
+    await fs.writeFile(path.join(dir, 'teardown.sh'), 't2');
+    const h2 = await ResponseCache.hashFixtures(
+      { state: 's', setup: 'setup.sh', teardown: 'teardown.sh' }, dir,
+    );
+
+    expect(h1).not.toBe(h2);
+  });
+
+  it('distinguishes between a missing script and a present one', async () => {
+    const dir = makeTmpDir();
+    tmpDirs.push(dir);
+    await fs.mkdir(dir, { recursive: true });
+
+    const hMissing = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
+
+    await fs.writeFile(path.join(dir, 'setup.sh'), 'content');
+    const hPresent = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
+
+    expect(hMissing).not.toBe(hPresent);
   });
 });
 
