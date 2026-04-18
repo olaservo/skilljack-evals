@@ -7,7 +7,6 @@
 
 import type {
   EvalTask,
-  SkillEvaluation,
   TaskResult,
 } from '../types.js';
 import type { SessionLogger } from '../session/session-logger.js';
@@ -18,8 +17,6 @@ import type { SessionLogger } from '../session/session-logger.js';
 export interface AgentRunnerOptions {
   /** Working directory for agent execution */
   cwd?: string;
-  /** Max concurrent tasks. 1 = sequential (default), 0 = unlimited, N = bounded. */
-  concurrency?: number;
   /** Model identifier (format depends on runner) */
   model?: string;
   /** Per-task timeout in ms */
@@ -64,12 +61,6 @@ export interface AgentRunner {
     logger?: SessionLogger,
   ): Promise<TaskResult>;
 
-  /** Run all tasks in an evaluation suite */
-  runAll(
-    evaluation: SkillEvaluation,
-    createLogger?: (task: EvalTask) => SessionLogger,
-  ): Promise<TaskResult[]>;
-
-  /** Release runner resources (e.g., child processes). Called after runAll() completes. */
+  /** Release runner resources (e.g., child processes). Called after all tasks complete. */
   dispose?(): Promise<void>;
 }

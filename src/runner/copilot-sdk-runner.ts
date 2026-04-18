@@ -44,22 +44,20 @@ export interface CopilotSdkRunnerOptions extends AgentRunnerOptions {
 
 export class CopilotSdkRunner extends BaseRunner {
   readonly providerName = 'copilot-sdk';
-  private sdkOptions: CopilotSdkRunnerOptions;
+  private readonly githubToken?: string;
+  private readonly provider?: CopilotProviderConfig;
   private client: any = null;
   private configDir: string | null = null;
 
   constructor(options: CopilotSdkRunnerOptions = {}, config?: EvalConfig) {
     super(options, config);
-    this.sdkOptions = {
-      ...this.options,
-      githubToken: options.githubToken,
-      provider: options.provider,
-    };
+    this.githubToken = options.githubToken;
+    this.provider = options.provider;
   }
 
   /** Check for Copilot token at call time to avoid stale reads. */
   private get hasCopilotToken(): boolean {
-    return !!(this.sdkOptions.githubToken ?? process.env.COPILOT_GITHUB_TOKEN);
+    return !!(this.githubToken ?? process.env.COPILOT_GITHUB_TOKEN);
   }
 
   /**
@@ -98,12 +96,11 @@ export class CopilotSdkRunner extends BaseRunner {
     // Auth: explicit Copilot token > env vars > logged-in user.
     // Skip the generic GITHUB_TOKEN — it typically lacks Copilot permissions
     // (e.g., the auto-generated token in GitHub Actions).
-    const token = this.sdkOptions.githubToken
-      ?? process.env.COPILOT_GITHUB_TOKEN;
+    const token = this.githubToken ?? process.env.COPILOT_GITHUB_TOKEN;
 
     if (token) {
       clientOptions.githubToken = token;
-    } else if (!this.sdkOptions.provider) {
+    } else if (!this.provider) {
       // Only use logged-in user when no BYOK API keys are in the environment.
       // BYOK auto-detection in runTask() sets a session-level provider that
       // takes precedence over client auth, but avoiding conflicting configs
@@ -237,8 +234,8 @@ export class CopilotSdkRunner extends BaseRunner {
 
       // BYOK provider config: explicit > auto-detect from model + API keys.
       // Auto-detect enables CI usage without a Copilot-enabled token.
-      if (this.sdkOptions.provider) {
-        sessionConfig.provider = this.sdkOptions.provider;
+      if (this.provider) {
+        sessionConfig.provider = this.provider;
       } else if (!this.hasCopilotToken) {
         const model = sessionConfig.model ?? '';
         const isAnthropicModel = model.startsWith('claude');
@@ -297,7 +294,7 @@ export class CopilotSdkRunner extends BaseRunner {
 
   /**
    * Stop the shared client and clean up temp config directory.
-   * Called after runAll() completes.
+   * Called after all tasks complete.
    */
   async dispose(): Promise<void> {
     if (this.client) {

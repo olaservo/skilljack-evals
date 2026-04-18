@@ -15,8 +15,7 @@ import { parseEvalFile, createEvalTemplate, validateEvalFile } from './parser.js
 import { runPipeline, scorePipeline } from './pipeline.js';
 import { generateReport, generateJsonResults } from './report/report.js';
 import { generateHtmlReport } from './report/html-report.js';
-import { SkillJudge } from './scorer/judge.js';
-import type { EvalTask, TaskResult, JudgeScore, SkillEvaluation, CombinedScore } from './types.js';
+import type { EvalTask, TaskResult, SkillEvaluation, CombinedScore } from './types.js';
 import { validateFeedback } from './feedback.js';
 import { VALID_RUNNER_TYPES, loadConfig } from './config.js';
 import type { EvalConfig, RunnerType } from './config.js';
@@ -289,41 +288,6 @@ program
   });
 
 // ============================================
-// Parse (legacy, for interop)
-// ============================================
-
-program
-  .command('parse')
-  .description('Parse tasks YAML and output JSON')
-  .argument('<skill_name>', 'Name of the skill')
-  .option('-f, --eval-file <path>', 'Path to evaluation YAML file')
-  .option('-o, --output <path>', 'Output JSON file (default: stdout)')
-  .action(async (skillName: string, options: {
-    evalFile?: string;
-    output?: string;
-  }) => {
-    const baseDir = path.join(process.cwd(), 'evals', skillName);
-    const evalFile = options.evalFile || path.join(baseDir, 'tasks.yaml');
-
-    try {
-      await fs.access(evalFile);
-    } catch {
-      console.error(`Error: Evaluation file not found: ${evalFile}`);
-      process.exit(1);
-    }
-
-    const evaluation = await parseEvalFile(evalFile);
-    const json = JSON.stringify(evaluation, null, 2);
-
-    if (options.output) {
-      await fs.writeFile(options.output, json);
-      console.error(`Parsed ${evaluation.tasks.length} tasks to: ${options.output}`);
-    } else {
-      console.log(json);
-    }
-  });
-
-// ============================================
 // Validate
 // ============================================
 
@@ -367,71 +331,6 @@ cacheCommand
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
-    }
-  });
-
-// ============================================
-// Judge (legacy single-task scoring)
-// ============================================
-
-program
-  .command('judge')
-  .description('Score a single task result using LLM judge')
-  .requiredOption('--task-id <id>', 'Task ID')
-  .requiredOption('--prompt <text>', 'Original task prompt')
-  .requiredOption('--expected-skill <name>', 'Expected skill to be loaded')
-  .requiredOption('--output <text>', 'Agent output to judge')
-  .option('--skill-loads <skills>', 'Comma-separated list of skills loaded', '')
-  .option('--checklist <items>', 'Comma-separated golden checklist items', '')
-  .option('--model <model>', 'Judge model (default: haiku)')
-  .option('--feedback <text>', 'Human review feedback text for this task')
-  .option('-o, --output-file <path>', 'Output JSON file (default: stdout)')
-  .action(async (options: {
-    taskId: string;
-    prompt: string;
-    expectedSkill: string;
-    output: string;
-    skillLoads: string;
-    checklist: string;
-    model?: string;
-    feedback?: string;
-    outputFile?: string;
-  }) => {
-    const task: EvalTask = {
-      id: options.taskId,
-      prompt: options.prompt,
-      expectedSkillLoad: options.expectedSkill,
-      criteria: [
-        { dimension: 'discovery', weight: 0.3, description: 'Skill discovery' },
-        { dimension: 'adherence', weight: 0.4, description: 'Instruction adherence' },
-        { dimension: 'output', weight: 0.3, description: 'Output quality' },
-      ],
-      goldenChecklist: options.checklist ? options.checklist.split(',').map(s => s.trim()) : [],
-    };
-
-    const result: TaskResult = {
-      taskId: options.taskId,
-      prompt: options.prompt,
-      output: options.output,
-      durationMs: 0,
-      numTurns: 0,
-      costUsd: 0,
-      skillLoads: options.skillLoads ? options.skillLoads.split(',').map(s => s.trim()) : [],
-      toolCalls: [],
-      isError: false,
-      errorMessage: '',
-    };
-
-    const judge = new SkillJudge({ model: options.model });
-    console.error(`Judging task ${options.taskId}...`);
-    const score = await judge.judgeResult(task, result, options.feedback);
-
-    const json = JSON.stringify(score, null, 2);
-    if (options.outputFile) {
-      await fs.writeFile(options.outputFile, json);
-      console.error(`Score saved to: ${options.outputFile}`);
-    } else {
-      console.log(json);
     }
   });
 

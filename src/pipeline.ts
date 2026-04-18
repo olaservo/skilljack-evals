@@ -167,7 +167,6 @@ async function runPhase(
   const runner = await createRunner(config.runnerType, {
     cwd,
     model: config.defaultAgentModel,
-    concurrency: config.concurrency,
     allowedWriteDirs: config.allowedWriteDirs,
     skillsDir,
   }, config);

@@ -17,7 +17,7 @@ import type {
 import { scoreDeterministic } from './deterministic.js';
 import { SkillJudge } from './judge.js';
 import type { JudgeOptions } from '../types.js';
-import { loadConfigSync, getDefaultWeights } from '../config.js';
+import { loadConfigSync } from '../config.js';
 import { getFeedbackForTask } from '../feedback.js';
 
 export interface ScorerOptions {
@@ -44,7 +44,11 @@ export async function scoreTask(
   options: ScorerOptions = {}
 ): Promise<CombinedScore> {
   const config = loadConfigSync();
-  const weights = getDefaultWeights(config);
+  const weights = new Map<string, number>([
+    ['discovery', config.defaultWeights.discovery],
+    ['adherence', config.defaultWeights.adherence],
+    ['output', config.defaultWeights.output],
+  ]);
 
   // Run deterministic scoring
   let deterministicResult: DeterministicResult | null = null;

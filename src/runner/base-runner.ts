@@ -8,14 +8,12 @@
 import type { AgentRunner, AgentRunnerOptions } from './agent-runner.js';
 import type {
   EvalTask,
-  SkillEvaluation,
   TaskResult,
   ToolCallRecord,
 } from '../types.js';
 import { loadConfigSync } from '../config.js';
 import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
-import { withConcurrencyLimit, DEFAULT_RUNNER_CONCURRENCY } from '../utils/concurrency.js';
 import { runFixtureScript } from './fixture-runner.js';
 
 export abstract class BaseRunner implements AgentRunner {
@@ -39,7 +37,6 @@ export abstract class BaseRunner implements AgentRunner {
 
     this.options = {
       cwd: options.cwd ?? process.cwd(),
-      concurrency: options.concurrency ?? resolvedConfig.concurrency ?? DEFAULT_RUNNER_CONCURRENCY,
       model: options.model ?? resolvedConfig.defaultAgentModel,
       taskTimeoutMs: options.taskTimeoutMs ?? resolvedConfig.taskTimeoutMs,
       allowedWriteDirs: options.allowedWriteDirs ?? resolvedConfig.allowedWriteDirs,
@@ -199,42 +196,5 @@ export abstract class BaseRunner implements AgentRunner {
         }
       }
     }
-  }
-
-  /**
-   * Run all tasks in an evaluation suite.
-   *
-   * Concurrency is controlled by `options.concurrency`:
-   * - 1 = sequential (default)
-   * - 0 = unlimited
-   * - N = at most N tasks in flight
-   */
-  async runAll(
-    evaluation: SkillEvaluation,
-    createLogger?: (task: EvalTask) => SessionLogger,
-  ): Promise<TaskResult[]> {
-    const limit = this.options.concurrency ?? 1;
-
-    const factories = evaluation.tasks.map((task) => async () => {
-      console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
-      try {
-        const logger = createLogger?.(task);
-        const result = await this.runTaskWithTimeout(task, undefined, logger);
-
-        if (result.isError) {
-          console.error(`  Task ${task.id} ERROR: ${result.errorMessage}`);
-        } else {
-          console.log(`  Task ${task.id} done — Skills loaded: ${result.skillLoads.join(', ') || 'none'}`);
-          console.log(`  Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
-        }
-        return result;
-      } catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        console.error(`  Task ${task.id} ERROR: ${errMsg}`);
-        return this.createErrorResult(task, errMsg, 0);
-      }
-    });
-
-    return withConcurrencyLimit(factories, limit);
   }
 }

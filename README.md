@@ -263,12 +263,6 @@ skilljack-evals validate evals/greeting/tasks.yaml
 skilljack-evals create-eval greeting -o evals/greeting/tasks.yaml -n 10
 ```
 
-### `parse` — Parse YAML to JSON
-
-```bash
-skilljack-evals parse evals/greeting/tasks.yaml
-```
-
 ## Architecture
 
 ```

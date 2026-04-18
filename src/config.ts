@@ -300,29 +300,29 @@ function loadEnvConfig(): Partial<EvalConfig> {
   return config;
 }
 
+/** Keys whose sub-fields should be merged, not replaced wholesale. */
+const NESTED_CONFIG_KEYS = new Set<keyof EvalConfig>(['defaultWeights', 'cache']);
+
 /**
- * Deep merge multiple partial configs into a full config.
+ * Deep merge multiple partial configs into a full config. Nested objects
+ * listed in NESTED_CONFIG_KEYS are shallow-merged so a partial override
+ * doesn't clobber sibling fields.
  */
 function mergeConfigs(...configs: Partial<EvalConfig>[]): EvalConfig {
   const result = { ...DEFAULT_CONFIG };
 
   for (const config of configs) {
-    if (config.runnerType !== undefined) result.runnerType = config.runnerType;
-    if (config.defaultAgentModel !== undefined) result.defaultAgentModel = config.defaultAgentModel;
-    if (config.defaultJudgeModel !== undefined) result.defaultJudgeModel = config.defaultJudgeModel;
-    if (config.defaultWeights !== undefined) result.defaultWeights = { ...result.defaultWeights, ...config.defaultWeights };
-    if (config.judgeOutputTruncation !== undefined) result.judgeOutputTruncation = config.judgeOutputTruncation;
-    if (config.reportOutputTruncation !== undefined) result.reportOutputTruncation = config.reportOutputTruncation;
-    if (config.taskTimeoutMs !== undefined) result.taskTimeoutMs = config.taskTimeoutMs;
-    if (config.concurrency !== undefined) result.concurrency = config.concurrency;
-    if (config.exitOnFailure !== undefined) result.exitOnFailure = config.exitOnFailure;
-    if (config.outputDir !== undefined) result.outputDir = config.outputDir;
-    if (config.githubSummary !== undefined) result.githubSummary = config.githubSummary;
-    if (config.htmlReport !== undefined) result.htmlReport = config.htmlReport;
-    if (config.discoveryThreshold !== undefined) result.discoveryThreshold = config.discoveryThreshold;
-    if (config.scoreThreshold !== undefined) result.scoreThreshold = config.scoreThreshold;
-    if (config.allowedWriteDirs !== undefined) result.allowedWriteDirs = config.allowedWriteDirs;
-    if (config.cache !== undefined) result.cache = { ...result.cache, ...config.cache };
+    for (const [key, value] of Object.entries(config) as [keyof EvalConfig, unknown][]) {
+      if (value === undefined) continue;
+      if (NESTED_CONFIG_KEYS.has(key)) {
+        (result as Record<string, unknown>)[key] = {
+          ...(result[key] as object),
+          ...(value as object),
+        };
+      } else {
+        (result as Record<string, unknown>)[key] = value;
+      }
+    }
   }
 
   return result;
@@ -351,16 +351,4 @@ export async function loadConfig(
 export function loadConfigSync(overrides?: Partial<EvalConfig>): EvalConfig {
   const envConfig = loadEnvConfig();
   return mergeConfigs(envConfig, overrides ?? {});
-}
-
-/**
- * Get default weights for scoring dimensions.
- */
-export function getDefaultWeights(config?: EvalConfig): Map<string, number> {
-  const c = config ?? DEFAULT_CONFIG;
-  return new Map([
-    ['discovery', c.defaultWeights.discovery],
-    ['adherence', c.defaultWeights.adherence],
-    ['output', c.defaultWeights.output],
-  ]);
 }

@@ -47,7 +47,7 @@ export type {
 } from './types.js';
 
 // Config
-export { loadConfig, loadConfigSync, getDefaultWeights, DEFAULT_CONFIG, VALID_RUNNER_TYPES } from './config.js';
+export { loadConfig, loadConfigSync, DEFAULT_CONFIG, VALID_RUNNER_TYPES } from './config.js';
 export type { EvalConfig, RunnerType } from './config.js';
 
 // Parser

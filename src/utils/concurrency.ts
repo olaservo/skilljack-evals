@@ -1,8 +1,8 @@
 /**
  * Shared concurrency utilities.
  *
- * Provides a generic bounded-concurrency runner used by both the task runner
- * (BaseRunner.runAll) and the scorer (SkillJudge.judgeAll / blindCompareAll).
+ * Provides a generic bounded-concurrency runner used by the pipeline's task
+ * loop and the scorer (SkillJudge.judgeAll / blindCompareAll).
  */
 
 /** Default maximum number of concurrent API calls to the judge. */

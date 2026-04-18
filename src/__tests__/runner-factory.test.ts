@@ -48,11 +48,4 @@ describe('createRunner', () => {
     expect(opts.taskTimeoutMs).toBe(60000);
   });
 
-  it('passes concurrency option through to runner', async () => {
-    const runner = await createRunner('claude-sdk', {
-      concurrency: 3,
-    });
-    const opts = (runner as any).runnerOptions;
-    expect(opts.concurrency).toBe(3);
-  });
 });
