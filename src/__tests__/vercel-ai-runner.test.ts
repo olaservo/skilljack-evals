@@ -51,7 +51,7 @@ function createMockAiModule(overrides: {
   } else {
     mockGenerateText = vi.fn().mockResolvedValue(overrides.generateTextResult ?? {
       text: 'Hello!',
-      usage: { promptTokens: 100, completionTokens: 50 },
+      usage: { inputTokens: 100, outputTokens: 50 },
     });
   }
 
@@ -151,7 +151,7 @@ describe('VercelAiRunner', () => {
           toolCallId: 'tc-1',
         }],
       });
-      return { text: 'Hello!', usage: { promptTokens: 100, completionTokens: 50 } };
+      return { text: 'Hello!', usage: { inputTokens: 100, outputTokens: 50 } };
     });
 
     const result = await runner.runTask(mockTask);
@@ -179,7 +179,7 @@ describe('VercelAiRunner', () => {
           toolCallId: 'tc-1',
         }],
       });
-      return { text: 'Hello!', usage: { promptTokens: 100, completionTokens: 50 } };
+      return { text: 'Hello!', usage: { inputTokens: 100, outputTokens: 50 } };
     });
 
     const result = await runner.runTask(mockTask);
@@ -194,7 +194,7 @@ describe('VercelAiRunner', () => {
           { toolName: 'bash', args: { command: 'echo hi' }, toolCallId: 'tc-2' },
         ],
       });
-      return { text: 'Hello!', usage: { promptTokens: 100, completionTokens: 50 } };
+      return { text: 'Hello!', usage: { inputTokens: 100, outputTokens: 50 } };
     });
 
     const result = await runner.runTask(mockTask);

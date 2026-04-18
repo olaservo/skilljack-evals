@@ -274,12 +274,12 @@ export class VercelAiRunner extends BaseRunner {
 
       // Extract usage info (cumulative across the tool loop).
       // Vercel AI normalizes usage across providers; cache tokens are not surfaced here.
-      const rawUsage = result.usage as { promptTokens?: number; completionTokens?: number } | undefined;
+      const rawUsage = result.usage as { inputTokens?: number; outputTokens?: number } | undefined;
       let tokens: TokenUsage | undefined;
       let totalForCost = 0;
       if (rawUsage) {
-        const input = rawUsage.promptTokens ?? 0;
-        const output = rawUsage.completionTokens ?? 0;
+        const input = rawUsage.inputTokens ?? 0;
+        const output = rawUsage.outputTokens ?? 0;
         const cacheRead = 0;
         const cacheCreation = 0;
         tokens = {

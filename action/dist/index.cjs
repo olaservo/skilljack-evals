@@ -23160,8 +23160,8 @@ ${skillsPrompt}` : "You are a helpful AI assistant.";
           let tokens;
           let totalForCost = 0;
           if (rawUsage) {
-            const input = rawUsage.promptTokens ?? 0;
-            const output2 = rawUsage.completionTokens ?? 0;
+            const input = rawUsage.inputTokens ?? 0;
+            const output2 = rawUsage.outputTokens ?? 0;
             const cacheRead = 0;
             const cacheCreation = 0;
             tokens = {
@@ -47535,7 +47535,7 @@ function costImpact(delta) {
     return "Lower";
   return "Similar";
 }
-var TOKEN_IMPACT_THRESHOLD = 100;
+var TOKEN_IMPACT_THRESHOLD = 1e3;
 function tokenImpact(delta) {
   if (delta > TOKEN_IMPACT_THRESHOLD)
     return "Higher";
@@ -47939,7 +47939,7 @@ function renderComparisonSection(comparison) {
       <td>${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.adherenceDelta, 1))}</span></td>
       <td>${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.outputQualityDelta, 1))}</span></td>
       <td>${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / <span class="delta">${escapeHtml(formatDelta(t.delta.weightedScoreDelta))}</span></td>
-      <td data-sort="${t.delta.totalTokensDelta ?? 0}">${tokenCell}</td>
+      <td>${tokenCell}</td>
     </tr>`;
   }
   return `

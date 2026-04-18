@@ -498,7 +498,8 @@ function costImpact(delta: number): string {
   return 'Similar';
 }
 
-const TOKEN_IMPACT_THRESHOLD = 100;
+// 1000 tokens ≈ $0.003 at Sonnet input rates — coarse enough to ignore whitespace-level deltas.
+const TOKEN_IMPACT_THRESHOLD = 1000;
 
 function tokenImpact(delta: number): string {
   if (delta > TOKEN_IMPACT_THRESHOLD) return 'Higher';
