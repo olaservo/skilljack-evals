@@ -32,6 +32,10 @@ class TestableBaseRunner extends BaseRunner {
   async runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult> {
     return this.mockRunTask(task, logger);
   }
+
+  buildResultForTest(task: EvalTask, fields: Parameters<BaseRunner['buildTaskResult']>[1]): TaskResult {
+    return this.buildTaskResult(task, fields);
+  }
 }
 
 function makeTask(overrides: Partial<EvalTask> = {}): EvalTask {
@@ -222,6 +226,34 @@ describe('BaseRunner fixture integration', () => {
 
     expect(mockRunFixtureScript).not.toHaveBeenCalled();
     expect(runner.mockRunTask).toHaveBeenCalled();
+  });
+
+  it('buildTaskResult threads tokens onto the TaskResult', () => {
+    const task = makeTask();
+    const tokens = { input: 1000, output: 250, cacheRead: 50, cacheCreation: 10, total: 1310 };
+    const result = runner.buildResultForTest(task, {
+      output: 'ok',
+      durationMs: 100,
+      numTurns: 1,
+      costUsd: 0.001,
+      skillLoads: [],
+      toolCalls: [],
+      tokens,
+    });
+    expect(result.tokens).toEqual(tokens);
+  });
+
+  it('buildTaskResult leaves tokens undefined when not provided', () => {
+    const task = makeTask();
+    const result = runner.buildResultForTest(task, {
+      output: 'ok',
+      durationMs: 100,
+      numTurns: 1,
+      costUsd: 0.001,
+      skillLoads: [],
+      toolCalls: [],
+    });
+    expect(result.tokens).toBeUndefined();
   });
 
   it('handles teardown throwing an unexpected error without masking the task result', async () => {

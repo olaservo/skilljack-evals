@@ -208,6 +208,31 @@ describe('generateGitHubSummary', () => {
     expect(summary).toMatch(/Avg Output Quality.*3\.5/);
   });
 
+  it('renders Tokens row with thousand-separated value when summary reports totalTokens', () => {
+    const report = makeReport({
+      summary: {
+        totalTasks: 1,
+        numRuns: 1,
+        discoveryAccuracy: 1,
+        avgAdherence: 5,
+        avgOutputQuality: 5,
+        avgWeightedScore: 1,
+        totalDurationMs: 1000,
+        totalCostUsd: 0.01,
+        totalTokens: 123456,
+      },
+    });
+
+    const summary = generateGitHubSummary(report);
+    expect(summary).toMatch(/\| Tokens \| 123,456 \|/);
+  });
+
+  it('renders Tokens row as n/a when summary omits totalTokens', () => {
+    const report = makeReport();
+    const summary = generateGitHubSummary(report);
+    expect(summary).toMatch(/\| Tokens \| n\/a \|/);
+  });
+
   it('passes at exact threshold boundary (>=)', () => {
     const customConfig: EvalConfig = { ...DEFAULT_CONFIG, discoveryThreshold: 0.6, scoreThreshold: 3.0 };
     const report = makeReport({

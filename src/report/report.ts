@@ -90,6 +90,7 @@ ${metaSection}
 | **Avg Weighted Score** | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | | |
 | **Total Duration** | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |
 | **Total Cost** | $${summary.totalCostUsd.toFixed(4)} | | |
+| **Total Tokens** | ${summary.totalTokens !== undefined ? summary.totalTokens.toLocaleString() : 'n/a'} | | |
 
 ## Failure Analysis
 
@@ -207,7 +208,7 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
 
 </details>
 
-**Metrics:** Duration: ${(result.durationMs / 1000).toFixed(1)}s | Turns: ${result.numTurns} | Cost: $${result.costUsd.toFixed(4)}
+**Metrics:** Duration: ${(result.durationMs / 1000).toFixed(1)}s | Turns: ${result.numTurns} | Cost: $${result.costUsd.toFixed(4)} | Tokens: ${result.tokens ? result.tokens.total.toLocaleString() : 'n/a'}
 `;
 
     // Per-run breakdown
@@ -216,13 +217,14 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
 <details>
 <summary>Per-run breakdown (${runDetails[i].length} runs)</summary>
 
-| Run | Discovery | Adherence | Output | Weighted | Skills Loaded |
-|-----|-----------|-----------|--------|----------|---------------|
+| Run | Discovery | Adherence | Output | Weighted | Tokens | Skills Loaded |
+|-----|-----------|-----------|--------|----------|--------|---------------|
 `;
       for (let r = 0; r < runDetails[i].length; r++) {
         const rd = runDetails[i][r];
         const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(', ') : 'none';
-        report += `| ${r + 1} | ${rd.score.discovery} | ${rd.score.adherence}/5 | ${rd.score.outputQuality}/5 | ${rd.score.weightedScore.toFixed(2)} | ${skills} |\n`;
+        const runTokens = rd.result.tokens ? rd.result.tokens.total.toLocaleString() : 'n/a';
+        report += `| ${r + 1} | ${rd.score.discovery} | ${rd.score.adherence}/5 | ${rd.score.outputQuality}/5 | ${rd.score.weightedScore.toFixed(2)} | ${runTokens} | ${skills} |\n`;
       }
       report += `\n</details>\n`;
     }
@@ -370,6 +372,11 @@ export function computeSummary(
     ? scores.reduce((sum, s) => sum + s.weightedScore, 0) / totalTasks
     : 0;
 
+  const allHaveTokens = results.length > 0 && results.every((r) => r.tokens);
+  const totalTokens = allHaveTokens
+    ? results.reduce((sum, r) => sum + r.tokens!.total, 0)
+    : undefined;
+
   const summary: EvaluationSummary = {
     totalTasks,
     numRuns,
@@ -379,6 +386,7 @@ export function computeSummary(
     avgWeightedScore,
     totalDurationMs: results.reduce((sum, r) => sum + r.durationMs, 0),
     totalCostUsd: results.reduce((sum, r) => sum + r.costUsd, 0),
+    totalTokens,
   };
 
   // Compute summary-level stddev as the mean of per-task stddevs (cross-run variability).
@@ -445,6 +453,7 @@ function generateComparisonSection(comparison: ComparisonData): string {
 | Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | ${formatDelta(d.avgWeightedScoreDelta)} | ${qualityImpact(d.avgWeightedScoreDelta, WEIGHTED_SCORE_IMPACT_THRESHOLD)} |
 | Duration | ${(ws.totalDurationMs / 1000).toFixed(1)}s | ${(bs.totalDurationMs / 1000).toFixed(1)}s | ${formatDelta(d.totalDurationDeltaMs / 1000, 1)}s | ${durationImpact(d.totalDurationDeltaMs)} |
 | Cost | $${ws.totalCostUsd.toFixed(4)} | $${bs.totalCostUsd.toFixed(4)} | $${formatDelta(d.totalCostDeltaUsd, 4)} | ${costImpact(d.totalCostDeltaUsd)} |
+| Tokens | ${ws.totalTokens !== undefined ? ws.totalTokens.toLocaleString() : 'n/a'} | ${bs.totalTokens !== undefined ? bs.totalTokens.toLocaleString() : 'n/a'} | ${d.totalTokensDelta !== undefined ? formatDelta(d.totalTokensDelta, 0) : 'n/a'} | ${d.totalTokensDelta !== undefined ? tokenImpact(d.totalTokensDelta) : ''} |
 
 ### Per-Task Comparison
 
@@ -486,6 +495,15 @@ function durationImpact(deltaMs: number): string {
 function costImpact(delta: number): string {
   if (delta > COST_IMPACT_THRESHOLD_USD) return 'Higher';
   if (delta < -COST_IMPACT_THRESHOLD_USD) return 'Lower';
+  return 'Similar';
+}
+
+// 1000 tokens ≈ $0.003 at Sonnet input rates — coarse enough to ignore whitespace-level deltas.
+const TOKEN_IMPACT_THRESHOLD = 1000;
+
+function tokenImpact(delta: number): string {
+  if (delta > TOKEN_IMPACT_THRESHOLD) return 'Higher';
+  if (delta < -TOKEN_IMPACT_THRESHOLD) return 'Lower';
   return 'Similar';
 }
 

@@ -10,7 +10,7 @@
  * Requires: @openai/agents, openai
  */
 
-import type { EvalTask, ToolCallRecord, TaskResult } from '../types.js';
+import type { EvalTask, ToolCallRecord, TaskResult, TokenUsage } from '../types.js';
 import { BaseRunner } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
 import { discoverSkills, type SkillMetadata } from './skill-discovery.js';
@@ -244,11 +244,26 @@ export class OpenAiAgentsRunner extends BaseRunner {
       // 5. Detect skill loads
       const skillLoads = detectSkillLoadsFromShellCommands(shellCommands, localSkills);
 
-      // 6. Extract usage
+      // 6. Extract usage (cache tokens not surfaced by the OpenAI Agents SDK).
       const usage = (result as unknown as { usage?: { inputTokens?: number; outputTokens?: number } }).usage;
-      const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
+      let tokens: TokenUsage | undefined;
+      let totalForCost = 0;
+      if (usage) {
+        const input = usage.inputTokens ?? 0;
+        const output = usage.outputTokens ?? 0;
+        const cacheRead = 0;
+        const cacheCreation = 0;
+        tokens = {
+          input,
+          output,
+          cacheRead,
+          cacheCreation,
+          total: input + output + cacheRead + cacheCreation,
+        };
+        totalForCost = input + output;
+      }
       // Rough cost estimate — actual pricing varies by model and provider
-      const costUsd = totalTokens * 0.000003;
+      const costUsd = totalForCost * 0.000003;
 
       return this.buildTaskResult(task, {
         output: typeof output === 'string' ? output : JSON.stringify(output),
@@ -257,6 +272,7 @@ export class OpenAiAgentsRunner extends BaseRunner {
         costUsd,
         skillLoads,
         toolCalls,
+        tokens,
       });
     } catch (error) {
       return this.handleRunError(task, error, startTime, logger);

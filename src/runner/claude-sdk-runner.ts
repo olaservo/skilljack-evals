@@ -14,6 +14,7 @@ import type {
   EvalTask,
   ToolCallRecord,
   TaskResult,
+  TokenUsage,
 } from '../types.js';
 import {
   isAssistantMessage,
@@ -41,6 +42,7 @@ export class ClaudeSdkRunner extends BaseRunner {
       let resultDurationMs = 0;
       let resultNumTurns = 0;
       let resultCostUsd = 0;
+      let resultTokens: TokenUsage | undefined;
 
       const toolPolicy = createToolPolicy(
         this.options.allowedWriteDirs ?? [],
@@ -118,6 +120,21 @@ export class ClaudeSdkRunner extends BaseRunner {
           resultNumTurns = message.num_turns ?? 0;
           resultCostUsd = message.total_cost_usd ?? 0;
 
+          const u = message.usage;
+          if (u) {
+            const input = u.input_tokens ?? 0;
+            const output = u.output_tokens ?? 0;
+            const cacheRead = u.cache_read_input_tokens ?? 0;
+            const cacheCreation = u.cache_creation_input_tokens ?? 0;
+            resultTokens = {
+              input,
+              output,
+              cacheRead,
+              cacheCreation,
+              total: input + output + cacheRead + cacheCreation,
+            };
+          }
+
           if (message.result) {
             resultOutput = message.result;
           }
@@ -131,6 +148,7 @@ export class ClaudeSdkRunner extends BaseRunner {
         costUsd: resultCostUsd,
         skillLoads,
         toolCalls,
+        tokens: resultTokens,
       });
     } catch (error) {
       return this.handleRunError(task, error, startTime, logger);

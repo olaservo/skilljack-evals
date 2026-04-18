@@ -78,6 +78,7 @@ export async function generateHtmlReport(options: ReportOptions): Promise<string
     weightedScore: t.score.weightedScore,
     failureCategory: t.score.failureCategory,
     isFlaky: isFlaky(t.score.stddev),
+    tokens: t.result.tokens?.total ?? null,
   }));
 
   // Check if any cross-iteration regression data exists
@@ -202,6 +203,10 @@ function renderDashboard(summary: EvaluationSummary, config: EvalConfig): string
       <div class="stat-value">$${summary.totalCostUsd.toFixed(4)}</div>
       <div class="stat-label">Cost</div>
     </div>
+    <div class="stat">
+      <div class="stat-value">${summary.totalTokens !== undefined ? summary.totalTokens.toLocaleString() : '&mdash;'}</div>
+      <div class="stat-label">Tokens</div>
+    </div>
   </div>
 </section>`;
 }
@@ -253,6 +258,7 @@ function renderTaskTable(tasks: HtmlTaskData[], config: EvalConfig, humanFeedbac
     const statusClass = isFailed ? 'status-fail' : (flaky ? 'status-flaky' : 'status-pass');
     const statusLabel = isFailed ? 'FAIL' : (flaky ? 'FLAKY' : 'PASS');
 
+    const tokensCell = t.result.tokens ? t.result.tokens.total.toLocaleString() : 'n/a';
     rows += `
     <tr class="task-row" data-task-id="${escapeHtml(t.task.id)}" data-index="${t.index}">
       <td>${t.index + 1}</td>
@@ -261,11 +267,12 @@ function renderTaskTable(tasks: HtmlTaskData[], config: EvalConfig, humanFeedbac
       <td>${t.score.adherence.toFixed(1)}</td>
       <td>${t.score.outputQuality.toFixed(1)}</td>
       <td>${t.score.weightedScore.toFixed(2)}</td>
+      <td>${tokensCell}</td>
       <td>${escapeHtml(formatCategory(t.score.failureCategory))}</td>
       <td><span class="status ${statusClass}">${statusLabel}</span></td>
     </tr>
     <tr class="detail-row" data-task-id="${escapeHtml(t.task.id)}">
-      <td colspan="8">
+      <td colspan="9">
         ${renderTaskDetail(t, config, humanFeedback)}
       </td>
     </tr>`;
@@ -284,6 +291,7 @@ function renderTaskTable(tasks: HtmlTaskData[], config: EvalConfig, humanFeedbac
           <th class="sortable" data-col="adherence">Adherence</th>
           <th class="sortable" data-col="outputQuality">Output Quality</th>
           <th class="sortable" data-col="weightedScore">Weighted</th>
+          <th class="sortable" data-col="tokens">Tokens</th>
           <th class="sortable" data-col="failureCategory">Failure</th>
           <th>Status</th>
         </tr>
@@ -375,7 +383,7 @@ function renderTaskDetail(t: HtmlTaskData, config: EvalConfig, humanFeedback: Hu
   <div class="detail-section">
     <h4>Agent Output</h4>
     <pre class="agent-output">${escapeHtml(truncatedOutput)}</pre>
-    <p class="metrics">Duration: ${(t.result.durationMs / 1000).toFixed(1)}s | Turns: ${t.result.numTurns} | Cost: $${t.result.costUsd.toFixed(4)}</p>
+    <p class="metrics">Duration: ${(t.result.durationMs / 1000).toFixed(1)}s | Turns: ${t.result.numTurns} | Cost: $${t.result.costUsd.toFixed(4)} | Tokens: ${t.result.tokens ? t.result.tokens.total.toLocaleString() : 'n/a'}</p>
   </div>`;
 
   // Per-run breakdown
@@ -384,12 +392,14 @@ function renderTaskDetail(t: HtmlTaskData, config: EvalConfig, humanFeedback: Hu
     for (let r = 0; r < t.runDetails.length; r++) {
       const rd = t.runDetails[r];
       const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(', ') : 'none';
+      const runTokens = rd.result.tokens ? rd.result.tokens.total.toLocaleString() : 'n/a';
       runRows += `<tr>
         <td>${r + 1}</td>
         <td>${rd.score.discovery}</td>
         <td>${rd.score.adherence}/5</td>
         <td>${rd.score.outputQuality}/5</td>
         <td>${rd.score.weightedScore.toFixed(2)}</td>
+        <td>${runTokens}</td>
         <td>${escapeHtml(skills)}</td>
       </tr>`;
     }
@@ -397,7 +407,7 @@ function renderTaskDetail(t: HtmlTaskData, config: EvalConfig, humanFeedback: Hu
   <div class="detail-section">
     <h4>Per-Run Breakdown (${t.runDetails.length} runs)</h4>
     <table class="run-table">
-      <thead><tr><th>Run</th><th>Discovery</th><th>Adherence</th><th>Output</th><th>Weighted</th><th>Skills</th></tr></thead>
+      <thead><tr><th>Run</th><th>Discovery</th><th>Adherence</th><th>Output</th><th>Weighted</th><th>Tokens</th><th>Skills</th></tr></thead>
       <tbody>${runRows}</tbody>
     </table>
   </div>`;
@@ -417,11 +427,17 @@ function renderComparisonSection(comparison: ComparisonData): string {
   for (const t of tasks) {
     const w = t.withSkill.score;
     const b = t.withoutSkill.score;
+    const wTokens = t.withSkill.result.tokens;
+    const bTokens = t.withoutSkill.result.tokens;
+    const tokenCell = wTokens && bTokens && t.delta.totalTokensDelta !== undefined
+      ? `${wTokens.total.toLocaleString()} / ${bTokens.total.toLocaleString()} / <span class="delta">${escapeHtml(formatDelta(t.delta.totalTokensDelta, 0))}</span>`
+      : 'n/a';
     taskRows += `<tr>
       <td>${escapeHtml(t.taskId)}</td>
       <td>${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.adherenceDelta, 1))}</span></td>
       <td>${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.outputQualityDelta, 1))}</span></td>
       <td>${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / <span class="delta">${escapeHtml(formatDelta(t.delta.weightedScoreDelta))}</span></td>
+      <td>${tokenCell}</td>
     </tr>`;
   }
 
@@ -438,12 +454,13 @@ function renderComparisonSection(comparison: ComparisonData): string {
       <tr><td>Weighted Score</td><td>${ws.avgWeightedScore.toFixed(2)}</td><td>${bs.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(d.avgWeightedScoreDelta))}</td></tr>
       <tr><td>Duration</td><td>${(ws.totalDurationMs / 1000).toFixed(1)}s</td><td>${(bs.totalDurationMs / 1000).toFixed(1)}s</td><td class="delta">${escapeHtml(formatDelta(d.totalDurationDeltaMs / 1000, 1))}s</td></tr>
       <tr><td>Cost</td><td>$${ws.totalCostUsd.toFixed(4)}</td><td>$${bs.totalCostUsd.toFixed(4)}</td><td class="delta">$${escapeHtml(formatDelta(d.totalCostDeltaUsd, 4))}</td></tr>
+      <tr><td>Tokens</td><td>${ws.totalTokens !== undefined ? ws.totalTokens.toLocaleString() : 'n/a'}</td><td>${bs.totalTokens !== undefined ? bs.totalTokens.toLocaleString() : 'n/a'}</td><td class="delta">${d.totalTokensDelta !== undefined ? escapeHtml(formatDelta(d.totalTokensDelta, 0)) : 'n/a'}</td></tr>
     </tbody>
   </table>
   <h3>Per-Task Comparison</h3>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Task</th><th>Adherence (W / B / Delta)</th><th>Output (W / B / Delta)</th><th>Weighted (W / B / Delta)</th></tr></thead>
+      <thead><tr><th>Task</th><th>Adherence (W / B / Delta)</th><th>Output (W / B / Delta)</th><th>Weighted (W / B / Delta)</th><th>Tokens (W / B / Delta)</th></tr></thead>
       <tbody>${taskRows}</tbody>
     </table>
   </div>
@@ -792,6 +809,12 @@ function renderScript(): string {
       else if (sortCol === 'taskId') { valA = dA.taskId.toLowerCase(); valB = dB.taskId.toLowerCase(); }
       else if (sortCol === 'failureCategory') { valA = dA.failureCategory; valB = dB.failureCategory; }
       else { valA = dA[sortCol]; valB = dB[sortCol]; }
+      // Always push null/undefined to the end, regardless of direction.
+      const aMissing = valA === null || valA === undefined;
+      const bMissing = valB === null || valB === undefined;
+      if (aMissing && bMissing) return 0;
+      if (aMissing) return 1;
+      if (bMissing) return -1;
       if (valA < valB) return sortAsc ? -1 : 1;
       if (valA > valB) return sortAsc ? 1 : -1;
       return 0;

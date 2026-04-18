@@ -93,6 +93,22 @@ describe('generateHtmlReport', () => {
     expect(html).toContain('>2<');
   });
 
+  it('renders Tokens stat card with summed value when results report tokens', async () => {
+    const html = await generateHtmlReport(makeReportOptions({
+      results: [
+        makeResult({ taskId: 'task-1', skillLoads: ['my-skill'], tokens: { input: 1000, output: 500, cacheRead: 100, cacheCreation: 0, total: 1600 } }),
+        makeResult({ taskId: 'task-2', skillLoads: [], tokens: { input: 2000, output: 800, cacheRead: 0, cacheCreation: 100, total: 2900 } }),
+      ],
+    }));
+
+    expect(html).toMatch(/<div class="stat-value">4,500<\/div>\s*<div class="stat-label">Tokens<\/div>/);
+  });
+
+  it('renders Tokens stat card as em-dash when any result lacks tokens', async () => {
+    const html = await generateHtmlReport(makeReportOptions());
+    expect(html).toMatch(/<div class="stat-value">&mdash;<\/div>\s*<div class="stat-label">Tokens<\/div>/);
+  });
+
   it('renders the correct number of task rows', async () => {
     const html = await generateHtmlReport(makeReportOptions());
 

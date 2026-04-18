@@ -18,6 +18,7 @@ export type {
   FixtureConfig,
   ToolCallRecord,
   TaskResult,
+  TokenUsage,
   FailureCategory,
   ChecklistItemResult,
   JudgeScore,

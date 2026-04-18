@@ -9,6 +9,7 @@ import type { AgentRunner, AgentRunnerOptions } from './agent-runner.js';
 import type {
   EvalTask,
   TaskResult,
+  TokenUsage,
   ToolCallRecord,
 } from '../types.js';
 import { loadConfigSync } from '../config.js';
@@ -79,6 +80,7 @@ export abstract class BaseRunner implements AgentRunner {
       costUsd: number;
       skillLoads: string[];
       toolCalls: ToolCallRecord[];
+      tokens?: TokenUsage;
     },
   ): TaskResult {
     return {
@@ -92,6 +94,7 @@ export abstract class BaseRunner implements AgentRunner {
       toolCalls: fields.toolCalls,
       isError: false,
       errorMessage: '',
+      tokens: fields.tokens,
     };
   }
 
