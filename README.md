@@ -2,7 +2,7 @@
 
 CLI for evaluating AI agent skills across multiple agent frameworks. Tests how well agents discover, load, and execute [Agent Skills](https://agentskills.io/home) — measuring discoverability, instruction adherence, and output quality.
 
-Supports the Claude Agent SDK, Vercel AI SDK, and OpenAI Agents SDK. Runs standalone or as a GitHub Action.
+Supports the Claude Agent SDK, Vercel AI SDK, OpenAI Agents SDK, and GitHub Copilot SDK. Runs standalone or as a GitHub Action.
 
 ## What are Agent Skills?
 
@@ -35,7 +35,7 @@ skilljack-evals validate evals/example-greeting/tasks.yaml
 
 ## Building Skills with Evals
 
-Start by writing eval tasks that describe the outcomes you want, then build your skill to pass them. This eval-first approach works like TDD for agent skills:
+Start by writing eval tasks that describe the outcomes you want, then build your skill to pass them. This eval-first approach works like TDD for agent skills — inspired by Anthropic's [Writing tools for agents](https://www.anthropic.com/engineering/writing-tools-for-agents), which recommends iterating on agent tools via programmatic evaluation loops and transcript analysis.
 
 1. **Decide if a skill is the right tool** — Skills are for capabilities that should only activate on demand. For instructions that always apply, use `CLAUDE.md` or `AGENTS.md`. For validation and formatting, consider static analysis, pre-commit hooks, or agent hooks instead.
 
@@ -113,13 +113,14 @@ For detailed guidance, see the full [evaluation documentation on agentskills.io]
 
 ## Multi-Runner Support
 
-Three runners are available, selected via the `--runner` CLI flag:
+Four runners are available, selected via the `--runner` CLI flag:
 
 | Runner | Flag | Model Format | Example |
 |--------|------|-------------|---------|
 | Claude Agent SDK (default) | `--runner claude-sdk` | Model aliases | `sonnet`, `haiku` |
 | Vercel AI SDK | `--runner vercel-ai` | `provider:model` | `anthropic:claude-sonnet-4-6`, `google:gemini-2.5-pro`, `openai:gpt-5.2`, `openrouter:deepseek/deepseek-v3.2` |
 | OpenAI Agents SDK | `--runner openai-agents` | Plain model name | `gpt-5.2` |
+| GitHub Copilot SDK | `--runner copilot-sdk` | Plain model name | `gpt-5`, `claude-sonnet-4-6` |
 
 ```bash
 # Claude SDK (default)
@@ -140,9 +141,12 @@ skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model
 
 # OpenAI Agents SDK
 skilljack-evals run evals/example-greeting/tasks.yaml --runner openai-agents --model "gpt-5.2"
+
+# GitHub Copilot SDK (GitHub auth or BYOK)
+skilljack-evals run evals/example-greeting/tasks.yaml --runner copilot-sdk --model "gpt-5"
 ```
 
-The Vercel AI SDK and OpenAI Agents SDK runners require their respective peer dependencies:
+The non-default runners require their respective peer dependencies:
 
 ```bash
 # Vercel AI SDK
@@ -150,6 +154,9 @@ npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @openrouter/a
 
 # OpenAI Agents SDK
 npm install @openai/agents openai
+
+# GitHub Copilot SDK
+npm install @github/copilot-sdk
 ```
 
 ### Skill Support by SDK
@@ -159,6 +166,7 @@ Each runner uses the SDK's native mechanism for skill discovery and loading:
 - **Claude Agent SDK** — Skills via `.claude/skills/` and the `Skill` tool. See [Claude Code Skills](https://docs.anthropic.com/en/docs/claude-code/skills) and [Agent Skills format](https://agentskills.io/home).
 - **Vercel AI SDK** — Skills via a `loadSkill` tool defined in the runner, following the [Agent Skills cookbook guide](https://ai-sdk.dev/cookbook/guides/agent-skills).
 - **OpenAI Agents SDK** — Skills via `shellTool()` with local skill bundles. See [Skills in OpenAI API](https://developers.openai.com/api/docs/guides/tools-skills/) and the [Skills cookbook](https://developers.openai.com/cookbook/examples/skills_in_api/).
+- **GitHub Copilot SDK** — Skills via the Copilot SDK's native tool interface. Supports GitHub auth (`COPILOT_GITHUB_TOKEN` with Copilot permissions) or BYOK via `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`.
 
 ## Configuration
 
@@ -174,6 +182,8 @@ Set the appropriate API key in your environment or a `.env` file (see `.env.exam
 | Vercel AI (`google:`) | `GOOGLE_GENERATIVE_AI_API_KEY` |
 | Vercel AI (`openrouter:`) | `OPENROUTER_API_KEY` |
 | OpenAI Agents | `OPENAI_API_KEY` |
+| Copilot SDK (GitHub auth) | `COPILOT_GITHUB_TOKEN` |
+| Copilot SDK (BYOK) | `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` |
 
 ### Bedrock
 
@@ -234,10 +244,25 @@ skilljack-evals run evals/greeting/tasks.yaml \
   --judge-model haiku \
   --timeout 300000 \
   --tasks gr-001,gr-002 \
+  --concurrency 4 \
+  --runs 3 \
   --threshold-discovery 0.8 --threshold-score 4.0 \
   --output-dir ./results \
   --github-summary --verbose
 ```
+
+Key flags:
+- `--tasks <ids>` — comma-separated task IDs (filters to a subset; great for TDD iteration on one task)
+- `--concurrency <N>` — max concurrent tasks (1 = sequential, 0 = unlimited)
+- `--runs <N>` — run each task N times (default 3) for stability
+- `--no-judge` — deterministic-only scoring (free, fast — no LLM calls)
+- `--no-deterministic` — LLM judge only
+- `--skip-cache` — ignore cached task results; re-execute everything (writes still happen)
+- `--bust-cache` — disable caching entirely (no reads, no writes)
+- `--compare` — run tasks with and without the skill, report impact deltas
+- `--compare-skill <path>` — A/B a baseline skill directory (e.g. previous version) against the current skill
+- `--blind-compare` — combine with `--compare` for bias-resistant blind judge evaluation
+- `--html` / `--no-html` — toggle the interactive HTML report (on by default)
 
 ### `score` — Score existing results
 
@@ -248,8 +273,10 @@ skilljack-evals score results.json --judge-model haiku
 ### `report` — Generate reports from scored results
 
 ```bash
-skilljack-evals report -r results.json -o report.md --json report.json
+skilljack-evals report -r results.json -o report.md --json report.json --html-output report.html
 ```
+
+Supports markdown (`-o`), JSON (`--json`), and interactive HTML (`--html-output`) outputs.
 
 ### `validate` — Check YAML syntax
 
@@ -263,10 +290,18 @@ skilljack-evals validate evals/greeting/tasks.yaml
 skilljack-evals create-eval greeting -o evals/greeting/tasks.yaml -n 10
 ```
 
+### `cache` — Manage the response cache
+
+```bash
+skilljack-evals cache clear
+```
+
+Task results are keyed by a SHA-256 hash of `{taskId, prompt, model, runnerType, skillsHash, fixturesHash, timeout, allowedWriteDirs, runIndex}`. The cache invalidates automatically when skill or fixture content changes. Tasks using `fixture` hooks or `expect_file_exists` bypass the cache because their outcome depends on current filesystem state.
+
 ## Architecture
 
 ```
-YAML tasks → Config → Runner (Claude SDK / Vercel AI / OpenAI Agents) → Scorer (deterministic + LLM judge) → Report
+YAML tasks → Config → Runner (Claude SDK / Vercel AI / OpenAI Agents / Copilot SDK) → Scorer (deterministic + LLM judge) → Report
 ```
 
 ### Pipeline
@@ -282,19 +317,46 @@ YAML tasks → Config → Runner (Claude SDK / Vercel AI / OpenAI Agents) → Sc
 
 Two scoring methods that can run independently or together:
 
-**Deterministic** (free, fast):
-- Checks tool calls for skill activation
-- Searches output for expected marker strings
-- Validates expected/forbidden tool usage
-- Binary pass/fail
+**Deterministic** (free, fast — no LLM calls):
+- `expect_skill_activation` — did the correct skill load (via tool-call analysis)
+- `expect_marker` — case-insensitive substring in output
+- `expect_contains` / `expect_not_contains` — case-sensitive substring assertions
+- `expect_regex` — regex patterns (sandboxed, 5s timeout to guard against ReDoS)
+- `expect_javascript` — sandboxed JS expression returning boolean; `output`, `JSON`, `Math`, etc. available in scope
+- `expect_file_exists` — filesystem assertions (path-traversal guarded, scoped to `cwd`)
+- `expect_tool_calls` / `expect_no_tool_calls` — required and forbidden tool usage
 
-**LLM Judge** (richer, ~$0.20/run with default settings):
+**LLM Judge** (richer, requires API calls):
 - Discovery (0 or 1) — Did the agent load the expected skill?
 - Adherence (1-5) — How well did the agent follow skill instructions?
 - Output Quality (1-5) — Does the output meet task requirements?
 - Failure categorization
 
 **Combined score**: `w_d * discovery + w_a * ((adherence-1)/4) + w_o * ((outputQuality-1)/4)`
+
+### Comparison modes
+
+Three orthogonal comparison modes help measure skill impact and iteration quality:
+
+- `--compare` — run each task with and without the skill, report adherence/output/score deltas
+- `--compare-skill <path>` — A/B the current skill against a baseline skill directory (e.g. the previous version)
+- `--blind-compare` — anonymized judge evaluation alongside `--compare` to detect bias in the standard scoring path
+- `--compare-results <path>` — compare against a previous results JSON to flag regressions across iterations
+
+### Fixtures
+
+Tasks may declare per-task setup and teardown scripts:
+
+```yaml
+tasks:
+  - id: fx-001
+    prompt: "Fix the failing test in tests/foo.test.ts"
+    fixture:
+      setup: ./fixtures/fx-001-setup.sh
+      teardown: ./fixtures/fx-001-teardown.sh
+```
+
+Setup runs before the agent; teardown always runs after (even on setup failure). Scripts execute via `execFile` — **eval authors are trusted**, do not run untrusted task YAML. Tasks with a `fixture` or `expect_file_exists` check bypass the response cache, since their outcome depends on current filesystem state.
 
 ### Failure Categories
 
@@ -367,17 +429,32 @@ Both `deterministic` and `criteria` blocks are optional. If both are present, th
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `tasks` | Yes | — | Path to tasks YAML file |
-| `runner` | No | `claude-sdk` | Runner type: `claude-sdk`, `vercel-ai`, `openai-agents` |
+| `runner` | No | `claude-sdk` | Runner type: `claude-sdk`, `vercel-ai`, `openai-agents`, `copilot-sdk` |
 | `model` | No | `sonnet` | Agent model |
 | `judge-model` | No | `haiku` | LLM judge model |
 | `config` | No | — | Path to eval.config.yaml |
 | `threshold-discovery` | No | `0.8` | Minimum discovery rate (0-1) |
 | `threshold-score` | No | `4.0` | Minimum average score (1-5) |
 | `timeout` | No | `300000` | Per-task timeout (ms) |
+| `concurrency` | No | `1` | Max concurrent tasks (1 = sequential, 0 = unlimited) |
+| `runs` | No | `3` | Number of times to run each task |
 | `tasks-filter` | No | — | Comma-separated task IDs |
 | `skills-dir` | No | — | Path to skills directory |
+| `working-directory` | No | `.` | Agent working directory |
 | `no-judge` | No | `false` | Skip LLM judge |
 | `no-deterministic` | No | `false` | Skip deterministic scoring |
+| `anthropic-api-key` | No | — | Anthropic API key (or use env var) |
+| `openai-api-key` | No | — | OpenAI API key (for openai-agents / vercel-ai openai:) |
+| `google-api-key` | No | — | Google AI API key (for vercel-ai google:) |
+| `openrouter-api-key` | No | — | OpenRouter API key (for vercel-ai openrouter:) |
+| `github-token` | No | — | GitHub token for copilot-sdk auth (must have Copilot permissions) |
+| `compare` | No | `false` | Run with and without skill; report impact deltas |
+| `compare-skill` | No | — | Path to baseline skill directory for A/B comparison |
+| `compare-label` | No | — | Custom label for the baseline in comparison reports |
+| `compare-results` | No | — | Path to previous results JSON for regression detection |
+| `blind-compare` | No | `false` | Blind A/B judge evaluation (combine with `compare`) |
+| `generate-feedback` | No | — | Path to write feedback template JSON after run |
+| `feedback` | No | — | Path to human review feedback JSON for judge enrichment |
 
 ### Outputs
 
@@ -388,6 +465,14 @@ Both `deterministic` and `criteria` blocks are optional. If both are present, th
 | `avg-score` | Average weighted score |
 | `report-path` | Path to markdown report |
 | `json-path` | Path to JSON report |
+| `feedback-template-path` | Path to generated feedback template (if `generate-feedback` used) |
+| `adherence-delta` | Adherence delta (with minus without skill); compare mode only |
+| `output-delta` | Output quality delta; compare mode only |
+| `score-delta` | Weighted score delta; compare mode only |
+| `has-regressions` | Whether any tasks regressed vs. previous results |
+| `blind-with-skill-preferred` | Tasks where blind comparison preferred with-skill output |
+| `blind-without-skill-preferred` | Tasks where blind comparison preferred without-skill output |
+| `blind-bias-signals` | Tasks where blind comparison disagrees with standard scoring |
 
 The action writes a condensed summary to `$GITHUB_STEP_SUMMARY` and exits with code 1 if thresholds are not met.
 
