@@ -23162,12 +23162,14 @@ ${skillsPrompt}` : "You are a helpful AI assistant.";
           if (rawUsage) {
             const input = rawUsage.promptTokens ?? 0;
             const output2 = rawUsage.completionTokens ?? 0;
+            const cacheRead = 0;
+            const cacheCreation = 0;
             tokens = {
               input,
               output: output2,
-              cacheRead: 0,
-              cacheCreation: 0,
-              total: input + output2
+              cacheRead,
+              cacheCreation,
+              total: input + output2 + cacheRead + cacheCreation
             };
             totalForCost = input + output2;
           }
@@ -23364,12 +23366,14 @@ var init_openai_agents_runner = __esm({
           if (usage) {
             const input = usage.inputTokens ?? 0;
             const output2 = usage.outputTokens ?? 0;
+            const cacheRead = 0;
+            const cacheCreation = 0;
             tokens = {
               input,
               output: output2,
-              cacheRead: 0,
-              cacheCreation: 0,
-              total: input + output2
+              cacheRead,
+              cacheCreation,
+              total: input + output2 + cacheRead + cacheCreation
             };
             totalForCost = input + output2;
           }
@@ -47927,7 +47931,9 @@ function renderComparisonSection(comparison) {
   for (const t of tasks) {
     const w = t.withSkill.score;
     const b = t.withoutSkill.score;
-    const tokenCell = t.delta.totalTokensDelta !== void 0 ? `${t.withSkill.result.tokens.total.toLocaleString()} / ${t.withoutSkill.result.tokens.total.toLocaleString()} / <span class="delta">${escapeHtml(formatDelta(t.delta.totalTokensDelta, 0))}</span>` : "n/a";
+    const wTokens = t.withSkill.result.tokens;
+    const bTokens = t.withoutSkill.result.tokens;
+    const tokenCell = wTokens && bTokens && t.delta.totalTokensDelta !== void 0 ? `${wTokens.total.toLocaleString()} / ${bTokens.total.toLocaleString()} / <span class="delta">${escapeHtml(formatDelta(t.delta.totalTokensDelta, 0))}</span>` : "n/a";
     taskRows += `<tr>
       <td>${escapeHtml(t.taskId)}</td>
       <td>${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.adherenceDelta, 1))}</span></td>
@@ -48288,6 +48294,12 @@ function renderScript() {
       else if (sortCol === 'taskId') { valA = dA.taskId.toLowerCase(); valB = dB.taskId.toLowerCase(); }
       else if (sortCol === 'failureCategory') { valA = dA.failureCategory; valB = dB.failureCategory; }
       else { valA = dA[sortCol]; valB = dB[sortCol]; }
+      // Always push null/undefined to the end, regardless of direction.
+      const aMissing = valA === null || valA === undefined;
+      const bMissing = valB === null || valB === undefined;
+      if (aMissing && bMissing) return 0;
+      if (aMissing) return 1;
+      if (bMissing) return -1;
       if (valA < valB) return sortAsc ? -1 : 1;
       if (valA > valB) return sortAsc ? 1 : -1;
       return 0;

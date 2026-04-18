@@ -427,8 +427,10 @@ function renderComparisonSection(comparison: ComparisonData): string {
   for (const t of tasks) {
     const w = t.withSkill.score;
     const b = t.withoutSkill.score;
-    const tokenCell = t.delta.totalTokensDelta !== undefined
-      ? `${t.withSkill.result.tokens!.total.toLocaleString()} / ${t.withoutSkill.result.tokens!.total.toLocaleString()} / <span class="delta">${escapeHtml(formatDelta(t.delta.totalTokensDelta, 0))}</span>`
+    const wTokens = t.withSkill.result.tokens;
+    const bTokens = t.withoutSkill.result.tokens;
+    const tokenCell = wTokens && bTokens && t.delta.totalTokensDelta !== undefined
+      ? `${wTokens.total.toLocaleString()} / ${bTokens.total.toLocaleString()} / <span class="delta">${escapeHtml(formatDelta(t.delta.totalTokensDelta, 0))}</span>`
       : 'n/a';
     taskRows += `<tr>
       <td>${escapeHtml(t.taskId)}</td>
@@ -807,6 +809,12 @@ function renderScript(): string {
       else if (sortCol === 'taskId') { valA = dA.taskId.toLowerCase(); valB = dB.taskId.toLowerCase(); }
       else if (sortCol === 'failureCategory') { valA = dA.failureCategory; valB = dB.failureCategory; }
       else { valA = dA[sortCol]; valB = dB[sortCol]; }
+      // Always push null/undefined to the end, regardless of direction.
+      const aMissing = valA === null || valA === undefined;
+      const bMissing = valB === null || valB === undefined;
+      if (aMissing && bMissing) return 0;
+      if (aMissing) return 1;
+      if (bMissing) return -1;
       if (valA < valB) return sortAsc ? -1 : 1;
       if (valA > valB) return sortAsc ? 1 : -1;
       return 0;

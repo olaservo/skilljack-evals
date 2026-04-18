@@ -280,12 +280,14 @@ export class VercelAiRunner extends BaseRunner {
       if (rawUsage) {
         const input = rawUsage.promptTokens ?? 0;
         const output = rawUsage.completionTokens ?? 0;
+        const cacheRead = 0;
+        const cacheCreation = 0;
         tokens = {
           input,
           output,
-          cacheRead: 0,
-          cacheCreation: 0,
-          total: input + output,
+          cacheRead,
+          cacheCreation,
+          total: input + output + cacheRead + cacheCreation,
         };
         totalForCost = input + output;
       }
