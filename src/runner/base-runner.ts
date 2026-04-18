@@ -10,6 +10,7 @@ import type {
   EvalTask,
   SkillEvaluation,
   TaskResult,
+  ToolCallRecord,
 } from '../types.js';
 import { loadConfigSync } from '../config.js';
 import type { EvalConfig } from '../config.js';
@@ -38,8 +39,7 @@ export abstract class BaseRunner implements AgentRunner {
 
     this.options = {
       cwd: options.cwd ?? process.cwd(),
-      // Precedence: explicit concurrency > parallel (deprecated, maps to unlimited) > config file > default (1)
-      concurrency: options.concurrency ?? (options.parallel ? 0 : undefined) ?? resolvedConfig.concurrency ?? DEFAULT_RUNNER_CONCURRENCY,
+      concurrency: options.concurrency ?? resolvedConfig.concurrency ?? DEFAULT_RUNNER_CONCURRENCY,
       model: options.model ?? resolvedConfig.defaultAgentModel,
       taskTimeoutMs: options.taskTimeoutMs ?? resolvedConfig.taskTimeoutMs,
       allowedWriteDirs: options.allowedWriteDirs ?? resolvedConfig.allowedWriteDirs,
@@ -68,6 +68,48 @@ export abstract class BaseRunner implements AgentRunner {
       isError: true,
       errorMessage,
     };
+  }
+
+  /**
+   * Build a successful TaskResult. Dedupes skillLoads.
+   */
+  protected buildTaskResult(
+    task: EvalTask,
+    fields: {
+      output: string;
+      durationMs: number;
+      numTurns: number;
+      costUsd: number;
+      skillLoads: string[];
+      toolCalls: ToolCallRecord[];
+    },
+  ): TaskResult {
+    return {
+      taskId: task.id,
+      prompt: task.prompt,
+      output: fields.output,
+      durationMs: fields.durationMs,
+      numTurns: fields.numTurns,
+      costUsd: fields.costUsd,
+      skillLoads: [...new Set(fields.skillLoads)],
+      toolCalls: fields.toolCalls,
+      isError: false,
+      errorMessage: '',
+    };
+  }
+
+  /**
+   * Handle a caught error inside runTask: log it and build an error TaskResult.
+   */
+  protected handleRunError(
+    task: EvalTask,
+    error: unknown,
+    startTime: number,
+    logger?: SessionLogger,
+  ): TaskResult {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger?.markAsError(errorMessage);
+    return this.createErrorResult(task, errorMessage, Date.now() - startTime);
   }
 
   /**

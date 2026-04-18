@@ -23,28 +23,10 @@ import {
 } from '../types.js';
 import { createToolPolicy } from './security.js';
 import { BaseRunner } from './base-runner.js';
-import type { AgentRunnerOptions } from './agent-runner.js';
-import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
-
-/**
- * Claude SDK-specific options (extends shared options).
- */
-export interface ClaudeSdkRunnerOptions extends AgentRunnerOptions {
-  settingSources?: Array<'user' | 'project' | 'local'>;
-}
 
 export class ClaudeSdkRunner extends BaseRunner {
   readonly providerName = 'claude-sdk';
-  private sdkOptions: ClaudeSdkRunnerOptions;
-
-  constructor(options: ClaudeSdkRunnerOptions = {}, config?: EvalConfig) {
-    super(options, config);
-    this.sdkOptions = {
-      ...this.options,
-      settingSources: options.settingSources ?? ['project'],
-    };
-  }
 
   /**
    * Execute a single evaluation task.
@@ -71,7 +53,7 @@ export class ClaudeSdkRunner extends BaseRunner {
           cwd: this.options.cwd,
           model: this.options.model,
           systemPrompt: { type: 'preset', preset: 'claude_code' },
-          settingSources: this.sdkOptions.settingSources,
+          settingSources: ['project'],
           allowedTools: [
             'Read', 'Write', 'Edit',
             'Glob', 'Grep', 'Bash',
@@ -142,23 +124,16 @@ export class ClaudeSdkRunner extends BaseRunner {
         }
       }
 
-      return {
-        taskId: task.id,
-        prompt: task.prompt,
+      return this.buildTaskResult(task, {
         output: resultOutput,
         durationMs: resultDurationMs || (Date.now() - startTime),
         numTurns: resultNumTurns,
         costUsd: resultCostUsd,
-        skillLoads: [...new Set(skillLoads)],
+        skillLoads,
         toolCalls,
-        isError: false,
-        errorMessage: '',
-      };
+      });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger?.markAsError(errorMessage);
-
-      return this.createErrorResult(task, errorMessage, Date.now() - startTime);
+      return this.handleRunError(task, error, startTime, logger);
     }
   }
 }

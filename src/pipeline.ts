@@ -457,10 +457,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   // 2b. Set up response cache
   const cacheEnabled = config.cache.enabled && !options.bustCache;
   const cache = cacheEnabled ? new ResponseCache(config.cache) : null;
-  const skillsHash = cache ? await ResponseCache.hashSkillsDir(skillsDir) : '';
-  const cacheOpts: PhaseCacheOptions | undefined = cache
-    ? { cache, skillsHash, skipCache: options.skipCache }
-    : undefined;
+  const buildCacheOpts = async (dir: string | undefined): Promise<PhaseCacheOptions | undefined> =>
+    cache ? { cache, skillsHash: await ResponseCache.hashSkillsDir(dir), skipCache: options.skipCache } : undefined;
+  const cacheOpts = await buildCacheOpts(skillsDir);
 
   // 3. Run evaluation phase(s)
   let primaryPhase: PhaseResult;
@@ -514,9 +513,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       };
 
       // Recompute skills hash for baseline phase (different skill dir or no skills)
-      const baseCacheOpts: PhaseCacheOptions | undefined = cache
-        ? { cache, skillsHash: await ResponseCache.hashSkillsDir(baseSkillsDir), skipCache: options.skipCache }
-        : undefined;
+      const baseCacheOpts = await buildCacheOpts(baseSkillsDir);
 
       const basePhase = await runPhase(
         baselineLabel, evaluation, config, cwd, baseSkillsDir, numRuns, baselineScorerOptions,

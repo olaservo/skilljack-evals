@@ -250,23 +250,16 @@ export class OpenAiAgentsRunner extends BaseRunner {
       // Rough cost estimate — actual pricing varies by model and provider
       const costUsd = totalTokens * 0.000003;
 
-      return {
-        taskId: task.id,
-        prompt: task.prompt,
+      return this.buildTaskResult(task, {
         output: typeof output === 'string' ? output : JSON.stringify(output),
         durationMs: Date.now() - startTime,
         numTurns,
         costUsd,
-        skillLoads: [...new Set(skillLoads)],
+        skillLoads,
         toolCalls,
-        isError: false,
-        errorMessage: '',
-      };
+      });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger?.markAsError(errorMessage);
-
-      return this.createErrorResult(task, errorMessage, Date.now() - startTime);
+      return this.handleRunError(task, error, startTime, logger);
     }
   }
 }

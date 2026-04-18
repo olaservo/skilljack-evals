@@ -14,6 +14,7 @@ import type {
 } from '../types.js';
 import { loadConfigSync, type EvalConfig } from '../config.js';
 import { isFlaky } from '../scorer/aggregator.js';
+import { evaluatePassFail } from './report.js';
 
 /**
  * Generate a condensed summary for GitHub Actions.
@@ -21,6 +22,7 @@ import { isFlaky } from '../scorer/aggregator.js';
 export function generateGitHubSummary(report: EvaluationReport, config?: EvalConfig): string {
   const resolvedConfig = config ?? loadConfigSync();
   const { summary, failureBreakdown, tasks } = report;
+  const { discoveryPassed, adherencePassed, outputQualityPassed } = evaluatePassFail(summary, resolvedConfig);
   const lines: string[] = [];
 
   const icon = report.passed ? ':white_check_mark:' : ':x:';
@@ -31,9 +33,9 @@ export function generateGitHubSummary(report: EvaluationReport, config?: EvalCon
   // Summary table
   lines.push('| Metric | Value | Threshold | Status |');
   lines.push('|--------|-------|-----------|--------|');
-  lines.push(`| Discovery Rate | ${(summary.discoveryAccuracy * 100).toFixed(0)}%${summary.stddev ? ` \u00B1 ${(summary.stddev.discovery * 100).toFixed(0)}%` : ''} (${Math.round(summary.discoveryAccuracy * summary.totalTasks)}/${summary.totalTasks}) | ${(resolvedConfig.discoveryThreshold * 100).toFixed(0)}% | ${summary.discoveryAccuracy >= resolvedConfig.discoveryThreshold ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Avg Adherence | ${summary.avgAdherence.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.adherence.toFixed(1)}` : ''} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${summary.avgAdherence >= resolvedConfig.scoreThreshold ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Avg Output Quality | ${summary.avgOutputQuality.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.outputQuality.toFixed(1)}` : ''} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${summary.avgOutputQuality >= resolvedConfig.scoreThreshold ? 'PASS' : 'FAIL'} |`);
+  lines.push(`| Discovery Rate | ${(summary.discoveryAccuracy * 100).toFixed(0)}%${summary.stddev ? ` \u00B1 ${(summary.stddev.discovery * 100).toFixed(0)}%` : ''} (${Math.round(summary.discoveryAccuracy * summary.totalTasks)}/${summary.totalTasks}) | ${(resolvedConfig.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? 'PASS' : 'FAIL'} |`);
+  lines.push(`| Avg Adherence | ${summary.avgAdherence.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.adherence.toFixed(1)}` : ''} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${adherencePassed ? 'PASS' : 'FAIL'} |`);
+  lines.push(`| Avg Output Quality | ${summary.avgOutputQuality.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.outputQuality.toFixed(1)}` : ''} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${outputQualityPassed ? 'PASS' : 'FAIL'} |`);
   lines.push(`| Weighted Score | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | | |`);
   lines.push(`| Duration | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |`);
   lines.push(`| Cost | $${summary.totalCostUsd.toFixed(4)} | | |`);

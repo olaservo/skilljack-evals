@@ -279,25 +279,19 @@ export class CopilotSdkRunner extends BaseRunner {
         // assistant.message events, leaving numTurns at 0.
         const effectiveTurns = numTurns === 0 && output ? 1 : numTurns;
 
-        return {
-          taskId: task.id,
-          prompt: task.prompt,
+        return this.buildTaskResult(task, {
           output,
           durationMs: Date.now() - startTime,
           numTurns: effectiveTurns,
           costUsd: 0, // Copilot SDK doesn't expose per-token cost
-          skillLoads: [...new Set(skillLoads)],
+          skillLoads,
           toolCalls,
-          isError: false,
-          errorMessage: '',
-        };
+        });
       } finally {
         await session.disconnect();
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger?.markAsError(errorMessage);
-      return this.createErrorResult(task, errorMessage, Date.now() - startTime);
+      return this.handleRunError(task, error, startTime, logger);
     }
   }
 

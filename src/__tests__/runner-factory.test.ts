@@ -55,21 +55,4 @@ describe('createRunner', () => {
     const opts = (runner as any).runnerOptions;
     expect(opts.concurrency).toBe(3);
   });
-
-  it('maps parallel: true to concurrency: 0 for backward compat', async () => {
-    const runner = await createRunner('claude-sdk', {
-      parallel: true,
-    });
-    const opts = (runner as any).runnerOptions;
-    expect(opts.concurrency).toBe(0);
-  });
-
-  it('explicit concurrency takes precedence over parallel', async () => {
-    const runner = await createRunner('claude-sdk', {
-      parallel: true,
-      concurrency: 5,
-    });
-    const opts = (runner as any).runnerOptions;
-    expect(opts.concurrency).toBe(5);
-  });
 });

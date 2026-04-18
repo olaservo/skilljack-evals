@@ -51,11 +51,7 @@ export async function generateReport(options: ReportOptions): Promise<string> {
   const totalTasks = evaluation.tasks.length;
   const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-
-  // Determine pass/fail
-  const discoveryPassed = summary.discoveryAccuracy >= config.discoveryThreshold;
-  const scorePassed = summary.avgAdherence >= config.scoreThreshold && summary.avgOutputQuality >= config.scoreThreshold;
-  const passed = discoveryPassed && scorePassed;
+  const { discoveryPassed, adherencePassed, outputQualityPassed, passed } = evaluatePassFail(summary, config);
 
   // Build metadata section
   let metaSection = '';
@@ -89,8 +85,8 @@ ${metaSection}
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
 | **Discovery Accuracy** | ${(summary.discoveryAccuracy * 100).toFixed(1)}%${summary.stddev ? ` \u00B1 ${(summary.stddev.discovery * 100).toFixed(1)}%` : ''} | ${(config.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? 'PASS' : 'FAIL'} |
-| **Avg Adherence Score** | ${summary.avgAdherence.toFixed(2)}/5.0${summary.stddev ? ` \u00B1 ${summary.stddev.adherence.toFixed(2)}` : ''} | ${config.scoreThreshold.toFixed(1)} | ${summary.avgAdherence >= config.scoreThreshold ? 'PASS' : 'FAIL'} |
-| **Avg Output Quality** | ${summary.avgOutputQuality.toFixed(2)}/5.0${summary.stddev ? ` \u00B1 ${summary.stddev.outputQuality.toFixed(2)}` : ''} | ${config.scoreThreshold.toFixed(1)} | ${summary.avgOutputQuality >= config.scoreThreshold ? 'PASS' : 'FAIL'} |
+| **Avg Adherence Score** | ${summary.avgAdherence.toFixed(2)}/5.0${summary.stddev ? ` \u00B1 ${summary.stddev.adherence.toFixed(2)}` : ''} | ${config.scoreThreshold.toFixed(1)} | ${adherencePassed ? 'PASS' : 'FAIL'} |
+| **Avg Output Quality** | ${summary.avgOutputQuality.toFixed(2)}/5.0${summary.stddev ? ` \u00B1 ${summary.stddev.outputQuality.toFixed(2)}` : ''} | ${config.scoreThreshold.toFixed(1)} | ${outputQualityPassed ? 'PASS' : 'FAIL'} |
 | **Avg Weighted Score** | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | | |
 | **Total Duration** | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |
 | **Total Cost** | $${summary.totalCostUsd.toFixed(4)} | | |
@@ -252,27 +248,8 @@ export async function generateJsonResults(options: ReportOptions): Promise<Evalu
   const config = options.config ?? loadConfigSync();
   const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-
-  const discoveryPassed = summary.discoveryAccuracy >= config.discoveryThreshold;
-  const scorePassed = summary.avgAdherence >= config.scoreThreshold && summary.avgOutputQuality >= config.scoreThreshold;
-  const passed = discoveryPassed && scorePassed;
-
-  const failureReasons: string[] = [];
-  if (!discoveryPassed) {
-    failureReasons.push(
-      `Discovery rate ${(summary.discoveryAccuracy * 100).toFixed(1)}% below threshold ${(config.discoveryThreshold * 100).toFixed(0)}%`
-    );
-  }
-  if (summary.avgAdherence < config.scoreThreshold) {
-    failureReasons.push(
-      `Avg adherence ${summary.avgAdherence.toFixed(2)} below threshold ${config.scoreThreshold}`
-    );
-  }
-  if (summary.avgOutputQuality < config.scoreThreshold) {
-    failureReasons.push(
-      `Avg output quality ${summary.avgOutputQuality.toFixed(2)} below threshold ${config.scoreThreshold}`
-    );
-  }
+  const { passed } = evaluatePassFail(summary, config);
+  const failureReasons = computeFailureReasons(summary, config);
 
   const report: EvaluationReport = {
     skillName: evaluation.skillName,
@@ -311,6 +288,60 @@ export async function generateJsonResults(options: ReportOptions): Promise<Evalu
   }
 
   return report;
+}
+
+/**
+ * Pass/fail evaluation against configured thresholds.
+ */
+export interface PassFailResult {
+  discoveryPassed: boolean;
+  adherencePassed: boolean;
+  outputQualityPassed: boolean;
+  passed: boolean;
+}
+
+/**
+ * Evaluate whether a summary passes the configured thresholds.
+ */
+export function evaluatePassFail(
+  summary: EvaluationSummary,
+  config: EvalConfig,
+): PassFailResult {
+  const discoveryPassed = summary.discoveryAccuracy >= config.discoveryThreshold;
+  const adherencePassed = summary.avgAdherence >= config.scoreThreshold;
+  const outputQualityPassed = summary.avgOutputQuality >= config.scoreThreshold;
+  return {
+    discoveryPassed,
+    adherencePassed,
+    outputQualityPassed,
+    passed: discoveryPassed && adherencePassed && outputQualityPassed,
+  };
+}
+
+/**
+ * Build human-readable failure reasons for a summary that did not pass.
+ */
+export function computeFailureReasons(
+  summary: EvaluationSummary,
+  config: EvalConfig,
+): string[] {
+  const reasons: string[] = [];
+  if (summary.discoveryAccuracy < config.discoveryThreshold) {
+    reasons.push(
+      `Discovery rate ${(summary.discoveryAccuracy * 100).toFixed(1)}% below threshold ${(config.discoveryThreshold * 100).toFixed(0)}%`,
+    );
+  }
+  if (summary.avgAdherence < config.scoreThreshold) {
+    reasons.push(
+      `Avg adherence ${summary.avgAdherence.toFixed(2)} below threshold ${config.scoreThreshold}`,
+    );
+  }
+  if (summary.avgOutputQuality < config.scoreThreshold) {
+    reasons.push(
+      `Avg output quality ${summary.avgOutputQuality.toFixed(2)} below threshold ${config.scoreThreshold}`,
+    );
+  }
+  return reasons;
 }
 
 /**

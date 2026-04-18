@@ -87,6 +87,23 @@ export async function scoreAll(
 }
 
 /**
+ * Apply dimension weights to produce a 0-1 weighted score.
+ * Normalizes 1-5 dimensions to 0-1 before weighting.
+ */
+function computeWeightedScore(
+  discovery: number,
+  adherence: number,
+  outputQuality: number,
+  weights: Map<string, number>,
+): number {
+  const adherenceNorm = (adherence - 1) / 4;
+  const outputNorm = (outputQuality - 1) / 4;
+  return (weights.get('discovery') ?? 0.3) * discovery
+    + (weights.get('adherence') ?? 0.4) * adherenceNorm
+    + (weights.get('output') ?? 0.3) * outputNorm;
+}
+
+/**
  * Merge deterministic and judge scores into a combined score.
  *
  * Merge rules:
@@ -112,13 +129,7 @@ function mergeScores(
     const discovery = computeDiscovery(det.skillActivated);
     const adherence = judge.adherence;
     const outputQuality = judge.outputQuality;
-
-    const adherenceNorm = (adherence - 1) / 4;
-    const outputNorm = (outputQuality - 1) / 4;
-    const weightedScore =
-      (weights.get('discovery') ?? 0.3) * discovery +
-      (weights.get('adherence') ?? 0.4) * adherenceNorm +
-      (weights.get('output') ?? 0.3) * outputNorm;
+    const weightedScore = computeWeightedScore(discovery, adherence, outputQuality, weights);
 
     // Determine failure category
     let failureCategory = judge.failureCategory;
@@ -153,13 +164,7 @@ function mergeScores(
     const discovery = computeDiscovery(det.skillActivated);
     const adherence = det.passed ? 5 : 1;
     const outputQuality = det.passed ? 5 : 1;
-
-    const adherenceNorm = (adherence - 1) / 4;
-    const outputNorm = (outputQuality - 1) / 4;
-    const weightedScore =
-      (weights.get('discovery') ?? 0.3) * discovery +
-      (weights.get('adherence') ?? 0.4) * adherenceNorm +
-      (weights.get('output') ?? 0.3) * outputNorm;
+    const weightedScore = computeWeightedScore(discovery, adherence, outputQuality, weights);
 
     let failureCategory: FailureCategory = 'none';
     if (!det.skillActivated && det.details.some((d) => d.includes('Expected skill activation'))) {

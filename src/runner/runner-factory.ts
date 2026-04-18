@@ -7,7 +7,6 @@
 
 import type { AgentRunner, AgentRunnerOptions } from './agent-runner.js';
 import { ClaudeSdkRunner } from './claude-sdk-runner.js';
-import type { ClaudeSdkRunnerOptions } from './claude-sdk-runner.js';
 import type { RunnerType, EvalConfig } from '../config.js';
 
 /**
@@ -26,7 +25,7 @@ export async function createRunner(
 ): Promise<AgentRunner> {
   switch (type) {
     case 'claude-sdk':
-      return new ClaudeSdkRunner(options as ClaudeSdkRunnerOptions, config);
+      return new ClaudeSdkRunner(options, config);
 
     case 'vercel-ai': {
       const { VercelAiRunner } = await import('./vercel-ai-runner.js').catch(() => {

@@ -9,7 +9,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { formatDelta, formatCategory, pct } from '../utils/format.js';
-import { computeSummary, computeFailureBreakdown } from './report.js';
+import { computeSummary, computeFailureBreakdown, evaluatePassFail } from './report.js';
 import type { ReportOptions } from './report.js';
 import type {
   CombinedScore,
@@ -58,10 +58,7 @@ export async function generateHtmlReport(options: ReportOptions): Promise<string
 
   const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-
-  const discoveryPassed = summary.discoveryAccuracy >= config.discoveryThreshold;
-  const scorePassed = summary.avgAdherence >= config.scoreThreshold && summary.avgOutputQuality >= config.scoreThreshold;
-  const passed = discoveryPassed && scorePassed;
+  const { passed } = evaluatePassFail(summary, config);
 
   const tasks: HtmlTaskData[] = evaluation.tasks.map((task, i) => ({
     index: i,

@@ -22807,8 +22807,7 @@ var init_base_runner = __esm({
         const resolvedConfig = config2 ?? loadConfigSync();
         this.options = {
           cwd: options.cwd ?? process.cwd(),
-          // Precedence: explicit concurrency > parallel (deprecated, maps to unlimited) > config file > default (1)
-          concurrency: options.concurrency ?? (options.parallel ? 0 : void 0) ?? resolvedConfig.concurrency ?? DEFAULT_RUNNER_CONCURRENCY,
+          concurrency: options.concurrency ?? resolvedConfig.concurrency ?? DEFAULT_RUNNER_CONCURRENCY,
           model: options.model ?? resolvedConfig.defaultAgentModel,
           taskTimeoutMs: options.taskTimeoutMs ?? resolvedConfig.taskTimeoutMs,
           allowedWriteDirs: options.allowedWriteDirs ?? resolvedConfig.allowedWriteDirs,
@@ -22832,6 +22831,31 @@ var init_base_runner = __esm({
           isError: true,
           errorMessage
         };
+      }
+      /**
+       * Build a successful TaskResult. Dedupes skillLoads.
+       */
+      buildTaskResult(task, fields) {
+        return {
+          taskId: task.id,
+          prompt: task.prompt,
+          output: fields.output,
+          durationMs: fields.durationMs,
+          numTurns: fields.numTurns,
+          costUsd: fields.costUsd,
+          skillLoads: [...new Set(fields.skillLoads)],
+          toolCalls: fields.toolCalls,
+          isError: false,
+          errorMessage: ""
+        };
+      }
+      /**
+       * Handle a caught error inside runTask: log it and build an error TaskResult.
+       */
+      handleRunError(task, error2, startTime, logger) {
+        const errorMessage = error2 instanceof Error ? error2.message : String(error2);
+        logger?.markAsError(errorMessage);
+        return this.createErrorResult(task, errorMessage, Date.now() - startTime);
       }
       /**
        * Dynamically import a module, throwing a helpful error if missing.
@@ -23193,22 +23217,16 @@ ${skillsPrompt}` : "You are a helpful AI assistant.";
           const usage = result.usage ?? { promptTokens: 0, completionTokens: 0 };
           const totalTokens = (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0);
           const costUsd = totalTokens * 3e-6;
-          return {
-            taskId: task.id,
-            prompt: task.prompt,
+          return this.buildTaskResult(task, {
             output,
             durationMs: Date.now() - startTime,
             numTurns: stepCount,
             costUsd,
-            skillLoads: [...new Set(skillLoads)],
-            toolCalls,
-            isError: false,
-            errorMessage: ""
-          };
+            skillLoads,
+            toolCalls
+          });
         } catch (error2) {
-          const errorMessage = error2 instanceof Error ? error2.message : String(error2);
-          logger?.markAsError(errorMessage);
-          return this.createErrorResult(task, errorMessage, Date.now() - startTime);
+          return this.handleRunError(task, error2, startTime, logger);
         }
       }
     };
@@ -23387,22 +23405,16 @@ var init_openai_agents_runner = __esm({
           const usage = result.usage;
           const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
           const costUsd = totalTokens * 3e-6;
-          return {
-            taskId: task.id,
-            prompt: task.prompt,
+          return this.buildTaskResult(task, {
             output: typeof output === "string" ? output : JSON.stringify(output),
             durationMs: Date.now() - startTime,
             numTurns,
             costUsd,
-            skillLoads: [...new Set(skillLoads)],
-            toolCalls,
-            isError: false,
-            errorMessage: ""
-          };
+            skillLoads,
+            toolCalls
+          });
         } catch (error2) {
-          const errorMessage = error2 instanceof Error ? error2.message : String(error2);
-          logger?.markAsError(errorMessage);
-          return this.createErrorResult(task, errorMessage, Date.now() - startTime);
+          return this.handleRunError(task, error2, startTime, logger);
         }
       }
     };
@@ -23597,26 +23609,20 @@ var init_copilot_sdk_runner = __esm({
               logger?.addTextMessage(output);
             }
             const effectiveTurns = numTurns === 0 && output ? 1 : numTurns;
-            return {
-              taskId: task.id,
-              prompt: task.prompt,
+            return this.buildTaskResult(task, {
               output,
               durationMs: Date.now() - startTime,
               numTurns: effectiveTurns,
               costUsd: 0,
               // Copilot SDK doesn't expose per-token cost
-              skillLoads: [...new Set(skillLoads)],
-              toolCalls,
-              isError: false,
-              errorMessage: ""
-            };
+              skillLoads,
+              toolCalls
+            });
           } finally {
             await session.disconnect();
           }
         } catch (error2) {
-          const errorMessage = error2 instanceof Error ? error2.message : String(error2);
-          logger?.markAsError(errorMessage);
-          return this.createErrorResult(task, errorMessage, Date.now() - startTime);
+          return this.handleRunError(task, error2, startTime, logger);
         }
       }
       /**
@@ -45619,14 +45625,6 @@ init_security();
 init_base_runner();
 var ClaudeSdkRunner = class extends BaseRunner {
   providerName = "claude-sdk";
-  sdkOptions;
-  constructor(options = {}, config2) {
-    super(options, config2);
-    this.sdkOptions = {
-      ...this.options,
-      settingSources: options.settingSources ?? ["project"]
-    };
-  }
   /**
    * Execute a single evaluation task.
    */
@@ -45646,7 +45644,7 @@ var ClaudeSdkRunner = class extends BaseRunner {
           cwd: this.options.cwd,
           model: this.options.model,
           systemPrompt: { type: "preset", preset: "claude_code" },
-          settingSources: this.sdkOptions.settingSources,
+          settingSources: ["project"],
           allowedTools: [
             "Read",
             "Write",
@@ -45707,22 +45705,16 @@ var ClaudeSdkRunner = class extends BaseRunner {
           }
         }
       }
-      return {
-        taskId: task.id,
-        prompt: task.prompt,
+      return this.buildTaskResult(task, {
         output: resultOutput,
         durationMs: resultDurationMs || Date.now() - startTime,
         numTurns: resultNumTurns,
         costUsd: resultCostUsd,
-        skillLoads: [...new Set(skillLoads)],
-        toolCalls,
-        isError: false,
-        errorMessage: ""
-      };
+        skillLoads,
+        toolCalls
+      });
     } catch (error2) {
-      const errorMessage = error2 instanceof Error ? error2.message : String(error2);
-      logger?.markAsError(errorMessage);
-      return this.createErrorResult(task, errorMessage, Date.now() - startTime);
+      return this.handleRunError(task, error2, startTime, logger);
     }
   }
 };
@@ -46615,15 +46607,18 @@ async function scoreAll(tasks, results, options = {}) {
   }
   return scores;
 }
+function computeWeightedScore(discovery, adherence, outputQuality, weights) {
+  const adherenceNorm = (adherence - 1) / 4;
+  const outputNorm = (outputQuality - 1) / 4;
+  return (weights.get("discovery") ?? 0.3) * discovery + (weights.get("adherence") ?? 0.4) * adherenceNorm + (weights.get("output") ?? 0.3) * outputNorm;
+}
 function mergeScores(taskId, det, judge, weights, isNegativeTest = false) {
   const computeDiscovery = (activated) => isNegativeTest ? activated ? 0 : 1 : activated ? 1 : 0;
   if (det && judge) {
     const discovery = computeDiscovery(det.skillActivated);
     const adherence = judge.adherence;
     const outputQuality = judge.outputQuality;
-    const adherenceNorm = (adherence - 1) / 4;
-    const outputNorm = (outputQuality - 1) / 4;
-    const weightedScore = (weights.get("discovery") ?? 0.3) * discovery + (weights.get("adherence") ?? 0.4) * adherenceNorm + (weights.get("output") ?? 0.3) * outputNorm;
+    const weightedScore = computeWeightedScore(discovery, adherence, outputQuality, weights);
     let failureCategory = judge.failureCategory;
     if (!det.passed && det.skillActivated === false) {
       failureCategory = "discovery_failure";
@@ -46653,9 +46648,7 @@ function mergeScores(taskId, det, judge, weights, isNegativeTest = false) {
     const discovery = computeDiscovery(det.skillActivated);
     const adherence = det.passed ? 5 : 1;
     const outputQuality = det.passed ? 5 : 1;
-    const adherenceNorm = (adherence - 1) / 4;
-    const outputNorm = (outputQuality - 1) / 4;
-    const weightedScore = (weights.get("discovery") ?? 0.3) * discovery + (weights.get("adherence") ?? 0.4) * adherenceNorm + (weights.get("output") ?? 0.3) * outputNorm;
+    const weightedScore = computeWeightedScore(discovery, adherence, outputQuality, weights);
     let failureCategory = "none";
     if (!det.skillActivated && det.details.some((d) => d.includes("Expected skill activation"))) {
       failureCategory = "discovery_failure";
@@ -47189,9 +47182,7 @@ async function generateReport(options) {
   const totalTasks = evaluation.tasks.length;
   const summary2 = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-  const discoveryPassed = summary2.discoveryAccuracy >= config2.discoveryThreshold;
-  const scorePassed = summary2.avgAdherence >= config2.scoreThreshold && summary2.avgOutputQuality >= config2.scoreThreshold;
-  const passed = discoveryPassed && scorePassed;
+  const { discoveryPassed, adherencePassed, outputQualityPassed, passed } = evaluatePassFail(summary2, config2);
   let metaSection = "";
   if (metadata) {
     const metaLines = [`**Skill Path:** \`${metadata.skillPath}\``];
@@ -47221,8 +47212,8 @@ ${metaSection}
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
 | **Discovery Accuracy** | ${(summary2.discoveryAccuracy * 100).toFixed(1)}%${summary2.stddev ? ` \xB1 ${(summary2.stddev.discovery * 100).toFixed(1)}%` : ""} | ${(config2.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? "PASS" : "FAIL"} |
-| **Avg Adherence Score** | ${summary2.avgAdherence.toFixed(2)}/5.0${summary2.stddev ? ` \xB1 ${summary2.stddev.adherence.toFixed(2)}` : ""} | ${config2.scoreThreshold.toFixed(1)} | ${summary2.avgAdherence >= config2.scoreThreshold ? "PASS" : "FAIL"} |
-| **Avg Output Quality** | ${summary2.avgOutputQuality.toFixed(2)}/5.0${summary2.stddev ? ` \xB1 ${summary2.stddev.outputQuality.toFixed(2)}` : ""} | ${config2.scoreThreshold.toFixed(1)} | ${summary2.avgOutputQuality >= config2.scoreThreshold ? "PASS" : "FAIL"} |
+| **Avg Adherence Score** | ${summary2.avgAdherence.toFixed(2)}/5.0${summary2.stddev ? ` \xB1 ${summary2.stddev.adherence.toFixed(2)}` : ""} | ${config2.scoreThreshold.toFixed(1)} | ${adherencePassed ? "PASS" : "FAIL"} |
+| **Avg Output Quality** | ${summary2.avgOutputQuality.toFixed(2)}/5.0${summary2.stddev ? ` \xB1 ${summary2.stddev.outputQuality.toFixed(2)}` : ""} | ${config2.scoreThreshold.toFixed(1)} | ${outputQualityPassed ? "PASS" : "FAIL"} |
 | **Avg Weighted Score** | ${summary2.avgWeightedScore.toFixed(2)}${summary2.stddev ? ` \xB1 ${summary2.stddev.weightedScore.toFixed(2)}` : ""} | | |
 | **Total Duration** | ${(summary2.totalDurationMs / 1e3).toFixed(1)}s | | |
 | **Total Cost** | $${summary2.totalCostUsd.toFixed(4)} | | |
@@ -47384,19 +47375,8 @@ async function generateJsonResults(options) {
   const config2 = options.config ?? loadConfigSync();
   const summary2 = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-  const discoveryPassed = summary2.discoveryAccuracy >= config2.discoveryThreshold;
-  const scorePassed = summary2.avgAdherence >= config2.scoreThreshold && summary2.avgOutputQuality >= config2.scoreThreshold;
-  const passed = discoveryPassed && scorePassed;
-  const failureReasons = [];
-  if (!discoveryPassed) {
-    failureReasons.push(`Discovery rate ${(summary2.discoveryAccuracy * 100).toFixed(1)}% below threshold ${(config2.discoveryThreshold * 100).toFixed(0)}%`);
-  }
-  if (summary2.avgAdherence < config2.scoreThreshold) {
-    failureReasons.push(`Avg adherence ${summary2.avgAdherence.toFixed(2)} below threshold ${config2.scoreThreshold}`);
-  }
-  if (summary2.avgOutputQuality < config2.scoreThreshold) {
-    failureReasons.push(`Avg output quality ${summary2.avgOutputQuality.toFixed(2)} below threshold ${config2.scoreThreshold}`);
-  }
+  const { passed } = evaluatePassFail(summary2, config2);
+  const failureReasons = computeFailureReasons(summary2, config2);
   const report = {
     skillName: evaluation.skillName,
     timestamp: (/* @__PURE__ */ new Date()).toISOString(),
@@ -47430,6 +47410,30 @@ async function generateJsonResults(options) {
     console.log(`JSON results saved to: ${outputPath}`);
   }
   return report;
+}
+function evaluatePassFail(summary2, config2) {
+  const discoveryPassed = summary2.discoveryAccuracy >= config2.discoveryThreshold;
+  const adherencePassed = summary2.avgAdherence >= config2.scoreThreshold;
+  const outputQualityPassed = summary2.avgOutputQuality >= config2.scoreThreshold;
+  return {
+    discoveryPassed,
+    adherencePassed,
+    outputQualityPassed,
+    passed: discoveryPassed && adherencePassed && outputQualityPassed
+  };
+}
+function computeFailureReasons(summary2, config2) {
+  const reasons = [];
+  if (summary2.discoveryAccuracy < config2.discoveryThreshold) {
+    reasons.push(`Discovery rate ${(summary2.discoveryAccuracy * 100).toFixed(1)}% below threshold ${(config2.discoveryThreshold * 100).toFixed(0)}%`);
+  }
+  if (summary2.avgAdherence < config2.scoreThreshold) {
+    reasons.push(`Avg adherence ${summary2.avgAdherence.toFixed(2)} below threshold ${config2.scoreThreshold}`);
+  }
+  if (summary2.avgOutputQuality < config2.scoreThreshold) {
+    reasons.push(`Avg output quality ${summary2.avgOutputQuality.toFixed(2)} below threshold ${config2.scoreThreshold}`);
+  }
+  return reasons;
 }
 function computeSummary(results, scores, numRuns = 1) {
   const totalTasks = scores.length;
@@ -47595,9 +47599,7 @@ async function generateHtmlReport(options) {
   }
   const summary2 = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-  const discoveryPassed = summary2.discoveryAccuracy >= config2.discoveryThreshold;
-  const scorePassed = summary2.avgAdherence >= config2.scoreThreshold && summary2.avgOutputQuality >= config2.scoreThreshold;
-  const passed = discoveryPassed && scorePassed;
+  const { passed } = evaluatePassFail(summary2, config2);
   const tasks = evaluation.tasks.map((task, i) => ({
     index: i,
     task,
@@ -48371,6 +48373,7 @@ init_config();
 function generateGitHubSummary(report, config2) {
   const resolvedConfig = config2 ?? loadConfigSync();
   const { summary: summary2, failureBreakdown, tasks } = report;
+  const { discoveryPassed, adherencePassed, outputQualityPassed } = evaluatePassFail(summary2, resolvedConfig);
   const lines = [];
   const icon = report.passed ? ":white_check_mark:" : ":x:";
   const runsLabel = summary2.numRuns > 1 ? ` (${summary2.numRuns} runs)` : "";
@@ -48378,9 +48381,9 @@ function generateGitHubSummary(report, config2) {
   lines.push("");
   lines.push("| Metric | Value | Threshold | Status |");
   lines.push("|--------|-------|-----------|--------|");
-  lines.push(`| Discovery Rate | ${(summary2.discoveryAccuracy * 100).toFixed(0)}%${summary2.stddev ? ` \xB1 ${(summary2.stddev.discovery * 100).toFixed(0)}%` : ""} (${Math.round(summary2.discoveryAccuracy * summary2.totalTasks)}/${summary2.totalTasks}) | ${(resolvedConfig.discoveryThreshold * 100).toFixed(0)}% | ${summary2.discoveryAccuracy >= resolvedConfig.discoveryThreshold ? "PASS" : "FAIL"} |`);
-  lines.push(`| Avg Adherence | ${summary2.avgAdherence.toFixed(1)}/5${summary2.stddev ? ` \xB1 ${summary2.stddev.adherence.toFixed(1)}` : ""} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${summary2.avgAdherence >= resolvedConfig.scoreThreshold ? "PASS" : "FAIL"} |`);
-  lines.push(`| Avg Output Quality | ${summary2.avgOutputQuality.toFixed(1)}/5${summary2.stddev ? ` \xB1 ${summary2.stddev.outputQuality.toFixed(1)}` : ""} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${summary2.avgOutputQuality >= resolvedConfig.scoreThreshold ? "PASS" : "FAIL"} |`);
+  lines.push(`| Discovery Rate | ${(summary2.discoveryAccuracy * 100).toFixed(0)}%${summary2.stddev ? ` \xB1 ${(summary2.stddev.discovery * 100).toFixed(0)}%` : ""} (${Math.round(summary2.discoveryAccuracy * summary2.totalTasks)}/${summary2.totalTasks}) | ${(resolvedConfig.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? "PASS" : "FAIL"} |`);
+  lines.push(`| Avg Adherence | ${summary2.avgAdherence.toFixed(1)}/5${summary2.stddev ? ` \xB1 ${summary2.stddev.adherence.toFixed(1)}` : ""} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${adherencePassed ? "PASS" : "FAIL"} |`);
+  lines.push(`| Avg Output Quality | ${summary2.avgOutputQuality.toFixed(1)}/5${summary2.stddev ? ` \xB1 ${summary2.stddev.outputQuality.toFixed(1)}` : ""} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${outputQualityPassed ? "PASS" : "FAIL"} |`);
   lines.push(`| Weighted Score | ${summary2.avgWeightedScore.toFixed(2)}${summary2.stddev ? ` \xB1 ${summary2.stddev.weightedScore.toFixed(2)}` : ""} | | |`);
   lines.push(`| Duration | ${(summary2.totalDurationMs / 1e3).toFixed(1)}s | | |`);
   lines.push(`| Cost | $${summary2.totalCostUsd.toFixed(4)} | | |`);
@@ -48944,8 +48947,8 @@ async function runPipeline(options) {
   };
   const cacheEnabled = config2.cache.enabled && !options.bustCache;
   const cache = cacheEnabled ? new ResponseCache(config2.cache) : null;
-  const skillsHash = cache ? await ResponseCache.hashSkillsDir(skillsDir) : "";
-  const cacheOpts = cache ? { cache, skillsHash, skipCache: options.skipCache } : void 0;
+  const buildCacheOpts = async (dir) => cache ? { cache, skillsHash: await ResponseCache.hashSkillsDir(dir), skipCache: options.skipCache } : void 0;
+  const cacheOpts = await buildCacheOpts(skillsDir);
   let primaryPhase;
   let comparison;
   let blindComparison;
@@ -48978,7 +48981,7 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
         noDeterministic: isNoSkillBaseline ? true : scorerOptions.noDeterministic,
         isBaseline: isNoSkillBaseline
       };
-      const baseCacheOpts = cache ? { cache, skillsHash: await ResponseCache.hashSkillsDir(baseSkillsDir), skipCache: options.skipCache } : void 0;
+      const baseCacheOpts = await buildCacheOpts(baseSkillsDir);
       const basePhase = await runPhase(baselineLabel, evaluation, config2, cwd2, baseSkillsDir, numRuns, baselineScorerOptions, path14.join(logDir, "baseline"), baseCacheOpts);
       console.log("\n=== Computing Comparison Deltas ===\n");
       comparison = computeComparison(withPhase, basePhase, baselineLabel, evaluation.tasks, options.compareSkillPath);
