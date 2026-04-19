@@ -6,7 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { formatDelta, formatCategory, pct } from '../utils/format.js';
+import { formatDelta, formatCategory, formatTokens, pct } from '../utils/format.js';
 import type {
   SkillEvaluation,
   TaskResult,
@@ -90,7 +90,7 @@ ${metaSection}
 | **Avg Weighted Score** | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | | |
 | **Total Duration** | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |
 | **Total Cost** | $${summary.totalCostUsd.toFixed(4)} | | |
-| **Total Tokens** | ${summary.totalTokens !== undefined ? summary.totalTokens.toLocaleString() : 'n/a'} | | |
+| **Total Tokens** | ${formatTokens(summary.totalTokens)} | | |
 
 ## Failure Analysis
 
@@ -208,7 +208,7 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
 
 </details>
 
-**Metrics:** Duration: ${(result.durationMs / 1000).toFixed(1)}s | Turns: ${result.numTurns} | Cost: $${result.costUsd.toFixed(4)} | Tokens: ${result.tokens ? result.tokens.total.toLocaleString() : 'n/a'}
+**Metrics:** Duration: ${(result.durationMs / 1000).toFixed(1)}s | Turns: ${result.numTurns} | Cost: $${result.costUsd.toFixed(4)} | Tokens: ${formatTokens(result.tokens?.total)}
 `;
 
     // Per-run breakdown
@@ -223,8 +223,7 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
       for (let r = 0; r < runDetails[i].length; r++) {
         const rd = runDetails[i][r];
         const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(', ') : 'none';
-        const runTokens = rd.result.tokens ? rd.result.tokens.total.toLocaleString() : 'n/a';
-        report += `| ${r + 1} | ${rd.score.discovery} | ${rd.score.adherence}/5 | ${rd.score.outputQuality}/5 | ${rd.score.weightedScore.toFixed(2)} | ${runTokens} | ${skills} |\n`;
+        report += `| ${r + 1} | ${rd.score.discovery} | ${rd.score.adherence}/5 | ${rd.score.outputQuality}/5 | ${rd.score.weightedScore.toFixed(2)} | ${formatTokens(rd.result.tokens?.total)} | ${skills} |\n`;
       }
       report += `\n</details>\n`;
     }
@@ -372,10 +371,16 @@ export function computeSummary(
     ? scores.reduce((sum, s) => sum + s.weightedScore, 0) / totalTasks
     : 0;
 
-  const allHaveTokens = results.length > 0 && results.every((r) => r.tokens);
-  const totalTokens = allHaveTokens
-    ? results.reduce((sum, r) => sum + r.tokens!.total, 0)
-    : undefined;
+  let totalDurationMs = 0;
+  let totalCostUsd = 0;
+  let tokenSum = 0;
+  let hasAllTokens = results.length > 0;
+  for (const r of results) {
+    totalDurationMs += r.durationMs;
+    totalCostUsd += r.costUsd;
+    if (r.tokens) tokenSum += r.tokens.total;
+    else hasAllTokens = false;
+  }
 
   const summary: EvaluationSummary = {
     totalTasks,
@@ -384,9 +389,9 @@ export function computeSummary(
     avgAdherence,
     avgOutputQuality,
     avgWeightedScore,
-    totalDurationMs: results.reduce((sum, r) => sum + r.durationMs, 0),
-    totalCostUsd: results.reduce((sum, r) => sum + r.costUsd, 0),
-    totalTokens,
+    totalDurationMs,
+    totalCostUsd,
+    totalTokens: hasAllTokens ? tokenSum : undefined,
   };
 
   // Compute summary-level stddev as the mean of per-task stddevs (cross-run variability).
@@ -453,7 +458,7 @@ function generateComparisonSection(comparison: ComparisonData): string {
 | Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | ${formatDelta(d.avgWeightedScoreDelta)} | ${qualityImpact(d.avgWeightedScoreDelta, WEIGHTED_SCORE_IMPACT_THRESHOLD)} |
 | Duration | ${(ws.totalDurationMs / 1000).toFixed(1)}s | ${(bs.totalDurationMs / 1000).toFixed(1)}s | ${formatDelta(d.totalDurationDeltaMs / 1000, 1)}s | ${durationImpact(d.totalDurationDeltaMs)} |
 | Cost | $${ws.totalCostUsd.toFixed(4)} | $${bs.totalCostUsd.toFixed(4)} | $${formatDelta(d.totalCostDeltaUsd, 4)} | ${costImpact(d.totalCostDeltaUsd)} |
-| Tokens | ${ws.totalTokens !== undefined ? ws.totalTokens.toLocaleString() : 'n/a'} | ${bs.totalTokens !== undefined ? bs.totalTokens.toLocaleString() : 'n/a'} | ${d.totalTokensDelta !== undefined ? formatDelta(d.totalTokensDelta, 0) : 'n/a'} | ${d.totalTokensDelta !== undefined ? tokenImpact(d.totalTokensDelta) : ''} |
+| Tokens | ${formatTokens(ws.totalTokens)} | ${formatTokens(bs.totalTokens)} | ${d.totalTokensDelta !== undefined ? formatDelta(d.totalTokensDelta, 0) : 'n/a'} | ${d.totalTokensDelta !== undefined ? tokenImpact(d.totalTokensDelta) : ''} |
 
 ### Per-Task Comparison
 

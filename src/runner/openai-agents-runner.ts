@@ -10,8 +10,8 @@
  * Requires: @openai/agents, openai
  */
 
-import type { EvalTask, ToolCallRecord, TaskResult, TokenUsage } from '../types.js';
-import { BaseRunner } from './base-runner.js';
+import type { EvalTask, ToolCallRecord, TaskResult } from '../types.js';
+import { BaseRunner, ROUGH_COST_PER_TOKEN, buildTokenUsage } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
 import { discoverSkills, type SkillMetadata } from './skill-discovery.js';
 
@@ -244,26 +244,12 @@ export class OpenAiAgentsRunner extends BaseRunner {
       // 5. Detect skill loads
       const skillLoads = detectSkillLoadsFromShellCommands(shellCommands, localSkills);
 
-      // 6. Extract usage (cache tokens not surfaced by the OpenAI Agents SDK).
+      // OpenAI Agents SDK does not surface cache tokens.
       const usage = (result as unknown as { usage?: { inputTokens?: number; outputTokens?: number } }).usage;
-      let tokens: TokenUsage | undefined;
-      let totalForCost = 0;
-      if (usage) {
-        const input = usage.inputTokens ?? 0;
-        const output = usage.outputTokens ?? 0;
-        const cacheRead = 0;
-        const cacheCreation = 0;
-        tokens = {
-          input,
-          output,
-          cacheRead,
-          cacheCreation,
-          total: input + output + cacheRead + cacheCreation,
-        };
-        totalForCost = input + output;
-      }
-      // Rough cost estimate — actual pricing varies by model and provider
-      const costUsd = totalForCost * 0.000003;
+      const tokens = buildTokenUsage(
+        usage && { input: usage.inputTokens, output: usage.outputTokens },
+      );
+      const costUsd = ((tokens?.input ?? 0) + (tokens?.output ?? 0)) * ROUGH_COST_PER_TOKEN;
 
       return this.buildTaskResult(task, {
         output: typeof output === 'string' ? output : JSON.stringify(output),

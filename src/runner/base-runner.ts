@@ -17,6 +17,35 @@ import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
 import { runFixtureScript } from './fixture-runner.js';
 
+/**
+ * Rough per-token cost for runners without per-model pricing data. Calibrated
+ * near Sonnet input rates — accurate enough to compare runs within a model
+ * family, not accurate enough for billing.
+ */
+export const ROUGH_COST_PER_TOKEN = 0.000003;
+
+/**
+ * Normalize a runner-provided usage snapshot into TokenUsage, enforcing
+ * `total = input + output + cacheRead + cacheCreation`. Returns undefined
+ * when the runner did not surface any usage.
+ */
+export function buildTokenUsage(
+  raw: { input?: number; output?: number; cacheRead?: number; cacheCreation?: number } | undefined,
+): TokenUsage | undefined {
+  if (!raw) return undefined;
+  const input = raw.input ?? 0;
+  const output = raw.output ?? 0;
+  const cacheRead = raw.cacheRead ?? 0;
+  const cacheCreation = raw.cacheCreation ?? 0;
+  return {
+    input,
+    output,
+    cacheRead,
+    cacheCreation,
+    total: input + output + cacheRead + cacheCreation,
+  };
+}
+
 export abstract class BaseRunner implements AgentRunner {
   abstract readonly providerName: string;
   protected options: AgentRunnerOptions;

@@ -79,15 +79,18 @@ export function aggregateResults(
     const repIdx = findRepresentativeIndex(scores);
     const rep = runs[repIdx];
     // Partial data is misleading — omit tokens if any run couldn't report them.
-    const allHaveTokens = runs.every((r) => r.tokens);
+    let allHaveTokens = true;
+    let tInput = 0, tOutput = 0, tCacheRead = 0, tCacheCreation = 0, tTotal = 0;
+    for (const r of runs) {
+      if (!r.tokens) { allHaveTokens = false; break; }
+      tInput += r.tokens.input;
+      tOutput += r.tokens.output;
+      tCacheRead += r.tokens.cacheRead;
+      tCacheCreation += r.tokens.cacheCreation;
+      tTotal += r.tokens.total;
+    }
     const tokens = allHaveTokens
-      ? {
-          input: runs.reduce((s, r) => s + r.tokens!.input, 0),
-          output: runs.reduce((s, r) => s + r.tokens!.output, 0),
-          cacheRead: runs.reduce((s, r) => s + r.tokens!.cacheRead, 0),
-          cacheCreation: runs.reduce((s, r) => s + r.tokens!.cacheCreation, 0),
-          total: runs.reduce((s, r) => s + r.tokens!.total, 0),
-        }
+      ? { input: tInput, output: tOutput, cacheRead: tCacheRead, cacheCreation: tCacheCreation, total: tTotal }
       : undefined;
     aggregated.push({
       taskId: rep.taskId,

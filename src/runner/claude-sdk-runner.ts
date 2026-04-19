@@ -23,7 +23,7 @@ import {
   isToolUseBlock,
 } from '../types.js';
 import { createToolPolicy } from './security.js';
-import { BaseRunner } from './base-runner.js';
+import { BaseRunner, buildTokenUsage } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
 
 export class ClaudeSdkRunner extends BaseRunner {
@@ -122,17 +122,12 @@ export class ClaudeSdkRunner extends BaseRunner {
 
           const u = message.usage;
           if (u) {
-            const input = u.input_tokens ?? 0;
-            const output = u.output_tokens ?? 0;
-            const cacheRead = u.cache_read_input_tokens ?? 0;
-            const cacheCreation = u.cache_creation_input_tokens ?? 0;
-            resultTokens = {
-              input,
-              output,
-              cacheRead,
-              cacheCreation,
-              total: input + output + cacheRead + cacheCreation,
-            };
+            resultTokens = buildTokenUsage({
+              input: u.input_tokens,
+              output: u.output_tokens,
+              cacheRead: u.cache_read_input_tokens,
+              cacheCreation: u.cache_creation_input_tokens,
+            });
           }
 
           if (message.result) {

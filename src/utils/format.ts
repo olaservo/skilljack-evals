@@ -22,6 +22,13 @@ export function pct(count: number, total: number): string {
 }
 
 /**
+ * Format a token count for display, or a fallback string when unavailable.
+ */
+export function formatTokens(n: number | undefined, fallback = 'n/a'): string {
+  return n !== undefined ? n.toLocaleString() : fallback;
+}
+
+/**
  * Format a failure category slug as a human-readable label.
  */
 export function formatCategory(cat: string): string {

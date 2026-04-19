@@ -22756,12 +22756,28 @@ var init_fixture_runner = __esm({
 });
 
 // dist/src/runner/base-runner.js
-var BaseRunner;
+function buildTokenUsage(raw) {
+  if (!raw)
+    return void 0;
+  const input = raw.input ?? 0;
+  const output = raw.output ?? 0;
+  const cacheRead = raw.cacheRead ?? 0;
+  const cacheCreation = raw.cacheCreation ?? 0;
+  return {
+    input,
+    output,
+    cacheRead,
+    cacheCreation,
+    total: input + output + cacheRead + cacheCreation
+  };
+}
+var ROUGH_COST_PER_TOKEN, BaseRunner;
 var init_base_runner = __esm({
   "dist/src/runner/base-runner.js"() {
     "use strict";
     init_config();
     init_fixture_runner();
+    ROUGH_COST_PER_TOKEN = 3e-6;
     BaseRunner = class {
       options;
       /** Read-only access to resolved runner options (for testing and introspection). */
@@ -23157,23 +23173,8 @@ ${skillsPrompt}` : "You are a helpful AI assistant.";
           const output = result.text ?? "";
           logger?.addTextMessage(output);
           const rawUsage = result.usage;
-          let tokens;
-          let totalForCost = 0;
-          if (rawUsage) {
-            const input = rawUsage.inputTokens ?? 0;
-            const output2 = rawUsage.outputTokens ?? 0;
-            const cacheRead = 0;
-            const cacheCreation = 0;
-            tokens = {
-              input,
-              output: output2,
-              cacheRead,
-              cacheCreation,
-              total: input + output2 + cacheRead + cacheCreation
-            };
-            totalForCost = input + output2;
-          }
-          const costUsd = totalForCost * 3e-6;
+          const tokens = buildTokenUsage(rawUsage && { input: rawUsage.inputTokens, output: rawUsage.outputTokens });
+          const costUsd = ((tokens?.input ?? 0) + (tokens?.output ?? 0)) * ROUGH_COST_PER_TOKEN;
           return this.buildTaskResult(task, {
             output,
             durationMs: Date.now() - startTime,
@@ -23361,23 +23362,8 @@ var init_openai_agents_runner = __esm({
           }
           const skillLoads = detectSkillLoadsFromShellCommands(shellCommands, localSkills);
           const usage = result.usage;
-          let tokens;
-          let totalForCost = 0;
-          if (usage) {
-            const input = usage.inputTokens ?? 0;
-            const output2 = usage.outputTokens ?? 0;
-            const cacheRead = 0;
-            const cacheCreation = 0;
-            tokens = {
-              input,
-              output: output2,
-              cacheRead,
-              cacheCreation,
-              total: input + output2 + cacheRead + cacheCreation
-            };
-            totalForCost = input + output2;
-          }
-          const costUsd = totalForCost * 3e-6;
+          const tokens = buildTokenUsage(usage && { input: usage.inputTokens, output: usage.outputTokens });
+          const costUsd = ((tokens?.input ?? 0) + (tokens?.output ?? 0)) * ROUGH_COST_PER_TOKEN;
           return this.buildTaskResult(task, {
             output: typeof output === "string" ? output : JSON.stringify(output),
             durationMs: Date.now() - startTime,
@@ -23642,6 +23628,9 @@ function formatDelta(value, decimals = 2) {
 }
 function pct(count, total) {
   return total > 0 ? (count / total * 100).toFixed(0) : "0";
+}
+function formatTokens(n, fallback = "n/a") {
+  return n !== void 0 ? n.toLocaleString() : fallback;
 }
 function formatCategory(cat) {
   if (cat === "none")
@@ -45675,17 +45664,12 @@ var ClaudeSdkRunner = class extends BaseRunner {
           resultCostUsd = message.total_cost_usd ?? 0;
           const u = message.usage;
           if (u) {
-            const input = u.input_tokens ?? 0;
-            const output = u.output_tokens ?? 0;
-            const cacheRead = u.cache_read_input_tokens ?? 0;
-            const cacheCreation = u.cache_creation_input_tokens ?? 0;
-            resultTokens = {
-              input,
-              output,
-              cacheRead,
-              cacheCreation,
-              total: input + output + cacheRead + cacheCreation
-            };
+            resultTokens = buildTokenUsage({
+              input: u.input_tokens,
+              output: u.output_tokens,
+              cacheRead: u.cache_read_input_tokens,
+              cacheCreation: u.cache_creation_input_tokens
+            });
           }
           if (message.result) {
             resultOutput = message.result;
@@ -46873,14 +46857,20 @@ function aggregateResults(allResults, allScores) {
     const scores = allScores.map((s) => s[t]);
     const repIdx = findRepresentativeIndex(scores);
     const rep = runs[repIdx];
-    const allHaveTokens = runs.every((r) => r.tokens);
-    const tokens = allHaveTokens ? {
-      input: runs.reduce((s, r) => s + r.tokens.input, 0),
-      output: runs.reduce((s, r) => s + r.tokens.output, 0),
-      cacheRead: runs.reduce((s, r) => s + r.tokens.cacheRead, 0),
-      cacheCreation: runs.reduce((s, r) => s + r.tokens.cacheCreation, 0),
-      total: runs.reduce((s, r) => s + r.tokens.total, 0)
-    } : void 0;
+    let allHaveTokens = true;
+    let tInput = 0, tOutput = 0, tCacheRead = 0, tCacheCreation = 0, tTotal = 0;
+    for (const r of runs) {
+      if (!r.tokens) {
+        allHaveTokens = false;
+        break;
+      }
+      tInput += r.tokens.input;
+      tOutput += r.tokens.output;
+      tCacheRead += r.tokens.cacheRead;
+      tCacheCreation += r.tokens.cacheCreation;
+      tTotal += r.tokens.total;
+    }
+    const tokens = allHaveTokens ? { input: tInput, output: tOutput, cacheRead: tCacheRead, cacheCreation: tCacheCreation, total: tTotal } : void 0;
     aggregated.push({
       taskId: rep.taskId,
       prompt: rep.prompt,
@@ -47208,7 +47198,7 @@ ${metaSection}
 | **Avg Weighted Score** | ${summary2.avgWeightedScore.toFixed(2)}${summary2.stddev ? ` \xB1 ${summary2.stddev.weightedScore.toFixed(2)}` : ""} | | |
 | **Total Duration** | ${(summary2.totalDurationMs / 1e3).toFixed(1)}s | | |
 | **Total Cost** | $${summary2.totalCostUsd.toFixed(4)} | | |
-| **Total Tokens** | ${summary2.totalTokens !== void 0 ? summary2.totalTokens.toLocaleString() : "n/a"} | | |
+| **Total Tokens** | ${formatTokens(summary2.totalTokens)} | | |
 
 ## Failure Analysis
 
@@ -47329,7 +47319,7 @@ ${result.output.slice(0, config2.reportOutputTruncation) || "(no output)"}
 
 </details>
 
-**Metrics:** Duration: ${(result.durationMs / 1e3).toFixed(1)}s | Turns: ${result.numTurns} | Cost: $${result.costUsd.toFixed(4)} | Tokens: ${result.tokens ? result.tokens.total.toLocaleString() : "n/a"}
+**Metrics:** Duration: ${(result.durationMs / 1e3).toFixed(1)}s | Turns: ${result.numTurns} | Cost: $${result.costUsd.toFixed(4)} | Tokens: ${formatTokens(result.tokens?.total)}
 `;
     if (runDetails && runDetails[i] && runDetails[i].length > 1) {
       report += `
@@ -47342,8 +47332,7 @@ ${result.output.slice(0, config2.reportOutputTruncation) || "(no output)"}
       for (let r = 0; r < runDetails[i].length; r++) {
         const rd = runDetails[i][r];
         const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(", ") : "none";
-        const runTokens = rd.result.tokens ? rd.result.tokens.total.toLocaleString() : "n/a";
-        report += `| ${r + 1} | ${rd.score.discovery} | ${rd.score.adherence}/5 | ${rd.score.outputQuality}/5 | ${rd.score.weightedScore.toFixed(2)} | ${runTokens} | ${skills} |
+        report += `| ${r + 1} | ${rd.score.discovery} | ${rd.score.adherence}/5 | ${rd.score.outputQuality}/5 | ${rd.score.weightedScore.toFixed(2)} | ${formatTokens(rd.result.tokens?.total)} | ${skills} |
 `;
       }
       report += `
@@ -47434,8 +47423,18 @@ function computeSummary(results, scores, numRuns = 1) {
   const avgAdherence = totalTasks > 0 ? scores.reduce((sum, s) => sum + s.adherence, 0) / totalTasks : 0;
   const avgOutputQuality = totalTasks > 0 ? scores.reduce((sum, s) => sum + s.outputQuality, 0) / totalTasks : 0;
   const avgWeightedScore = totalTasks > 0 ? scores.reduce((sum, s) => sum + s.weightedScore, 0) / totalTasks : 0;
-  const allHaveTokens = results.length > 0 && results.every((r) => r.tokens);
-  const totalTokens = allHaveTokens ? results.reduce((sum, r) => sum + r.tokens.total, 0) : void 0;
+  let totalDurationMs = 0;
+  let totalCostUsd = 0;
+  let tokenSum = 0;
+  let hasAllTokens = results.length > 0;
+  for (const r of results) {
+    totalDurationMs += r.durationMs;
+    totalCostUsd += r.costUsd;
+    if (r.tokens)
+      tokenSum += r.tokens.total;
+    else
+      hasAllTokens = false;
+  }
   const summary2 = {
     totalTasks,
     numRuns,
@@ -47443,9 +47442,9 @@ function computeSummary(results, scores, numRuns = 1) {
     avgAdherence,
     avgOutputQuality,
     avgWeightedScore,
-    totalDurationMs: results.reduce((sum, r) => sum + r.durationMs, 0),
-    totalCostUsd: results.reduce((sum, r) => sum + r.costUsd, 0),
-    totalTokens
+    totalDurationMs,
+    totalCostUsd,
+    totalTokens: hasAllTokens ? tokenSum : void 0
   };
   if (numRuns >= 2) {
     const tasksWithStddev = scores.filter((s) => s.stddev);
@@ -47493,7 +47492,7 @@ function generateComparisonSection(comparison) {
 | Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | ${formatDelta(d.avgWeightedScoreDelta)} | ${qualityImpact(d.avgWeightedScoreDelta, WEIGHTED_SCORE_IMPACT_THRESHOLD)} |
 | Duration | ${(ws.totalDurationMs / 1e3).toFixed(1)}s | ${(bs.totalDurationMs / 1e3).toFixed(1)}s | ${formatDelta(d.totalDurationDeltaMs / 1e3, 1)}s | ${durationImpact(d.totalDurationDeltaMs)} |
 | Cost | $${ws.totalCostUsd.toFixed(4)} | $${bs.totalCostUsd.toFixed(4)} | $${formatDelta(d.totalCostDeltaUsd, 4)} | ${costImpact(d.totalCostDeltaUsd)} |
-| Tokens | ${ws.totalTokens !== void 0 ? ws.totalTokens.toLocaleString() : "n/a"} | ${bs.totalTokens !== void 0 ? bs.totalTokens.toLocaleString() : "n/a"} | ${d.totalTokensDelta !== void 0 ? formatDelta(d.totalTokensDelta, 0) : "n/a"} | ${d.totalTokensDelta !== void 0 ? tokenImpact(d.totalTokensDelta) : ""} |
+| Tokens | ${formatTokens(ws.totalTokens)} | ${formatTokens(bs.totalTokens)} | ${d.totalTokensDelta !== void 0 ? formatDelta(d.totalTokensDelta, 0) : "n/a"} | ${d.totalTokensDelta !== void 0 ? tokenImpact(d.totalTokensDelta) : ""} |
 
 ### Per-Task Comparison
 
@@ -47737,7 +47736,7 @@ function renderDashboard(summary2, config2) {
       <div class="stat-label">Cost</div>
     </div>
     <div class="stat">
-      <div class="stat-value">${summary2.totalTokens !== void 0 ? summary2.totalTokens.toLocaleString() : "&mdash;"}</div>
+      <div class="stat-value">${formatTokens(summary2.totalTokens, "&mdash;")}</div>
       <div class="stat-label">Tokens</div>
     </div>
   </div>
@@ -47786,7 +47785,7 @@ function renderTaskTable(tasks, config2, humanFeedback) {
     const flaky = isFlaky(t.score.stddev);
     const statusClass = isFailed ? "status-fail" : flaky ? "status-flaky" : "status-pass";
     const statusLabel = isFailed ? "FAIL" : flaky ? "FLAKY" : "PASS";
-    const tokensCell = t.result.tokens ? t.result.tokens.total.toLocaleString() : "n/a";
+    const tokensCell = formatTokens(t.result.tokens?.total);
     rows += `
     <tr class="task-row" data-task-id="${escapeHtml(t.task.id)}" data-index="${t.index}">
       <td>${t.index + 1}</td>
@@ -47892,21 +47891,20 @@ function renderTaskDetail(t, config2, humanFeedback) {
   <div class="detail-section">
     <h4>Agent Output</h4>
     <pre class="agent-output">${escapeHtml(truncatedOutput)}</pre>
-    <p class="metrics">Duration: ${(t.result.durationMs / 1e3).toFixed(1)}s | Turns: ${t.result.numTurns} | Cost: $${t.result.costUsd.toFixed(4)} | Tokens: ${t.result.tokens ? t.result.tokens.total.toLocaleString() : "n/a"}</p>
+    <p class="metrics">Duration: ${(t.result.durationMs / 1e3).toFixed(1)}s | Turns: ${t.result.numTurns} | Cost: $${t.result.costUsd.toFixed(4)} | Tokens: ${formatTokens(t.result.tokens?.total)}</p>
   </div>`;
   if (t.runDetails && t.runDetails.length > 1) {
     let runRows = "";
     for (let r = 0; r < t.runDetails.length; r++) {
       const rd = t.runDetails[r];
       const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(", ") : "none";
-      const runTokens = rd.result.tokens ? rd.result.tokens.total.toLocaleString() : "n/a";
       runRows += `<tr>
         <td>${r + 1}</td>
         <td>${rd.score.discovery}</td>
         <td>${rd.score.adherence}/5</td>
         <td>${rd.score.outputQuality}/5</td>
         <td>${rd.score.weightedScore.toFixed(2)}</td>
-        <td>${runTokens}</td>
+        <td>${formatTokens(rd.result.tokens?.total)}</td>
         <td>${escapeHtml(skills)}</td>
       </tr>`;
     }
@@ -47955,7 +47953,7 @@ function renderComparisonSection(comparison) {
       <tr><td>Weighted Score</td><td>${ws.avgWeightedScore.toFixed(2)}</td><td>${bs.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(d.avgWeightedScoreDelta))}</td></tr>
       <tr><td>Duration</td><td>${(ws.totalDurationMs / 1e3).toFixed(1)}s</td><td>${(bs.totalDurationMs / 1e3).toFixed(1)}s</td><td class="delta">${escapeHtml(formatDelta(d.totalDurationDeltaMs / 1e3, 1))}s</td></tr>
       <tr><td>Cost</td><td>$${ws.totalCostUsd.toFixed(4)}</td><td>$${bs.totalCostUsd.toFixed(4)}</td><td class="delta">$${escapeHtml(formatDelta(d.totalCostDeltaUsd, 4))}</td></tr>
-      <tr><td>Tokens</td><td>${ws.totalTokens !== void 0 ? ws.totalTokens.toLocaleString() : "n/a"}</td><td>${bs.totalTokens !== void 0 ? bs.totalTokens.toLocaleString() : "n/a"}</td><td class="delta">${d.totalTokensDelta !== void 0 ? escapeHtml(formatDelta(d.totalTokensDelta, 0)) : "n/a"}</td></tr>
+      <tr><td>Tokens</td><td>${formatTokens(ws.totalTokens)}</td><td>${formatTokens(bs.totalTokens)}</td><td class="delta">${d.totalTokensDelta !== void 0 ? escapeHtml(formatDelta(d.totalTokensDelta, 0)) : "n/a"}</td></tr>
     </tbody>
   </table>
   <h3>Per-Task Comparison</h3>
@@ -48413,7 +48411,7 @@ function generateGitHubSummary(report, config2) {
   lines.push(`| Weighted Score | ${summary2.avgWeightedScore.toFixed(2)}${summary2.stddev ? ` \xB1 ${summary2.stddev.weightedScore.toFixed(2)}` : ""} | | |`);
   lines.push(`| Duration | ${(summary2.totalDurationMs / 1e3).toFixed(1)}s | | |`);
   lines.push(`| Cost | $${summary2.totalCostUsd.toFixed(4)} | | |`);
-  lines.push(`| Tokens | ${summary2.totalTokens !== void 0 ? summary2.totalTokens.toLocaleString() : "n/a"} | | |`);
+  lines.push(`| Tokens | ${formatTokens(summary2.totalTokens)} | | |`);
   lines.push("");
   const failures = tasks.filter((t) => t.score.failureCategory !== "none");
   if (failures.length > 0) {
@@ -48510,9 +48508,7 @@ function generateGitHubSummary(report, config2) {
     lines.push(`| Output Quality | ${ws.avgOutputQuality.toFixed(1)}/5 | ${bs.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
     lines.push(`| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
     if (d.totalTokensDelta !== void 0) {
-      const wsTokens = ws.totalTokens !== void 0 ? ws.totalTokens.toLocaleString() : "n/a";
-      const bsTokens = bs.totalTokens !== void 0 ? bs.totalTokens.toLocaleString() : "n/a";
-      lines.push(`| Tokens | ${wsTokens} | ${bsTokens} | **${formatDelta(d.totalTokensDelta, 0)}** |`);
+      lines.push(`| Tokens | ${formatTokens(ws.totalTokens)} | ${formatTokens(bs.totalTokens)} | **${formatDelta(d.totalTokensDelta, 0)}** |`);
     }
     lines.push("");
   }

@@ -8,7 +8,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { formatDelta, formatCategory, pct } from '../utils/format.js';
+import { formatDelta, formatCategory, formatTokens, pct } from '../utils/format.js';
 import { computeSummary, computeFailureBreakdown, evaluatePassFail } from './report.js';
 import type { ReportOptions } from './report.js';
 import type {
@@ -204,7 +204,7 @@ function renderDashboard(summary: EvaluationSummary, config: EvalConfig): string
       <div class="stat-label">Cost</div>
     </div>
     <div class="stat">
-      <div class="stat-value">${summary.totalTokens !== undefined ? summary.totalTokens.toLocaleString() : '&mdash;'}</div>
+      <div class="stat-value">${formatTokens(summary.totalTokens, '&mdash;')}</div>
       <div class="stat-label">Tokens</div>
     </div>
   </div>
@@ -258,7 +258,7 @@ function renderTaskTable(tasks: HtmlTaskData[], config: EvalConfig, humanFeedbac
     const statusClass = isFailed ? 'status-fail' : (flaky ? 'status-flaky' : 'status-pass');
     const statusLabel = isFailed ? 'FAIL' : (flaky ? 'FLAKY' : 'PASS');
 
-    const tokensCell = t.result.tokens ? t.result.tokens.total.toLocaleString() : 'n/a';
+    const tokensCell = formatTokens(t.result.tokens?.total);
     rows += `
     <tr class="task-row" data-task-id="${escapeHtml(t.task.id)}" data-index="${t.index}">
       <td>${t.index + 1}</td>
@@ -383,7 +383,7 @@ function renderTaskDetail(t: HtmlTaskData, config: EvalConfig, humanFeedback: Hu
   <div class="detail-section">
     <h4>Agent Output</h4>
     <pre class="agent-output">${escapeHtml(truncatedOutput)}</pre>
-    <p class="metrics">Duration: ${(t.result.durationMs / 1000).toFixed(1)}s | Turns: ${t.result.numTurns} | Cost: $${t.result.costUsd.toFixed(4)} | Tokens: ${t.result.tokens ? t.result.tokens.total.toLocaleString() : 'n/a'}</p>
+    <p class="metrics">Duration: ${(t.result.durationMs / 1000).toFixed(1)}s | Turns: ${t.result.numTurns} | Cost: $${t.result.costUsd.toFixed(4)} | Tokens: ${formatTokens(t.result.tokens?.total)}</p>
   </div>`;
 
   // Per-run breakdown
@@ -392,14 +392,13 @@ function renderTaskDetail(t: HtmlTaskData, config: EvalConfig, humanFeedback: Hu
     for (let r = 0; r < t.runDetails.length; r++) {
       const rd = t.runDetails[r];
       const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(', ') : 'none';
-      const runTokens = rd.result.tokens ? rd.result.tokens.total.toLocaleString() : 'n/a';
       runRows += `<tr>
         <td>${r + 1}</td>
         <td>${rd.score.discovery}</td>
         <td>${rd.score.adherence}/5</td>
         <td>${rd.score.outputQuality}/5</td>
         <td>${rd.score.weightedScore.toFixed(2)}</td>
-        <td>${runTokens}</td>
+        <td>${formatTokens(rd.result.tokens?.total)}</td>
         <td>${escapeHtml(skills)}</td>
       </tr>`;
     }
@@ -454,7 +453,7 @@ function renderComparisonSection(comparison: ComparisonData): string {
       <tr><td>Weighted Score</td><td>${ws.avgWeightedScore.toFixed(2)}</td><td>${bs.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(d.avgWeightedScoreDelta))}</td></tr>
       <tr><td>Duration</td><td>${(ws.totalDurationMs / 1000).toFixed(1)}s</td><td>${(bs.totalDurationMs / 1000).toFixed(1)}s</td><td class="delta">${escapeHtml(formatDelta(d.totalDurationDeltaMs / 1000, 1))}s</td></tr>
       <tr><td>Cost</td><td>$${ws.totalCostUsd.toFixed(4)}</td><td>$${bs.totalCostUsd.toFixed(4)}</td><td class="delta">$${escapeHtml(formatDelta(d.totalCostDeltaUsd, 4))}</td></tr>
-      <tr><td>Tokens</td><td>${ws.totalTokens !== undefined ? ws.totalTokens.toLocaleString() : 'n/a'}</td><td>${bs.totalTokens !== undefined ? bs.totalTokens.toLocaleString() : 'n/a'}</td><td class="delta">${d.totalTokensDelta !== undefined ? escapeHtml(formatDelta(d.totalTokensDelta, 0)) : 'n/a'}</td></tr>
+      <tr><td>Tokens</td><td>${formatTokens(ws.totalTokens)}</td><td>${formatTokens(bs.totalTokens)}</td><td class="delta">${d.totalTokensDelta !== undefined ? escapeHtml(formatDelta(d.totalTokensDelta, 0)) : 'n/a'}</td></tr>
     </tbody>
   </table>
   <h3>Per-Task Comparison</h3>

@@ -11,8 +11,8 @@
  *   "openrouter:deepseek/deepseek-v3.2"
  */
 
-import type { EvalTask, ToolCallRecord, TaskResult, TokenUsage } from '../types.js';
-import { BaseRunner } from './base-runner.js';
+import type { EvalTask, ToolCallRecord, TaskResult } from '../types.js';
+import { BaseRunner, ROUGH_COST_PER_TOKEN, buildTokenUsage } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
 import { discoverSkills, stripFrontmatter, type SkillMetadata } from './skill-discovery.js';
 import { isWriteAllowed } from './security.js';
@@ -272,27 +272,12 @@ export class VercelAiRunner extends BaseRunner {
       const output = result.text ?? '';
       logger?.addTextMessage(output);
 
-      // Extract usage info (cumulative across the tool loop).
-      // Vercel AI normalizes usage across providers; cache tokens are not surfaced here.
+      // Vercel AI normalizes usage across providers but does not surface cache tokens.
       const rawUsage = result.usage as { inputTokens?: number; outputTokens?: number } | undefined;
-      let tokens: TokenUsage | undefined;
-      let totalForCost = 0;
-      if (rawUsage) {
-        const input = rawUsage.inputTokens ?? 0;
-        const output = rawUsage.outputTokens ?? 0;
-        const cacheRead = 0;
-        const cacheCreation = 0;
-        tokens = {
-          input,
-          output,
-          cacheRead,
-          cacheCreation,
-          total: input + output + cacheRead + cacheCreation,
-        };
-        totalForCost = input + output;
-      }
-      // Rough cost estimate — actual pricing varies by model and provider
-      const costUsd = totalForCost * 0.000003;
+      const tokens = buildTokenUsage(
+        rawUsage && { input: rawUsage.inputTokens, output: rawUsage.outputTokens },
+      );
+      const costUsd = ((tokens?.input ?? 0) + (tokens?.output ?? 0)) * ROUGH_COST_PER_TOKEN;
 
       return this.buildTaskResult(task, {
         output,
