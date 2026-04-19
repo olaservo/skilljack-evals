@@ -1,6 +1,6 @@
 ---
 name: greeting
-description: Use when the user greets you, says hello, asks for a welcome, or introduces themselves. Examples: "hello", "welcome me", "I just joined the team", "greet me".
+description: 'Use when the user greets you, says hello, asks for a welcome, or introduces themselves. Examples: "hello", "welcome me", "I just joined the team", "greet me".'
 ---
 
 # Greeting Skill

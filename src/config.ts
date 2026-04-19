@@ -17,9 +17,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DEFAULT_RUNNER_CONCURRENCY } from './utils/concurrency.js';
 
-export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents' | 'copilot-sdk';
+export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents' | 'copilot-sdk' | 'google-adk';
 
-export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'vercel-ai', 'openai-agents', 'copilot-sdk'];
+export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'vercel-ai', 'openai-agents', 'copilot-sdk', 'google-adk'];
 
 export interface EvalConfig {
   // Runner

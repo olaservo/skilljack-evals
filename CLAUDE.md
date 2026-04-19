@@ -45,16 +45,17 @@ npm run start           # Run compiled CLI
 ## Architecture
 
 ```
-YAML tasks → Config → Runner (Claude SDK | Vercel AI | OpenAI Agents | Copilot SDK) → Scorer (deterministic + LLM judge) → Report
+YAML tasks → Config → Runner (Claude SDK | Vercel AI | OpenAI Agents | Copilot SDK | Google ADK) → Scorer (deterministic + LLM judge) → Report
 ```
 
 ## Runners
 
-Four runners selected via `--runner` flag:
+Five runners selected via `--runner` flag:
 - `claude-sdk` (default) — uses Claude Agent SDK, model aliases like `sonnet`, `haiku`
 - `vercel-ai` — uses Vercel AI SDK, model format `"provider:model"` (e.g., `anthropic:claude-sonnet-4-6`, `google:gemini-2.5-pro`, `openai:gpt-5.2`, `openrouter:deepseek/deepseek-v3.2`)
 - `openai-agents` — uses OpenAI Agents SDK, plain model names (e.g., `gpt-5.2`)
 - `copilot-sdk` — uses GitHub Copilot SDK, model names like `gpt-5`, `claude-sonnet-4-6`
+- `google-adk` — Python subprocess bridge to Google ADK. Spawns `python/adk_runner.py`. Model names like `gemini-2.5-flash`, `gemini-2.5-pro`. v1 leaves `toolCalls`/`skillLoads` empty — judge `discovery` rating is the activation signal.
 
 ## Scoring
 
@@ -93,6 +94,7 @@ Peer dependencies (install as needed for non-Claude runners):
 - `ai`, `zod`, `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`, `@openrouter/ai-sdk-provider` - Vercel AI SDK
 - `@openai/agents`, `openai` - OpenAI Agents SDK
 - `@github/copilot-sdk` - GitHub Copilot SDK
+- Python 3 + `pip install -r python/requirements.txt` (`google-adk`, `google-genai`) - Google ADK runner. Override interpreter with `PYTHON_BIN`.
 
 ## Environment
 
@@ -103,6 +105,7 @@ Requires API key for selected runner in environment or `.env` file:
 - Vercel AI (openrouter:): `OPENROUTER_API_KEY`
 - Copilot SDK (GitHub auth): `COPILOT_GITHUB_TOKEN` (must have Copilot permissions)
 - Copilot SDK (BYOK): Auto-detects `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` when no Copilot token
+- Google ADK: `GOOGLE_API_KEY`
 
 For Bedrock: set `CLAUDE_CODE_USE_BEDROCK=1` + AWS env vars.
 

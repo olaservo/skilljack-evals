@@ -57,6 +57,11 @@ export async function createRunner(
       return new CopilotSdkRunner(options, config);
     }
 
+    case 'google-adk': {
+      const { GoogleAdkRunner } = await import('./google-adk-runner.js');
+      return new GoogleAdkRunner(options, config);
+    }
+
     default:
       throw new Error(`Unknown runner type: ${type}`);
   }
