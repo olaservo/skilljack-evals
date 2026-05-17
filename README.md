@@ -117,9 +117,9 @@ Four runners are available, selected via the `--runner` CLI flag:
 
 | Runner | Flag | Model Format | Example |
 |--------|------|-------------|---------|
-| Claude Agent SDK (default) | `--runner claude-sdk` | Model aliases | `sonnet`, `haiku` |
-| Vercel AI SDK | `--runner vercel-ai` | `provider:model` | `anthropic:claude-sonnet-4-6`, `google:gemini-2.5-pro`, `openai:gpt-5.2`, `openrouter:deepseek/deepseek-v3.2` |
-| OpenAI Agents SDK | `--runner openai-agents` | Plain model name | `gpt-5.2` |
+| Claude Agent SDK (default) | `--runner claude-sdk` | Model aliases | `sonnet`, `haiku`, `opus` |
+| Vercel AI SDK | `--runner vercel-ai` | `provider:model` | `anthropic:claude-sonnet-4-6`, `google:gemini-3.1-pro`, `openai:gpt-5.5`, `openrouter:deepseek/deepseek-v4-pro` |
+| OpenAI Agents SDK | `--runner openai-agents` | Plain model name | `gpt-5.5` |
 | GitHub Copilot SDK | `--runner copilot-sdk` | Plain model name | `gpt-5`, `claude-sonnet-4-6` |
 
 ```bash
@@ -128,19 +128,20 @@ skilljack-evals run evals/example-greeting/tasks.yaml --model sonnet
 
 # Vercel AI SDK with different providers
 skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "anthropic:claude-sonnet-4-6"
-skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "google:gemini-2.5-pro"
-skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "openai:gpt-5.2"
-skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "openrouter:deepseek/deepseek-v3.2"
+skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "google:gemini-3.1-pro"
+skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "openai:gpt-5.5"
+skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model "openrouter:deepseek/deepseek-v4-pro"
 
 # OpenRouter — tested models
-# openrouter:deepseek/deepseek-v3.2
+# openrouter:deepseek/deepseek-v4-pro
+# openrouter:moonshotai/kimi-k2.6
+# openrouter:qwen/qwen3-coder
 # openrouter:minimax/minimax-m2.5
-# openrouter:moonshotai/kimi-k2.5
 # openrouter:z-ai/glm-5
 # openrouter:openai/gpt-oss-120b
 
 # OpenAI Agents SDK
-skilljack-evals run evals/example-greeting/tasks.yaml --runner openai-agents --model "gpt-5.2"
+skilljack-evals run evals/example-greeting/tasks.yaml --runner openai-agents --model "gpt-5.5"
 
 # GitHub Copilot SDK (GitHub auth or BYOK)
 skilljack-evals run evals/example-greeting/tasks.yaml --runner copilot-sdk --model "gpt-5"
@@ -240,7 +241,7 @@ Runs the agent against tasks, scores results, and generates reports.
 
 ```bash
 skilljack-evals run evals/greeting/tasks.yaml \
-  --runner vercel-ai --model "google:gemini-2.5-pro" \
+  --runner vercel-ai --model "google:gemini-3.1-pro" \
   --judge-model haiku \
   --timeout 300000 \
   --tasks gr-001,gr-002 \

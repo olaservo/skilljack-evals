@@ -7,8 +7,8 @@
  * https://sdk.vercel.ai/docs/guides/agent-skills
  *
  * Supports any model provider via the Vercel AI SDK registry pattern:
- *   "openai:gpt-5.2", "anthropic:claude-sonnet-4-6", "google:gemini-2.0-flash",
- *   "openrouter:deepseek/deepseek-v3.2"
+ *   "openai:gpt-5.5", "anthropic:claude-sonnet-4-6", "google:gemini-3-flash",
+ *   "openrouter:deepseek/deepseek-v4-pro"
  */
 
 import type { EvalTask, ToolCallRecord, TaskResult } from '../types.js';
@@ -31,7 +31,7 @@ const execAsync = promisify(exec);
 type ImportFn = (pkg: string, installHint: string) => Promise<any>;
 
 /**
- * Resolve a model string like "openai:gpt-5.2" into a Vercel AI SDK
+ * Resolve a model string like "openai:gpt-5.5" into a Vercel AI SDK
  * LanguageModel instance via dynamic provider import.
  */
 async function resolveModel(modelString: string, importFn: ImportFn): Promise<any> {
@@ -74,7 +74,7 @@ async function resolveModel(modelString: string, importFn: ImportFn): Promise<an
     default:
       throw new Error(
         `Unknown provider "${provider}". Supported: openai, anthropic, google, openrouter. ` +
-        `Use format "provider:model" (e.g. "openai:gpt-5.2").`,
+        `Use format "provider:model" (e.g. "openai:gpt-5.5").`,
       );
   }
 }
@@ -128,7 +128,7 @@ export class VercelAiRunner extends BaseRunner {
         : 'You are a helpful AI assistant.';
 
       // 3. Resolve model
-      const model = await resolveModel(this.options.model ?? 'openai:gpt-5.2', importFn);
+      const model = await resolveModel(this.options.model ?? 'openai:gpt-5.5', importFn);
 
       const cwd = this.options.cwd ?? process.cwd();
       const allowedWriteDirs = this.options.allowedWriteDirs ?? [];

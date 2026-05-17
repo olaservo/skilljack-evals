@@ -23009,7 +23009,7 @@ async function resolveModel(modelString, importFn) {
       return openrouter(model);
     }
     default:
-      throw new Error(`Unknown provider "${provider}". Supported: openai, anthropic, google, openrouter. Use format "provider:model" (e.g. "openai:gpt-5.2").`);
+      throw new Error(`Unknown provider "${provider}". Supported: openai, anthropic, google, openrouter. Use format "provider:model" (e.g. "openai:gpt-5.5").`);
   }
 }
 function buildSkillsPrompt(skills) {
@@ -23052,7 +23052,7 @@ var init_vercel_ai_runner = __esm({
           const systemPrompt = skillsPrompt ? `You are a helpful AI assistant.
 
 ${skillsPrompt}` : "You are a helpful AI assistant.";
-          const model = await resolveModel(this.options.model ?? "openai:gpt-5.2", importFn);
+          const model = await resolveModel(this.options.model ?? "openai:gpt-5.5", importFn);
           const cwd2 = this.options.cwd ?? process.cwd();
           const allowedWriteDirs = this.options.allowedWriteDirs ?? [];
           const tools = {
@@ -23338,7 +23338,7 @@ var init_openai_agents_runner = __esm({
         try {
           const localSkills = this.options.skillsDir ? await discoverSkills(this.options.skillsDir) : [];
           const cwd2 = this.options.cwd ?? process.cwd();
-          const model = this.options.model ?? "gpt-5.2";
+          const model = this.options.model ?? "gpt-5.5";
           const agent = new Agent({
             name: "SkillEvalAgent",
             model,

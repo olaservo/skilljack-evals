@@ -209,7 +209,7 @@ export class OpenAiAgentsRunner extends BaseRunner {
         : [];
 
       const cwd = this.options.cwd ?? process.cwd();
-      const model = this.options.model ?? 'gpt-5.2';
+      const model = this.options.model ?? 'gpt-5.5';
 
       // 2. Create agent with shell tool + local skills
       const agent = new Agent({
