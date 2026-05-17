@@ -136,7 +136,7 @@ skilljack-evals run evals/example-greeting/tasks.yaml --runner vercel-ai --model
 # openrouter:deepseek/deepseek-v4-pro
 # openrouter:moonshotai/kimi-k2.6
 # openrouter:qwen/qwen3-coder
-# openrouter:minimax/minimax-m2.5
+# openrouter:minimax/minimax-m2.7
 # openrouter:z-ai/glm-5
 # openrouter:openai/gpt-oss-120b
 

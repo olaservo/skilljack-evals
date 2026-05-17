@@ -65,7 +65,7 @@ jobs:
             model: 'openrouter:qwen/qwen3-coder'
             name: vercel-ai-openrouter-qwen3-coder
           - runner: vercel-ai
-            model: 'openrouter:minimax/minimax-m2.5'
+            model: 'openrouter:minimax/minimax-m2.7'
             name: vercel-ai-openrouter-minimax
           - runner: vercel-ai
             model: 'openrouter:z-ai/glm-5'
