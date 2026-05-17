@@ -89,7 +89,7 @@ describe('VercelAiRunner', () => {
     mockAi = createMockAiModule();
     runner = new TestableVercelAiRunner({
       cwd: '/tmp/test',
-      model: 'openai:gpt-5.2',
+      model: 'openai:gpt-5.5',
       skillsDir: '/skills',
     });
     runner.mockModules = {
@@ -161,7 +161,7 @@ describe('VercelAiRunner', () => {
   it('detects skill via readFile when countReadAsFallback is true', async () => {
     runner = new TestableVercelAiRunner({
       cwd: '/tmp/test',
-      model: 'openai:gpt-5.2',
+      model: 'openai:gpt-5.5',
       skillsDir: '/skills',
       countReadAsFallback: true,
     });
