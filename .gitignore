@@ -132,10 +132,6 @@ dist
 # Evaluation results (generated at runtime)
 results/
 
-# Python venv for the google-adk runner
-python/.venv/
-python/__pycache__/
-
 # yarn v3
 .pnp.*
 .yarn/*

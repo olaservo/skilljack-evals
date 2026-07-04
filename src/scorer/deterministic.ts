@@ -261,6 +261,19 @@ export function scoreDeterministic(
     }
   }
 
+  // 10. Verifier outcome (attached by the pipeline when the task package has one).
+  // Treated as an additional deterministic check: reward < 1 → failed.
+  let verifierPassed: boolean | null = null;
+  if (result.verifier) {
+    verifierPassed = result.verifier.reward >= 1;
+    if (verifierPassed) {
+      details.push(`Verifier passed (reward ${result.verifier.reward})`);
+    } else {
+      const stderrHint = result.verifier.stderr ? `: ${result.verifier.stderr.slice(0, 200)}` : '';
+      details.push(`Verifier failed (reward ${result.verifier.reward}, status ${result.verifier.status})${stderrHint}`);
+    }
+  }
+
   // Compute overall pass/fail
   let passed: boolean;
   if (check.expectSkillActivation) {
@@ -274,9 +287,11 @@ export function scoreDeterministic(
     if (regexCheckPassed !== null) passed = passed && regexCheckPassed;
     if (javascriptCheckPassed !== null) passed = passed && javascriptCheckPassed;
     if (fileExistsCheckPassed !== null) passed = passed && fileExistsCheckPassed;
+    if (verifierPassed !== null) passed = passed && verifierPassed;
   } else {
     // For negative tests (false positive): skill must NOT be activated
     passed = !skillActivated;
+    if (verifierPassed !== null) passed = passed && verifierPassed;
     const hasOtherAssertions = containsCheckPassed !== null || notContainsCheckPassed !== null
       || regexCheckPassed !== null || javascriptCheckPassed !== null || fileExistsCheckPassed !== null;
     if (hasOtherAssertions) {
@@ -295,6 +310,7 @@ export function scoreDeterministic(
     regexCheckPassed,
     javascriptCheckPassed,
     fileExistsCheckPassed,
+    verifierPassed,
     passed,
     details,
   };

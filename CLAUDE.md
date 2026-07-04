@@ -4,20 +4,19 @@ CLI for evaluating [Agent Skills](https://agentskills.io/home) - a format for ex
 
 ## Key Files
 
-- `src/cli.ts` - CLI entry point (run, score, report, validate, create-eval, parse, cache)
+- `src/cli.ts` - CLI entry point (run, score, report, validate, create-task, cache)
 - `src/types.ts` - TypeScript interfaces
 - `src/config.ts` - Centralized config (file + env + CLI precedence)
-- `src/parser.ts` - YAML parsing, validation, template generation
-- `src/pipeline.ts` - Full pipeline orchestrator (run → score → report)
-- `src/runner/runner.ts` - Claude Agent SDK runner (SkillEvalRunner)
-- `src/runner/vercel-ai-runner.ts` - Vercel AI SDK runner
-- `src/runner/openai-agents-runner.ts` - OpenAI Agents SDK runner
-- `src/runner/copilot-sdk-runner.ts` - GitHub Copilot SDK runner
-- `src/runner/base-runner.ts` - Shared runner base class (timeout, fixture setup/teardown)
+- `src/task/schema.ts` - Task-package frontmatter schema (checks, verifier, metadata)
+- `src/task/load.ts` - Task-package loader/validator (task.md frontmatter + prompt body)
+- `src/task/scaffold.ts` - `create-task` scaffolding (task.md, verifier, oracle stubs)
+- `src/pipeline.ts` - Full pipeline orchestrator (load → workspace → run → verify → score → report)
+- `src/run/workspace.ts` - Per-trial throwaway workspaces (seed files + skills mount)
+- `src/score/verifier.ts` - Cross-platform verifier/oracle executor (reward contract)
+- `src/runner/claude-sdk-runner.ts` - Claude Agent SDK runner
+- `src/runner/base-runner.ts` - Shared runner base class (timeout wrapper)
 - `src/runner/runner-factory.ts` - Runner selection factory
-- `src/runner/skill-setup.ts` - Copy/cleanup skills in .claude/skills/
-- `src/runner/fixture-runner.ts` - Execute per-task fixture setup/teardown scripts
-- `src/runner/security.ts` - canUseTool write restrictions
+- `src/runner/security.ts` - PreToolUse write restrictions
 - `src/scorer/scorer.ts` - Score orchestrator (deterministic + judge merge)
 - `src/scorer/deterministic.ts` - Activation/marker/tool-call/contains/regex/js/file-exists checks
 - `src/scorer/judge.ts` - LLM-as-judge scoring (SkillJudge)
@@ -40,39 +39,42 @@ npm run typecheck       # Type check without emitting
 npm run start           # Run compiled CLI
 ```
 
-**Important:** When changing scorer, parser, types, or pipeline code, run `npm run bundle:action` before committing to keep the GitHub Action bundle in sync.
+**Important:** When changing scorer, task loader, types, or pipeline code, run `npm run bundle:action` before committing to keep the GitHub Action bundle in sync.
 
 ## Architecture
 
 ```
-YAML tasks → Config → Runner (Claude SDK | Vercel AI | OpenAI Agents | Copilot SDK | Google ADK) → Scorer (deterministic + LLM judge) → Report
+Task packages → Config → Per-trial workspace → Runner (Claude SDK) → Verifier → Scorer (deterministic + LLM judge) → Report
 ```
+
+## Task packages
+
+A task is a directory containing `task.md` (YAML frontmatter + markdown prompt body). `skilljack-evals run <path>` accepts a single task-package dir or a suite dir of task packages. Frontmatter: `id` (defaults to dir name), `difficulty`/`category`/`tags`, `expected_skill`, `expect_skill_invocation` (false = anti-trigger test), `timeout_ms`, `verifier: { timeout_ms, command }`, `checks:` (lite checks: `contains`, `not_contains`, `regex`, `marker`, `tool_calls`, `no_tool_calls`, `files_exist`, `javascript`), `assertions:` (judge-graded checklist). Optional dirs: `environment/skills/` (task-level skills; falls back to suite-level `<suite>/skills/`), `environment/workspace/` (seed files), `verifier/verify.*`, `oracle/solve.*`. `--skills-dir` overrides skills for all tasks (candidate injection). `validate <path>` runs schema checks plus the oracle gate (oracle → verifier must yield reward 1.0; skip with `--no-oracle`).
+
+## Workspaces and verifiers
+
+Each trial runs in a throwaway workspace (`<output>/workspaces/<taskId>/run-<n>/`) with seed files copied in and skills mounted at `.claude/skills/`; retention via `--keep-workspaces all|failures|none` (default failures). Verifiers run with cwd = workspace and env contract `SKILLJACK_OUTPUT_FILE`, `SKILLJACK_TRAJECTORY_FILE`, `SKILLJACK_TASK_DIR`, `SKILLJACK_REWARD_FILE`; reward = reward-file float 0..1 if written, else exit code (0→1). Dispatch by extension: `.mjs`/`.js` → node, `.py` → py/python, `.sh` → bash (error with docker hint when missing), `.ps1` → powershell; `verifier.command` overrides.
+
+Note: a v2 redesign is in progress (SkillsBench-aligned task packages + real-harness CLI adapters). The four non-Claude SDK runners (vercel-ai, openai-agents, copilot-sdk, google-adk) were removed in v2 Phase 1; real-harness adapters (claude-code, codex, gemini, opencode) land in later phases.
 
 ## Runners
 
-Five runners selected via `--runner` flag:
+Two runners selected via `--runner` flag:
 - `claude-sdk` (default) — uses Claude Agent SDK, model aliases like `sonnet`, `haiku`, `opus`
-- `vercel-ai` — uses Vercel AI SDK, model format `"provider:model"` (e.g., `anthropic:claude-sonnet-4-6`, `google:gemini-3.1-pro`, `openai:gpt-5.5`, `openrouter:deepseek/deepseek-v4-pro`)
-- `openai-agents` — uses OpenAI Agents SDK, plain model names (e.g., `gpt-5.5`)
-- `copilot-sdk` — uses GitHub Copilot SDK, model names like `gpt-5`, `claude-sonnet-4-6`
-- `google-adk` — Python subprocess bridge to Google ADK. Spawns `python/adk_runner.py`. Model names like `gemini-2.5-flash`, `gemini-2.5-pro`. v1 leaves `toolCalls`/`skillLoads` empty — judge `discovery` rating is the activation signal.
+- `claude-code` — drives the real Claude Code CLI (`claude -p --output-format stream-json --setting-sources project`) as a subprocess per task; requires `claude` on PATH (`npm install -g @anthropic-ai/claude-code`); timeouts kill the whole CLI process tree (`src/harness/subprocess.ts`)
 
 ## Scoring
 
 Two methods, run independently or together:
-- **Deterministic** (free): skill activation, `expect_marker`, `expect_tool_calls` / `expect_no_tool_calls`, `expect_contains` / `expect_not_contains`, `expect_regex`, `expect_javascript` (sandboxed expression), `expect_file_exists`
-- **LLM Judge** (~$0.001/task): discovery (0/1), adherence (1-5), output quality (1-5)
+- **Deterministic** (free): skill activation, lite `checks:` (marker, tool calls, contains/not_contains, regex, sandboxed javascript, files_exist), plus the verifier outcome when the task has one (reward < 1 → failed)
+- **LLM Judge** (~$0.001/task): discovery (0/1), adherence (1-5), output quality (1-5), grading `assertions:` with evidence
 - **Weighted Score** (0-1): `w_d * discovery + w_a * ((adherence-1)/4) + w_o * ((output-1)/4)`
 - **Blind A/B Comparison** (`--blind-compare`, requires `--compare`): anonymized judge evaluation to detect scoring bias
-
-## Fixtures
-
-Tasks may declare `fixture.setup` / `fixture.teardown` scripts (paths relative to `cwd`). Setup runs before the agent, teardown always runs after (even on setup failure). Fixture scripts are executed via `execFile` — eval authors are trusted. Tasks with a `fixture` or `expect_file_exists` check bypass the response cache because their outcome depends on current filesystem state.
 
 ## Concurrency and caching
 
 - `--concurrency N` / `EVAL_RUNNER_CONCURRENCY` / `runner.concurrency`: max tasks in flight (1=sequential default, 0=unlimited). Applied by the pipeline's `runPhase` via `withConcurrencyLimit`.
-- Response cache: TaskResult keyed by SHA-256 of `{taskId, prompt, model, runnerType, skillsHash, fixturesHash, timeout, allowedWriteDirs, runIndex}`. Skill and fixture hashes invalidate on content change. Manage with `skilljack-evals cache clear`; bypass with `--skip-cache` (read-only skip) or `--bust-cache` (disable fully).
+- Response cache: TaskResult keyed by SHA-256 of `{taskId, prompt, model, runnerType, skillsHash, environmentHash, timeout, allowedWriteDirs, runIndex}`. Skill and environment-seed hashes invalidate on content change. Tasks with a verifier, a workspace seed, or a `files_exist` check bypass the cache. Manage with `skilljack-evals cache clear`; bypass with `--skip-cache` (read-only skip) or `--bust-cache` (disable fully).
 
 ## Failure Categories
 
@@ -90,22 +92,9 @@ Tasks may declare `fixture.setup` / `fixture.teardown` scripts (paths relative t
 - `dotenv` - Environment configuration
 - `@actions/core` (dev) - GitHub Action support
 
-Peer dependencies (install as needed for non-Claude runners):
-- `ai`, `zod`, `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`, `@openrouter/ai-sdk-provider` - Vercel AI SDK
-- `@openai/agents`, `openai` - OpenAI Agents SDK
-- `@github/copilot-sdk` - GitHub Copilot SDK
-- Python 3 + `pip install -r python/requirements.txt` (`google-adk`, `google-genai`) - Google ADK runner. Override interpreter with `PYTHON_BIN`.
-
 ## Environment
 
-Requires API key for selected runner in environment or `.env` file:
-- Claude SDK / Vercel AI (anthropic:): `ANTHROPIC_API_KEY`
-- Vercel AI (openai:) / OpenAI Agents: `OPENAI_API_KEY`
-- Vercel AI (google:): `GOOGLE_GENERATIVE_AI_API_KEY`
-- Vercel AI (openrouter:): `OPENROUTER_API_KEY`
-- Copilot SDK (GitHub auth): `COPILOT_GITHUB_TOKEN` (must have Copilot permissions)
-- Copilot SDK (BYOK): Auto-detects `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` when no Copilot token
-- Google ADK: `GOOGLE_API_KEY`
+Requires `ANTHROPIC_API_KEY` in environment or `.env` file.
 
 For Bedrock: set `CLAUDE_CODE_USE_BEDROCK=1` + AWS env vars.
 

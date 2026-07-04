@@ -24,11 +24,7 @@ export interface DeterministicCheck {
   expectFileExists?: string[]; // Files that must exist (relative to cwd)
 }
 
-export interface FixtureConfig {
-  state: string;
-  setup?: string; // Path to setup script
-  teardown?: string; // Path to teardown script
-}
+export type TaskDifficulty = 'easy' | 'medium' | 'hard';
 
 export interface EvalTask {
   id: string;
@@ -37,7 +33,14 @@ export interface EvalTask {
   criteria: EvalCriteria[];
   goldenChecklist: string[];
   deterministic?: DeterministicCheck;
-  fixture?: FixtureConfig;
+  /** Task-package metadata (optional). */
+  difficulty?: TaskDifficulty;
+  category?: string;
+  tags?: string[];
+  /** Per-task timeout override in ms. */
+  timeoutMs?: number;
+  /** Per-trial workspace directory (set by the pipeline before each run). */
+  workspaceDir?: string;
 }
 
 export interface EvalDefaults {
@@ -84,6 +87,26 @@ export interface TaskResult {
   errorMessage: string;
   /** Undefined when the runner cannot report usage (e.g. Copilot SDK). */
   tokens?: TokenUsage;
+  /** Outcome of the task's verifier script, when the task package has one. */
+  verifier?: VerifierOutcome;
+}
+
+// ============================================
+// Verifier Types
+// ============================================
+
+export type VerifierStatus = 'ok' | 'error' | 'timeout' | 'missing-interpreter';
+
+export interface VerifierOutcome {
+  /** Reward in [0, 1]: reward file contents if written, else exit code (0 → 1, nonzero → 0). */
+  reward: number;
+  /** True when reward >= 1. */
+  passed: boolean;
+  exitCode: number | null;
+  status: VerifierStatus;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
 }
 
 // ============================================
@@ -101,6 +124,7 @@ export interface DeterministicResult {
   regexCheckPassed: boolean | null; // null = not tested
   javascriptCheckPassed: boolean | null; // null = not tested
   fileExistsCheckPassed: boolean | null; // null = not tested
+  verifierPassed: boolean | null; // null = task has no verifier outcome
   passed: boolean;
   details: string[];
 }
@@ -139,7 +163,6 @@ export interface JudgeScore {
   discovery: number; // 0 or 1
   adherence: number; // 1-5
   outputQuality: number; // 1-5
-  weightedScore: number; // 0-1 (normalized)
   failureCategory: FailureCategory;
   reasoning: string;
   checklistResults: ChecklistItemResult[];
@@ -162,22 +185,47 @@ export interface CombinedScore {
   deterministic: DeterministicResult | null;
   judge: JudgeScore | null;
 
-  // Final computed scores
-  discovery: number; // 0 or 1
-  adherence: number; // 1-5
-  outputQuality: number; // 1-5
-  weightedScore: number; // 0-1 normalized
+  /**
+   * Reward-authoritative trial outcome: true when all deterministic checks
+   * passed (including verifier reward >= 1) and the agent did not error.
+   * For aggregated multi-trial scores: true only when every trial passed.
+   */
+  passed: boolean;
+  /**
+   * Reward in [0, 1]. 1 when passed; the verifier's partial reward (or 0)
+   * when failed. For aggregated scores this is the mean across trials —
+   * i.e. the per-task resolution rate.
+   */
+  reward: number;
+  /**
+   * Deterministic skill-discovery signal (0/1; rate across trials when
+   * aggregated). For anti-trigger tasks 1 = correctly did NOT activate.
+   */
+  discovery: number;
+  /**
+   * Expected-skill invocation signal (0/1; rate when aggregated). Undefined
+   * for anti-trigger tasks and baseline (no-skill) trials — feeds the
+   * Skill Invocation Rate metric.
+   */
+  invocation?: number;
+
+  // Judge diagnostics (present only when the judge ran). Never affect passed.
+  adherence?: number; // 1-5
+  outputQuality?: number; // 1-5
+
   failureCategory: FailureCategory;
   reasoning: string;
   checklistResults?: ChecklistItemResult[];
+  /** Per-trial outcomes (populated by multi-run aggregation). */
+  trials?: { passed: boolean[]; rewards: number[] };
   stddev?: ScoreStddev; // Only populated when N >= 2
 }
 
 export interface ScoreStddev {
+  reward: number;
   discovery: number;
-  adherence: number;
-  outputQuality: number;
-  weightedScore: number;
+  adherence?: number;
+  outputQuality?: number;
 }
 
 // ============================================
@@ -230,13 +278,29 @@ export interface SessionLog {
 // Report Types
 // ============================================
 
+/** Binomial confidence interval bounds, clamped to [0, 1]. */
+export interface ResolutionCI {
+  low: number;
+  high: number;
+}
+
 export interface EvaluationSummary {
   totalTasks: number;
   numRuns: number;
-  discoveryAccuracy: number; // 0-1
-  avgAdherence: number; // 1-5
-  avgOutputQuality: number; // 1-5
-  avgWeightedScore: number; // 0-1
+  /** Mean per-task trial pass rate (0-1) — the headline metric. */
+  resolutionRate: number;
+  /** 95% binomial CI on the resolution rate. */
+  resolutionCI: ResolutionCI;
+  /** Share of tasks with at least one passing trial (0-1). */
+  passAtK: number;
+  /**
+   * Share of trials where the expected skill was invoked, over tasks that
+   * expect an invocation. Undefined when no task expects one (e.g. baseline).
+   */
+  invocationRate?: number;
+  /** Judge diagnostics — present only when the judge ran. */
+  avgAdherence?: number; // 1-5
+  avgOutputQuality?: number; // 1-5
   totalDurationMs: number;
   totalCostUsd: number;
   /** Undefined when any task's runner couldn't report tokens. */
@@ -288,10 +352,8 @@ export interface EvaluationReport {
 /** Per-task delta metrics between with-skill and baseline runs */
 export interface TaskComparisonDelta {
   taskId: string;
-  discoveryDelta: number;
-  adherenceDelta: number;
-  outputQualityDelta: number;
-  weightedScoreDelta: number;
+  /** Skill lift: with-skill resolution rate minus baseline resolution rate. */
+  lift: number;
   durationDeltaMs: number;
   costDeltaUsd: number;
   /** Undefined when either arm lacks tokens. */
@@ -312,10 +374,9 @@ export interface ComparisonSummary {
   withSkill: EvaluationSummary;
   withoutSkill: EvaluationSummary;
   delta: {
-    discoveryAccuracyDelta: number;
-    avgAdherenceDelta: number;
-    avgOutputQualityDelta: number;
-    avgWeightedScoreDelta: number;
+    /** Macro skill lift: with-skill resolution rate minus baseline. */
+    resolutionRateDelta: number;
+    passAtKDelta: number;
     totalDurationDeltaMs: number;
     totalCostDeltaUsd: number;
     /** Undefined when either arm lacks tokens. */
@@ -331,20 +392,17 @@ export interface ComparisonData {
   tasks: TaskComparison[];
 }
 
-/** Score snapshot for cross-iteration comparison */
+/** Per-task score snapshot for cross-iteration comparison */
 export interface ScoreSnapshot {
-  discovery: number;
-  adherence: number;
-  outputQuality: number;
-  weightedScore: number;
+  resolutionRate: number;
+  lift?: number;
 }
 
 /** Summary snapshot for cross-iteration comparison */
 export interface SummarySnapshot {
-  discoveryAccuracy: number;
-  avgAdherence: number;
-  avgOutputQuality: number;
-  avgWeightedScore: number;
+  resolutionRate: number;
+  passAtK: number;
+  skillLift?: number;
 }
 
 /** Per-task delta for cross-iteration comparison */
@@ -352,7 +410,8 @@ export interface TaskDelta {
   taskId: string;
   previous: ScoreSnapshot;
   current: ScoreSnapshot;
-  delta: ScoreSnapshot;
+  /** Resolution-rate delta (current minus previous). */
+  delta: number;
   significantChange: 'improved' | 'regressed' | 'unchanged';
 }
 

@@ -37,7 +37,7 @@
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "bundle:action": "npm run build && esbuild dist/action/index.js --bundle --platform=node --target=node20 --format=cjs --outfile=action/dist/index.cjs --external:@openai/agents --external:openai --external:ai --external:@ai-sdk/* --external:@openrouter/* --external:zod --external:@github/copilot-sdk"
+    "bundle:action": "npm run build && esbuild dist/action/index.js --bundle --platform=node --target=node20 --format=cjs --outfile=action/dist/index.cjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.201",
@@ -53,52 +53,11 @@
     "typescript": "^5.0.0",
     "vitest": "^4.0.18"
   },
-  "peerDependencies": {
-    "@ai-sdk/anthropic": "^3.0.50",
-    "@ai-sdk/google": "^3.0.34",
-    "@ai-sdk/openai": "^3.0.33",
-    "@github/copilot-sdk": "^0.2.0",
-    "@openai/agents": "^0.4.15",
-    "@openrouter/ai-sdk-provider": "^2.2.3",
-    "ai": "^6.0.99",
-    "openai": "^6.25.0",
-    "zod": "^4.0.0"
-  },
-  "peerDependenciesMeta": {
-    "ai": {
-      "optional": true
-    },
-    "@ai-sdk/openai": {
-      "optional": true
-    },
-    "@ai-sdk/anthropic": {
-      "optional": true
-    },
-    "@ai-sdk/google": {
-      "optional": true
-    },
-    "@openai/agents": {
-      "optional": true
-    },
-    "@openrouter/ai-sdk-provider": {
-      "optional": true
-    },
-    "openai": {
-      "optional": true
-    },
-    "zod": {
-      "optional": true
-    },
-    "@github/copilot-sdk": {
-      "optional": true
-    }
-  },
   "engines": {
     "node": ">=20.0.0"
   },
   "files": [
     "dist",
-    "action",
-    "python"
+    "action"
   ]
 }

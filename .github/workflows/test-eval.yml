@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       eval-file:
-        description: 'Path to tasks YAML file'
+        description: 'Path to a task-package or suite directory'
         required: false
-        default: 'evals/example-greeting/tasks.yaml'
+        default: 'evals/example-greeting'
       no-judge:
         description: 'Skip LLM judge (deterministic only)'
         required: false
@@ -43,44 +43,6 @@ jobs:
           - runner: claude-sdk
             model: sonnet
             name: claude-sdk-sonnet
-          - runner: vercel-ai
-            model: 'anthropic:claude-sonnet-4-6'
-            name: vercel-ai-sonnet
-          - runner: vercel-ai
-            model: 'google:gemini-3.1-pro'
-            name: vercel-ai-gemini
-          - runner: vercel-ai
-            model: 'openai:gpt-5.5'
-            name: vercel-ai-gpt
-          - runner: openai-agents
-            model: gpt-5.5
-            name: openai-agents-gpt
-          - runner: vercel-ai
-            model: 'openrouter:deepseek/deepseek-v4-pro'
-            name: vercel-ai-openrouter-deepseek
-          - runner: vercel-ai
-            model: 'openrouter:moonshotai/kimi-k2.6'
-            name: vercel-ai-openrouter-kimi
-          - runner: vercel-ai
-            model: 'openrouter:qwen/qwen3-coder'
-            name: vercel-ai-openrouter-qwen3-coder
-          - runner: vercel-ai
-            model: 'openrouter:minimax/minimax-m2.7'
-            name: vercel-ai-openrouter-minimax
-          - runner: vercel-ai
-            model: 'openrouter:z-ai/glm-5'
-            name: vercel-ai-openrouter-glm
-          - runner: vercel-ai
-            model: 'openrouter:openai/gpt-oss-120b'
-            name: vercel-ai-openrouter-gpt-oss
-          # copilot-sdk entries disabled until github/copilot-sdk#629 is fixed
-          # (skillDirectories not working — agent relies on inconsistent file browsing)
-          # - runner: copilot-sdk
-          #   model: gpt-5.5
-          #   name: copilot-sdk-gpt
-          # - runner: copilot-sdk
-          #   model: claude-sonnet-4-6
-          #   name: copilot-sdk-sonnet
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v7
@@ -91,17 +53,6 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-
-      - name: Install peer dependencies
-        if: matrix.runner != 'claude-sdk'
-        run: |
-          if [ "${{ matrix.runner }}" = "vercel-ai" ]; then
-            npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @openrouter/ai-sdk-provider
-          elif [ "${{ matrix.runner }}" = "openai-agents" ]; then
-            npm install @openai/agents openai
-          elif [ "${{ matrix.runner }}" = "copilot-sdk" ]; then
-            npm install @github/copilot-sdk
-          fi
 
       - name: Build
         run: npm run build
@@ -127,9 +78,6 @@ jobs:
           node dist/src/cli.js run "$EVAL_FILE" $ARGS
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           EVAL_FILE: ${{ inputs.eval-file }}
           NO_JUDGE: ${{ inputs.no-judge }}
           RUNS_NUMBER: ${{ inputs.runs-number }}
@@ -162,7 +110,7 @@ jobs:
       - name: Test bundled action
         uses: ./action
         with:
-          tasks: evals/example-greeting/tasks.yaml
+          tasks: evals/example-greeting
           runner: claude-sdk
           model: sonnet
           no-judge: 'true'

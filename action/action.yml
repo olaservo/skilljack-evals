@@ -6,10 +6,10 @@ branding:
 
 inputs:
   tasks:
-    description: 'Path to tasks YAML file'
+    description: 'Path to a task-package directory or a suite directory of task packages'
     required: true
   runner:
-    description: 'Runner type: claude-sdk, vercel-ai, openai-agents, or copilot-sdk'
+    description: 'Runner type: claude-sdk or claude-code (requires Claude Code CLI on the runner)'
     required: false
     default: 'claude-sdk'
   model:
@@ -63,18 +63,6 @@ inputs:
     default: '3'
   anthropic-api-key:
     description: 'Anthropic API key (or use ANTHROPIC_API_KEY env var)'
-    required: false
-  openai-api-key:
-    description: 'OpenAI API key for vercel-ai (openai:) or openai-agents runner (or use OPENAI_API_KEY env var)'
-    required: false
-  google-api-key:
-    description: 'Google AI API key for vercel-ai (google:) runner (or use GOOGLE_GENERATIVE_AI_API_KEY env var)'
-    required: false
-  openrouter-api-key:
-    description: 'OpenRouter API key for vercel-ai (openrouter:) runner (or use OPENROUTER_API_KEY env var)'
-    required: false
-  github-token:
-    description: 'GitHub token for copilot-sdk runner auth (set as COPILOT_GITHUB_TOKEN; must have Copilot permissions)'
     required: false
   generate-feedback:
     description: 'Path to write feedback template JSON after run'

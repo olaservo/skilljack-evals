@@ -53,7 +53,8 @@ export async function scoreTask(
   // Run deterministic scoring
   let deterministicResult: DeterministicResult | null = null;
   if (!options.noDeterministic && task.deterministic) {
-    deterministicResult = scoreDeterministic(task, result, { cwd: options.cwd });
+    // File-based assertions resolve against the trial workspace when present.
+    deterministicResult = scoreDeterministic(task, result, { cwd: task.workspaceDir ?? options.cwd });
   }
 
   // Run LLM judge scoring

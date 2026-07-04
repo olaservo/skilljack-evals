@@ -2,7 +2,7 @@
  * Evaluation pipeline orchestrator.
  *
  * Coordinates the full evaluation flow:
- * parse tasks → setup skills → run agent → score → report → check thresholds
+ * load task packages → per-trial workspace → run agent → verifier → score → report → check thresholds
  *
  * In comparison mode (--compare), runs each task with AND without the skill,
  * then computes delta metrics showing the skill's impact.
@@ -11,8 +11,8 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { formatDelta, pct } from './utils/format.js';
-import { parseEvalFile } from './parser.js';
-import { setupLocalSkills, cleanupLocalSkills } from './runner/skill-setup.js';
+import { loadTaskPackages } from './task/load.js';
+import type { LoadedSuite, LoadedTask } from './task/load.js';
 import { createRunner } from './runner/runner-factory.js';
 import { scoreAll, type ScorerOptions } from './scorer/scorer.js';
 import { SessionLogger } from './session/session-logger.js';
@@ -22,6 +22,11 @@ import { generateGitHubSummary, writeGitHubSummary } from './report/github-summa
 import { loadConfig, type EvalConfig } from './config.js';
 import { aggregateResults, aggregateScores } from './scorer/aggregator.js';
 import { loadPreviousReport, compareResults, formatComparisonConsole } from './report/comparison.js';
+import { createTrialWorkspace, applyCleanupPolicy } from './run/workspace.js';
+import type { TrialWorkspace, WorkspaceCleanupPolicy } from './run/workspace.js';
+import { buildNudgeForSkillsDir } from './run/nudge.js';
+import type { NudgeLevel } from './run/nudge.js';
+import { runVerifier } from './score/verifier.js';
 import type {
   SkillEvaluation,
   TaskResult,
@@ -73,15 +78,15 @@ export function smartLabel(skillPath: string): string {
 }
 
 export interface PipelineOptions {
-  /** Path to tasks YAML file */
-  tasksFile: string;
+  /** Path to a task-package dir or a suite dir of task packages */
+  tasksPath: string;
   /** Path to eval.config.yaml */
   configPath?: string;
   /** Config overrides from CLI flags */
   configOverrides?: Partial<EvalConfig>;
-  /** Working directory for agent execution */
+  /** Fallback working directory (per-trial workspaces normally take precedence) */
   cwd?: string;
-  /** Path to skills directory (for local skill setup) */
+  /** Skills directory override applied to ALL tasks (candidate injection) */
   skillsDir?: string;
   /** Comma-separated task IDs to run (empty = all) */
   taskFilter?: string;
@@ -111,6 +116,10 @@ export interface PipelineOptions {
   skipCache?: boolean;
   /** Skip both reading and writing cache */
   bustCache?: boolean;
+  /** Workspace retention policy after scoring (default: failures) */
+  keepWorkspaces?: WorkspaceCleanupPolicy;
+  /** Skill nudge level appended to with-skill prompts (overrides config.nudge) */
+  nudge?: NudgeLevel;
 }
 
 export interface PipelineResult {
@@ -142,33 +151,50 @@ interface PhaseResult {
 /** Cache options passed into runPhase. */
 interface PhaseCacheOptions {
   cache: ResponseCache;
-  skillsHash: string;
   skipCache?: boolean;
+}
+
+/**
+ * Skills selection for a phase: 'task' mounts each task's resolved skills dir,
+ * 'none' mounts no skills (baseline), a string mounts that directory for all tasks.
+ */
+type PhaseSkills = 'task' | 'none' | { dir: string };
+
+function phaseSkillsDirFor(lt: LoadedTask, phaseSkills: PhaseSkills): string | undefined {
+  if (phaseSkills === 'task') return lt.skillsDir;
+  if (phaseSkills === 'none') return undefined;
+  return phaseSkills.dir;
+}
+
+interface PhaseEnvOptions {
+  workspaceBaseDir: string;
+  keepWorkspaces: WorkspaceCleanupPolicy;
+  phaseSkills: PhaseSkills;
+  /** Skill nudge appended to task prompts. Baseline phases always pass 'off'. */
+  nudgeLevel: NudgeLevel;
 }
 
 /**
  * Run a single evaluation phase (with or without skills).
  *
- * Encapsulates: create runner → run N times → score → aggregate.
- * When cacheOptions is provided, individual task results are cached
- * so unchanged executions replay from cache.
+ * Encapsulates: create runner → per-trial workspace → run N times → verifier →
+ * score → cleanup workspaces → aggregate. When cacheOptions is provided,
+ * cacheable task results replay from cache without creating a workspace.
  */
 async function runPhase(
   phaseLabel: string,
-  evaluation: SkillEvaluation,
+  suiteTasks: LoadedTask[],
   config: EvalConfig,
-  cwd: string,
-  skillsDir: string | undefined,
   numRuns: number,
   scorerOptions: ScorerOptions,
   logBaseDir: string,
+  env: PhaseEnvOptions,
   cacheOptions?: PhaseCacheOptions,
 ): Promise<PhaseResult> {
   const runner = await createRunner(config.runnerType, {
-    cwd,
+    cwd: process.cwd(),
     model: config.defaultAgentModel,
     allowedWriteDirs: config.allowedWriteDirs,
-    skillsDir,
   }, config);
 
   const allResults: TaskResult[][] = [];
@@ -184,25 +210,42 @@ async function runPhase(
     const runLogDir = numRuns > 1 ? path.join(logBaseDir, `run-${run + 1}`) : logBaseDir;
 
     // Per-task execution with optional cache support, bounded by config.concurrency.
-    // Tasks with fixtures or expectFileExists bypass the cache entirely: their
-    // success depends on filesystem state that a cached TaskResult cannot represent.
+    // Tasks with verifiers, workspace seeds, or expectFileExists bypass the cache:
+    // their success depends on filesystem state that a cached TaskResult cannot represent.
     let cacheHits = 0;
     const cacheConcurrent = config.concurrency ?? 1;
 
-    const factories = evaluation.tasks.map((task) => async (): Promise<TaskResult> => {
-      const cacheable = cacheOptions && isTaskCacheable(task);
+    // Per-trial effective tasks (workspaceDir attached) and workspaces, indexed by task position.
+    const effectiveTasks: EvalTask[] = suiteTasks.map((lt) => lt.task);
+    const workspaces: Array<TrialWorkspace | undefined> = suiteTasks.map(() => undefined);
+
+    const factories = suiteTasks.map((lt, index) => async (): Promise<TaskResult> => {
+      const task = lt.task;
+      const effSkillsDir = phaseSkillsDirFor(lt, env.phaseSkills);
+
+      // Finalize the prompt before cache-key computation so the nudge text is
+      // naturally part of the cache key (which hashes the prompt).
+      const nudgeText = await buildNudgeForSkillsDir(env.nudgeLevel, effSkillsDir);
+      const effectivePrompt = task.prompt + nudgeText;
+
+      const hasVerifier = !!(lt.verifierScript || lt.verifierCommand);
+      const cacheable = cacheOptions && isTaskCacheable(task, {
+        hasVerifier,
+        hasWorkspaceSeed: !!lt.workspaceSeedDir,
+      });
 
       let cacheKey: string | null = null;
       if (cacheable && cacheOptions) {
-        const fixturesHash = await ResponseCache.hashFixtures(task.fixture, cwd);
+        const skillsHash = await ResponseCache.hashSkillsDir(effSkillsDir);
+        const environmentHash = await ResponseCache.hashEnvironment(lt.workspaceSeedDir);
         cacheKey = ResponseCache.computeCacheKey({
           taskId: task.id,
-          prompt: task.prompt,
+          prompt: effectivePrompt,
           model: config.defaultAgentModel,
           runnerType: config.runnerType,
-          skillsHash: cacheOptions.skillsHash,
-          fixturesHash,
-          taskTimeoutMs: config.taskTimeoutMs,
+          skillsHash,
+          environmentHash,
+          taskTimeoutMs: task.timeoutMs ?? config.taskTimeoutMs,
           allowedWriteDirs: config.allowedWriteDirs,
           runIndex: numRuns > 1 ? run : undefined,
         });
@@ -217,14 +260,41 @@ async function runPhase(
         }
       }
 
+      // Create the per-trial workspace (seed files + mounted skills).
+      const workspace = await createTrialWorkspace({
+        baseDir: env.workspaceBaseDir,
+        taskId: task.id,
+        runIndex: run,
+        seedDir: lt.workspaceSeedDir,
+        skillsDir: effSkillsDir,
+      });
+      workspaces[index] = workspace;
+
+      const effectiveTask: EvalTask = { ...task, prompt: effectivePrompt, workspaceDir: workspace.dir };
+      effectiveTasks[index] = effectiveTask;
+
       console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
       const logger = new SessionLogger(task.id, runLogDir);
-      const result = await runner.runTaskWithTimeout(task, undefined, logger);
+      const result = await runner.runTaskWithTimeout(effectiveTask, undefined, logger);
 
       if (result.isError) {
         console.error(`  Task ${task.id} ERROR: ${result.errorMessage}`);
       } else {
         console.log(`  Task ${task.id}: Skills loaded: ${result.skillLoads.join(', ') || 'none'} | Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
+      }
+
+      // Run the verifier when the task package has one (skipped on agent error).
+      if (hasVerifier && !result.isError) {
+        result.verifier = await runVerifier({
+          scriptPath: lt.verifierScript,
+          command: lt.verifierCommand,
+          workspaceDir: workspace.dir,
+          taskDir: lt.taskDir,
+          output: result.output,
+          toolCalls: result.toolCalls,
+          timeoutMs: lt.verifierTimeoutMs,
+        });
+        console.log(`  Task ${task.id}: Verifier ${result.verifier.passed ? 'passed' : 'FAILED'} (reward ${result.verifier.reward}, status ${result.verifier.status})`);
       }
 
       if (cacheKey && cacheOptions && !result.isError) {
@@ -233,7 +303,7 @@ async function runPhase(
           cacheKeyPrefix: cacheKey.substring(0, 8),
           modelId: config.defaultAgentModel,
           runnerType: config.runnerType,
-          skillsHash: cacheOptions.skillsHash,
+          skillsHash: await ResponseCache.hashSkillsDir(effSkillsDir),
         });
       }
 
@@ -243,7 +313,7 @@ async function runPhase(
     const results = await withConcurrencyLimit(factories, cacheConcurrent);
 
     if (cacheOptions && cacheHits > 0) {
-      console.log(`\n${cacheHits} of ${evaluation.tasks.length} task(s) served from cache`);
+      console.log(`\n${cacheHits} of ${suiteTasks.length} task(s) served from cache`);
     }
 
     allResults.push(results);
@@ -253,8 +323,17 @@ async function runPhase(
     } else {
       console.log(`\n--- ${phaseLabel}: Scoring ---\n`);
     }
-    const scores = await scoreAll(evaluation.tasks, results, scorerOptions);
+    const scores = await scoreAll(effectiveTasks, results, scorerOptions);
     allScores.push(scores);
+
+    // Apply the workspace retention policy now that scoring is done.
+    for (let t = 0; t < suiteTasks.length; t++) {
+      const workspace = workspaces[t];
+      if (!workspace) continue;
+      const trialFailed = results[t].isError
+        || (scores[t].deterministic ? !scores[t].deterministic!.passed : false);
+      await applyCleanupPolicy(workspace, env.keepWorkspaces, trialFailed);
+    }
   }
 
   // Dispose runner resources (e.g., child processes) after all runs complete
@@ -265,7 +344,7 @@ async function runPhase(
 
   const runDetails: Array<{ result: TaskResult; score: CombinedScore }>[] = [];
   if (numRuns > 1) {
-    for (let t = 0; t < evaluation.tasks.length; t++) {
+    for (let t = 0; t < suiteTasks.length; t++) {
       runDetails.push(
         allResults.map((r, run) => ({
           result: r[t],
@@ -278,30 +357,6 @@ async function runPhase(
   const summary = computeSummary(results, scores, numRuns);
 
   return { results, scores, allResults, allScores, summary, runDetails };
-}
-
-/**
- * Setup local skills for Claude SDK and Copilot SDK runners.
- * Returns true if skills were set up and need cleanup.
- */
-async function setupSkills(
-  skillsDir: string | undefined,
-  config: EvalConfig,
-  cwd: string,
-): Promise<boolean> {
-  if (!skillsDir) return false;
-  if (
-    config.runnerType === 'claude-sdk' ||
-    config.runnerType === 'copilot-sdk' ||
-    config.runnerType === 'google-adk'
-  ) {
-    console.log(`Setting up local skills from: ${skillsDir}`);
-    const skillNames = await setupLocalSkills(skillsDir, cwd);
-    console.log(`Skills configured: ${skillNames.join(', ')}`);
-    return true;
-  }
-  console.log(`Skills directory: ${skillsDir} (${config.runnerType} handles discovery natively)`);
-  return false;
 }
 
 /**
@@ -371,8 +426,8 @@ function computeComparison(
  */
 export async function runPipeline(options: PipelineOptions): Promise<PipelineResult> {
   const config = await loadConfig(options.configPath, options.configOverrides);
-  const cwd = options.cwd || process.cwd();
   const compareMode = options.compare || !!options.compareSkillPath;
+  const keepWorkspaces = options.keepWorkspaces ?? 'failures';
 
   if (options.blindCompare && !compareMode) {
     throw new Error('--blind-compare requires --compare mode');
@@ -382,22 +437,28 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     console.warn('Warning: --compare-label has no effect without --compare or --compare-skill');
   }
 
-  // 1. Parse tasks
-  console.log(`Parsing tasks from: ${options.tasksFile}`);
-  let evaluation = await parseEvalFile(options.tasksFile);
+  // 1. Load task packages
+  console.log(`Loading task packages from: ${options.tasksPath}`);
+  const suite: LoadedSuite = await loadTaskPackages(options.tasksPath, {
+    skillsDirOverride: options.skillsDir,
+    weights: config.defaultWeights,
+  });
 
+  let suiteTasks = suite.tasks;
   if (options.taskFilter) {
     const filterIds = new Set(options.taskFilter.split(',').map((s) => s.trim()));
-    evaluation = {
-      ...evaluation,
-      tasks: evaluation.tasks.filter((t) => filterIds.has(t.id)),
-    };
-    console.log(`Filtered to ${evaluation.tasks.length} task(s): ${options.taskFilter}`);
+    suiteTasks = suiteTasks.filter((lt) => filterIds.has(lt.task.id));
+    console.log(`Filtered to ${suiteTasks.length} task(s): ${options.taskFilter}`);
   }
 
-  if (evaluation.tasks.length === 0) {
+  if (suiteTasks.length === 0) {
     throw new Error('No tasks to run');
   }
+
+  const evaluation: SkillEvaluation = {
+    skillName: suite.skillName,
+    tasks: suiteTasks.map((lt) => lt.task),
+  };
 
   // Load human feedback if provided
   const humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
@@ -420,21 +481,6 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     console.log('Comparison file validated successfully');
   }
 
-  // 2. Detect skills directory
-  let skillsDir = options.skillsDir;
-  if (!skillsDir) {
-    const tasksDir = path.dirname(path.resolve(options.tasksFile));
-    const autoSkillsDir = path.join(tasksDir, 'skills');
-    try {
-      const stat = await fs.stat(autoSkillsDir);
-      if (stat.isDirectory()) {
-        skillsDir = autoSkillsDir;
-      }
-    } catch {
-      // No skills/ directory found
-    }
-  }
-
   // Validate compare-skill path
   if (options.compareSkillPath) {
     let stat;
@@ -451,26 +497,27 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     }
   }
 
-  if (compareMode && !skillsDir) {
-    throw new Error('--compare requires a skills directory but none was found. Provide a skill via the evaluation YAML or use --compare-skill to specify a baseline skill path.');
+  const anySkills = suiteTasks.some((lt) => lt.skillsDir);
+  if (compareMode && !anySkills) {
+    throw new Error('--compare requires skills but none were found. Add skills under environment/skills/ (or a suite-level skills/ dir), or use --compare-skill to specify a baseline skill path.');
   }
 
   const numRuns = options.numRuns ?? 3;
+  const nudgeLevel: NudgeLevel = options.nudge ?? config.nudge;
   const logDir = path.join(config.outputDir, 'logs');
   const scorerOptions: ScorerOptions = {
     noDeterministic: options.noDeterministic,
     noJudge: options.noJudge,
     judgeOptions: { model: config.defaultJudgeModel },
     humanFeedback,
-    cwd,
+    cwd: options.cwd,
   };
 
-  // 2b. Set up response cache
+  // 2. Set up response cache
   const cacheEnabled = config.cache.enabled && !options.bustCache;
-  const cache = cacheEnabled ? new ResponseCache(config.cache) : null;
-  const buildCacheOpts = async (dir: string | undefined): Promise<PhaseCacheOptions | undefined> =>
-    cache ? { cache, skillsHash: await ResponseCache.hashSkillsDir(dir), skipCache: options.skipCache } : undefined;
-  const cacheOpts = await buildCacheOpts(skillsDir);
+  const cacheOpts: PhaseCacheOptions | undefined = cacheEnabled
+    ? { cache: new ResponseCache(config.cache), skipCache: options.skipCache }
+    : undefined;
 
   // 3. Run evaluation phase(s)
   let primaryPhase: PhaseResult;
@@ -478,97 +525,88 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   let blindComparison: BlindComparisonData | undefined;
   let crossIterationComparison: ComparisonResult | undefined;
 
-  let needsCleanup = false;
-  try {
-    if (compareMode && skillsDir) {
-      // --- Comparison mode: two phases ---
-      const rawLabel = options.compareLabel?.trim();
-      const baselineLabel = (rawLabel && rawLabel.length > 0)
-        ? rawLabel
-        : (options.compareSkillPath
-          ? smartLabel(options.compareSkillPath)
-          : 'No Skill');
+  if (compareMode) {
+    // --- Comparison mode: two phases ---
+    const rawLabel = options.compareLabel?.trim();
+    const baselineLabel = (rawLabel && rawLabel.length > 0)
+      ? rawLabel
+      : (options.compareSkillPath
+        ? smartLabel(options.compareSkillPath)
+        : 'No Skill');
 
-      console.log(`\nComparison mode: running each task with skill AND "${baselineLabel}"`);
-      console.log(`Total runs per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)\n`);
+    console.log(`\nComparison mode: running each task with skill AND "${baselineLabel}"`);
+    console.log(`Total runs per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)\n`);
 
-      // Phase 1: With Skill
-      console.log('=== Phase 1/2: With Skill ===');
-      needsCleanup = await setupSkills(skillsDir, config, cwd);
+    // Phase 1: With Skill
+    console.log('=== Phase 1/2: With Skill ===');
+    const withPhase = await runPhase(
+      'With Skill', suiteTasks, config, numRuns, scorerOptions,
+      path.join(logDir, 'with-skill'),
+      { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: 'task', nudgeLevel },
+      cacheOpts,
+    );
 
-      const withPhase = await runPhase(
-        'With Skill', evaluation, config, cwd, skillsDir, numRuns, scorerOptions,
-        path.join(logDir, 'with-skill'), cacheOpts,
-      );
+    // Phase 2: Baseline
+    console.log(`\n=== Phase 2/2: ${baselineLabel} ===`);
 
-      // Clean up between phases
-      if (needsCleanup) {
-        await cleanupLocalSkills(cwd);
-        needsCleanup = false;
-      }
+    // Only skip deterministic for no-skill baseline; version comparison keeps it.
+    // isBaseline tells the judge to use a prompt that doesn't penalize for missing skill.
+    const isNoSkillBaseline = !options.compareSkillPath;
+    const baselineScorerOptions: ScorerOptions = {
+      ...scorerOptions,
+      noDeterministic: isNoSkillBaseline ? true : scorerOptions.noDeterministic,
+      isBaseline: isNoSkillBaseline,
+    };
 
-      // Phase 2: Baseline
-      console.log(`\n=== Phase 2/2: ${baselineLabel} ===`);
-      const baseSkillsDir = options.compareSkillPath;
-      if (baseSkillsDir) {
-        needsCleanup = await setupSkills(baseSkillsDir, config, cwd);
-      }
+    const basePhase = await runPhase(
+      baselineLabel, suiteTasks, config, numRuns, baselineScorerOptions,
+      path.join(logDir, 'baseline'),
+      {
+        workspaceBaseDir: path.join(config.outputDir, 'baseline'),
+        keepWorkspaces,
+        phaseSkills: options.compareSkillPath ? { dir: options.compareSkillPath } : 'none',
+        // Baseline always gets the bare prompt — no nudge.
+        nudgeLevel: 'off',
+      },
+      cacheOpts,
+    );
 
-      // Only skip deterministic for no-skill baseline; version comparison keeps it.
-      // isBaseline tells the judge to use a prompt that doesn't penalize for missing skill.
-      const isNoSkillBaseline = !options.compareSkillPath;
-      const baselineScorerOptions: ScorerOptions = {
-        ...scorerOptions,
-        noDeterministic: isNoSkillBaseline ? true : scorerOptions.noDeterministic,
-        isBaseline: isNoSkillBaseline,
-      };
+    console.log('\n=== Computing Comparison Deltas ===\n');
+    comparison = computeComparison(withPhase, basePhase, baselineLabel, evaluation.tasks, options.compareSkillPath);
 
-      // Recompute skills hash for baseline phase (different skill dir or no skills)
-      const baseCacheOpts = await buildCacheOpts(baseSkillsDir);
-
-      const basePhase = await runPhase(
-        baselineLabel, evaluation, config, cwd, baseSkillsDir, numRuns, baselineScorerOptions,
-        path.join(logDir, 'baseline'), baseCacheOpts,
-      );
-
-      console.log('\n=== Computing Comparison Deltas ===\n');
-      comparison = computeComparison(withPhase, basePhase, baselineLabel, evaluation.tasks, options.compareSkillPath);
-
-      if (options.blindCompare) {
-        console.log('\n=== Running Blind A/B Comparison ===\n');
-        const blindJudge = new SkillJudge({ model: config.defaultJudgeModel });
-        blindComparison = await blindCompareAll(comparison.tasks, blindJudge);
-      }
-
-      primaryPhase = withPhase;
-    } else {
-      // --- Normal mode: single phase ---
-      needsCleanup = await setupSkills(skillsDir, config, cwd);
-      primaryPhase = await runPhase('Evaluation', evaluation, config, cwd, skillsDir, numRuns, scorerOptions, logDir, cacheOpts);
+    if (options.blindCompare) {
+      console.log('\n=== Running Blind A/B Comparison ===\n');
+      const blindJudge = new SkillJudge({ model: config.defaultJudgeModel });
+      blindComparison = await blindCompareAll(comparison.tasks, blindJudge);
     }
 
-    // Compare with previous results if requested (cross-iteration comparison)
-    if (previousReport) {
-      console.log('\n--- Comparing with Previous Results ---\n');
-      if (previousReport.skillName !== evaluation.skillName) {
-        console.warn(`Warning: Skill name mismatch — current: "${evaluation.skillName}", previous: "${previousReport.skillName}"`);
-      }
-      const currentSummary = computeSummary(primaryPhase.results, primaryPhase.scores, numRuns);
-      crossIterationComparison = compareResults(primaryPhase.scores, currentSummary, previousReport);
+    primaryPhase = withPhase;
+  } else {
+    // --- Normal mode: single phase ---
+    primaryPhase = await runPhase(
+      'Evaluation', suiteTasks, config, numRuns, scorerOptions, logDir,
+      { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: 'task', nudgeLevel },
+      cacheOpts,
+    );
+  }
 
-      if (crossIterationComparison.taskDeltas.length === 0 && primaryPhase.scores.length > 0) {
-        console.warn('Warning: No tasks matched between current and previous results. Comparison may not be meaningful.');
-      }
-      if (crossIterationComparison.tasksOnlyInCurrent.length > 0) {
-        console.warn(`Warning: ${crossIterationComparison.tasksOnlyInCurrent.length} task(s) in current results not found in previous: ${crossIterationComparison.tasksOnlyInCurrent.join(', ')}`)
-      }
-      if (crossIterationComparison.tasksOnlyInPrevious.length > 0) {
-        console.warn(`Warning: ${crossIterationComparison.tasksOnlyInPrevious.length} task(s) in previous results not found in current: ${crossIterationComparison.tasksOnlyInPrevious.join(', ')}`);
-      }
+  // Compare with previous results if requested (cross-iteration comparison)
+  if (previousReport) {
+    console.log('\n--- Comparing with Previous Results ---\n');
+    if (previousReport.skillName !== evaluation.skillName) {
+      console.warn(`Warning: Skill name mismatch — current: "${evaluation.skillName}", previous: "${previousReport.skillName}"`);
     }
-  } finally {
-    if (needsCleanup) {
-      await cleanupLocalSkills(cwd);
+    const currentSummary = computeSummary(primaryPhase.results, primaryPhase.scores, numRuns);
+    crossIterationComparison = compareResults(primaryPhase.scores, currentSummary, previousReport);
+
+    if (crossIterationComparison.taskDeltas.length === 0 && primaryPhase.scores.length > 0) {
+      console.warn('Warning: No tasks matched between current and previous results. Comparison may not be meaningful.');
+    }
+    if (crossIterationComparison.tasksOnlyInCurrent.length > 0) {
+      console.warn(`Warning: ${crossIterationComparison.tasksOnlyInCurrent.length} task(s) in current results not found in previous: ${crossIterationComparison.tasksOnlyInCurrent.join(', ')}`)
+    }
+    if (crossIterationComparison.tasksOnlyInPrevious.length > 0) {
+      console.warn(`Warning: ${crossIterationComparison.tasksOnlyInPrevious.length} task(s) in previous results not found in current: ${crossIterationComparison.tasksOnlyInPrevious.join(', ')}`);
     }
   }
 
@@ -581,7 +619,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   const jsonPath = path.join(config.outputDir, `${reportBaseName}.json`);
 
   const metadata: ReportMetadata = {
-    skillPath: options.tasksFile,
+    skillPath: options.tasksPath,
     runnerType: config.runnerType,
     agentModel: config.defaultAgentModel,
     judgeModel: config.defaultJudgeModel,
@@ -635,6 +673,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     reportPath,
     jsonPath,
     markdownSummary,
+    feedbackTemplatePath,
     comparison,
     blindComparison,
     crossIterationComparison,
@@ -743,10 +782,10 @@ function printSummary(report: EvaluationReport): void {
   if (s.numRuns > 1) {
     console.log(`  Runs: ${s.numRuns}`);
   }
-  console.log(`  Discovery: ${(s.discoveryAccuracy * 100).toFixed(0)}%${s.stddev ? ` (\u00B1 ${(s.stddev.discovery * 100).toFixed(1)}%)` : ''}`);
-  console.log(`  Avg Adherence: ${s.avgAdherence.toFixed(2)}/5${s.stddev ? ` (\u00B1 ${s.stddev.adherence.toFixed(2)})` : ''}`);
-  console.log(`  Avg Output Quality: ${s.avgOutputQuality.toFixed(2)}/5${s.stddev ? ` (\u00B1 ${s.stddev.outputQuality.toFixed(2)})` : ''}`);
-  console.log(`  Weighted Score: ${s.avgWeightedScore.toFixed(2)}${s.stddev ? ` (\u00B1 ${s.stddev.weightedScore.toFixed(2)})` : ''}`);
+  console.log(`  Discovery: ${(s.discoveryAccuracy * 100).toFixed(0)}%${s.stddev ? ` (± ${(s.stddev.discovery * 100).toFixed(1)}%)` : ''}`);
+  console.log(`  Avg Adherence: ${s.avgAdherence.toFixed(2)}/5${s.stddev ? ` (± ${s.stddev.adherence.toFixed(2)})` : ''}`);
+  console.log(`  Avg Output Quality: ${s.avgOutputQuality.toFixed(2)}/5${s.stddev ? ` (± ${s.stddev.outputQuality.toFixed(2)})` : ''}`);
+  console.log(`  Weighted Score: ${s.avgWeightedScore.toFixed(2)}${s.stddev ? ` (± ${s.stddev.weightedScore.toFixed(2)})` : ''}`);
   console.log(`  Duration: ${(s.totalDurationMs / 1000).toFixed(1)}s | Cost: $${s.totalCostUsd.toFixed(4)}`);
   if (!report.passed && report.failureReasons.length > 0) {
     console.log(`\n  Failures:`);
@@ -788,4 +827,3 @@ function printBlindComparisonSummary(blind: BlindComparisonData): void {
   }
   console.log('-'.repeat(50));
 }
-

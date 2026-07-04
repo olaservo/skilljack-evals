@@ -3,11 +3,6 @@ import { BaseRunner } from '../runner/base-runner.js';
 import type { EvalTask, TaskResult } from '../types.js';
 import type { SessionLogger } from '../session/session-logger.js';
 
-// Mock fixture-runner at module level
-vi.mock('../runner/fixture-runner.js', () => ({
-  runFixtureScript: vi.fn(),
-}));
-
 // Mock config loader to avoid file system reads
 vi.mock('../config.js', () => ({
   loadConfigSync: vi.fn(() => ({
@@ -16,10 +11,6 @@ vi.mock('../config.js', () => ({
     allowedWriteDirs: [],
   })),
 }));
-
-import { runFixtureScript } from '../runner/fixture-runner.js';
-
-const mockRunFixtureScript = runFixtureScript as ReturnType<typeof vi.fn>;
 
 /**
  * Concrete subclass of BaseRunner for testing.
@@ -64,7 +55,7 @@ function makeResult(taskId: string = 'test-1'): TaskResult {
   };
 }
 
-describe('BaseRunner fixture integration', () => {
+describe('BaseRunner runTaskWithTimeout', () => {
   let runner: TestableBaseRunner;
 
   beforeEach(() => {
@@ -73,159 +64,49 @@ describe('BaseRunner fixture integration', () => {
     runner.mockRunTask.mockResolvedValue(makeResult());
   });
 
-  it('runs task normally when no fixture is defined', async () => {
+  it('returns the task result on success', async () => {
     const task = makeTask();
     const result = await runner.runTaskWithTimeout(task);
 
-    expect(mockRunFixtureScript).not.toHaveBeenCalled();
     expect(runner.mockRunTask).toHaveBeenCalledWith(task, undefined);
     expect(result.isError).toBe(false);
-  });
-
-  it('runs setup before runTask when fixture.setup is defined', async () => {
-    mockRunFixtureScript.mockResolvedValue({ success: true, stdout: '', stderr: '' });
-
-    const callOrder: string[] = [];
-    mockRunFixtureScript.mockImplementation(async () => {
-      callOrder.push('setup');
-      return { success: true, stdout: '', stderr: '' };
-    });
-    runner.mockRunTask.mockImplementation(async () => {
-      callOrder.push('runTask');
-      return makeResult();
-    });
-
-    const task = makeTask({ fixture: { state: 'default', setup: 'scripts/setup.sh' } });
-    await runner.runTaskWithTimeout(task);
-
-    expect(callOrder).toEqual(['setup', 'runTask']);
-    expect(mockRunFixtureScript).toHaveBeenCalledWith('scripts/setup.sh', '/app');
-  });
-
-  it('runs teardown after runTask when fixture.teardown is defined', async () => {
-    const callOrder: string[] = [];
-    mockRunFixtureScript.mockImplementation(async () => {
-      callOrder.push('teardown');
-      return { success: true, stdout: '', stderr: '' };
-    });
-    runner.mockRunTask.mockImplementation(async () => {
-      callOrder.push('runTask');
-      return makeResult();
-    });
-
-    const task = makeTask({ fixture: { state: 'default', teardown: 'scripts/teardown.sh' } });
-    await runner.runTaskWithTimeout(task);
-
-    expect(callOrder).toEqual(['runTask', 'teardown']);
-    expect(mockRunFixtureScript).toHaveBeenCalledWith('scripts/teardown.sh', '/app');
-  });
-
-  it('runs setup, then runTask, then teardown in order', async () => {
-    const callOrder: string[] = [];
-    mockRunFixtureScript.mockImplementation(async (scriptPath: string) => {
-      callOrder.push(scriptPath.includes('setup') ? 'setup' : 'teardown');
-      return { success: true, stdout: '', stderr: '' };
-    });
-    runner.mockRunTask.mockImplementation(async () => {
-      callOrder.push('runTask');
-      return makeResult();
-    });
-
-    const task = makeTask({
-      fixture: { state: 'default', setup: 'scripts/setup.sh', teardown: 'scripts/teardown.sh' },
-    });
-    await runner.runTaskWithTimeout(task);
-
-    expect(callOrder).toEqual(['setup', 'runTask', 'teardown']);
-  });
-
-  it('skips task and returns error when setup fails', async () => {
-    mockRunFixtureScript.mockResolvedValue({
-      success: false,
-      stdout: '',
-      stderr: 'permission denied',
-      errorMessage: 'Script not found: /app/scripts/setup.sh',
-    });
-
-    const task = makeTask({
-      fixture: { state: 'default', setup: 'scripts/setup.sh' },
-    });
-    const result = await runner.runTaskWithTimeout(task);
-
-    expect(runner.mockRunTask).not.toHaveBeenCalled();
-    expect(result.isError).toBe(true);
-    expect(result.errorMessage).toMatch(/^Fixture setup failed:/);
-    expect(result.errorMessage).toContain('Script not found');
-  });
-
-  it('still runs teardown when setup fails', async () => {
-    let teardownCalled = false;
-    mockRunFixtureScript.mockImplementation(async (scriptPath: string) => {
-      if (scriptPath.includes('teardown')) {
-        teardownCalled = true;
-        return { success: true, stdout: '', stderr: '' };
-      }
-      return { success: false, stdout: '', stderr: '', errorMessage: 'setup failed' };
-    });
-
-    const task = makeTask({
-      fixture: { state: 'default', setup: 'scripts/setup.sh', teardown: 'scripts/teardown.sh' },
-    });
-    await runner.runTaskWithTimeout(task);
-
-    expect(teardownCalled).toBe(true);
-  });
-
-  it('does not fail the task when teardown fails', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    mockRunFixtureScript.mockImplementation(async (scriptPath: string) => {
-      if (scriptPath.includes('teardown')) {
-        return { success: false, stdout: '', stderr: '', errorMessage: 'cleanup error' };
-      }
-      return { success: true, stdout: '', stderr: '' };
-    });
-
-    const task = makeTask({
-      fixture: { state: 'default', setup: 'scripts/setup.sh', teardown: 'scripts/teardown.sh' },
-    });
-    const result = await runner.runTaskWithTimeout(task);
-
-    expect(result.isError).toBe(false);
     expect(result.output).toBe('Some output');
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Fixture teardown failed'),
-    );
-
-    warnSpy.mockRestore();
   });
 
-  it('runs teardown even when runTask throws', async () => {
-    let teardownCalled = false;
-    mockRunFixtureScript.mockImplementation(async (scriptPath: string) => {
-      if (scriptPath.includes('teardown')) {
-        teardownCalled = true;
-      }
-      return { success: true, stdout: '', stderr: '' };
-    });
+  it('returns an error result when runTask throws', async () => {
     runner.mockRunTask.mockRejectedValue(new Error('agent crashed'));
 
-    const task = makeTask({
-      fixture: { state: 'default', setup: 'scripts/setup.sh', teardown: 'scripts/teardown.sh' },
-    });
-    const result = await runner.runTaskWithTimeout(task);
+    const result = await runner.runTaskWithTimeout(makeTask());
 
-    expect(teardownCalled).toBe(true);
     expect(result.isError).toBe(true);
     expect(result.errorMessage).toBe('agent crashed');
   });
 
-  it('does not call runFixtureScript when fixture exists but has no setup or teardown', async () => {
-    const task = makeTask({ fixture: { state: 'default' } });
-    await runner.runTaskWithTimeout(task);
+  it('times out a hanging task with the explicit timeout argument', async () => {
+    runner.mockRunTask.mockImplementation(() => new Promise(() => {}));
 
-    expect(mockRunFixtureScript).not.toHaveBeenCalled();
-    expect(runner.mockRunTask).toHaveBeenCalled();
+    const result = await runner.runTaskWithTimeout(makeTask(), 20);
+
+    expect(result.isError).toBe(true);
+    expect(result.errorMessage).toContain('timed out after 20ms');
+  });
+
+  it('uses the per-task timeoutMs override when no explicit timeout given', async () => {
+    runner.mockRunTask.mockImplementation(() => new Promise(() => {}));
+
+    const result = await runner.runTaskWithTimeout(makeTask({ timeoutMs: 25 }));
+
+    expect(result.isError).toBe(true);
+    expect(result.errorMessage).toContain('timed out after 25ms');
+  });
+
+  it('prefers the explicit timeout argument over task.timeoutMs', async () => {
+    runner.mockRunTask.mockImplementation(() => new Promise(() => {}));
+
+    const result = await runner.runTaskWithTimeout(makeTask({ timeoutMs: 60000 }), 15);
+
+    expect(result.isError).toBe(true);
+    expect(result.errorMessage).toContain('timed out after 15ms');
   });
 
   it('buildTaskResult threads tokens onto the TaskResult', () => {
@@ -254,29 +135,5 @@ describe('BaseRunner fixture integration', () => {
       toolCalls: [],
     });
     expect(result.tokens).toBeUndefined();
-  });
-
-  it('handles teardown throwing an unexpected error without masking the task result', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    mockRunFixtureScript.mockImplementation(async (scriptPath: string) => {
-      if (scriptPath.includes('teardown')) {
-        throw new Error('unexpected teardown crash');
-      }
-      return { success: true, stdout: '', stderr: '' };
-    });
-
-    const task = makeTask({
-      fixture: { state: 'default', setup: 'scripts/setup.sh', teardown: 'scripts/teardown.sh' },
-    });
-    const result = await runner.runTaskWithTimeout(task);
-
-    expect(result.isError).toBe(false);
-    expect(result.output).toBe('Some output');
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Fixture teardown threw'),
-    );
-
-    warnSpy.mockRestore();
   });
 });

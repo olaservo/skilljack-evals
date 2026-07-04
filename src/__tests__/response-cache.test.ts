@@ -37,7 +37,7 @@ function makeKeyParams(overrides: Partial<CacheKeyParams> = {}): CacheKeyParams 
     model: 'sonnet',
     runnerType: 'claude-sdk',
     skillsHash: 'abc123',
-    fixturesHash: 'no-fixture',
+    environmentHash: 'no-environment',
     taskTimeoutMs: 300000,
     allowedWriteDirs: ['./results/', './fixtures/'],
     ...overrides,
@@ -85,9 +85,9 @@ describe('ResponseCache.computeCacheKey', () => {
     expect(key1).not.toBe(key2);
   });
 
-  it('produces different hashes when fixtures hash changes', () => {
-    const key1 = ResponseCache.computeCacheKey(makeKeyParams({ fixturesHash: 'fx-a' }));
-    const key2 = ResponseCache.computeCacheKey(makeKeyParams({ fixturesHash: 'fx-b' }));
+  it('produces different hashes when environment hash changes', () => {
+    const key1 = ResponseCache.computeCacheKey(makeKeyParams({ environmentHash: 'env-a' }));
+    const key2 = ResponseCache.computeCacheKey(makeKeyParams({ environmentHash: 'env-b' }));
     expect(key1).not.toBe(key2);
   });
 
@@ -195,16 +195,16 @@ describe('isTaskCacheable', () => {
     };
   }
 
-  it('caches a plain task with no fixture or file checks', () => {
+  it('caches a plain task with no verifier, seed, or file checks', () => {
     expect(isTaskCacheable(makeTask())).toBe(true);
   });
 
-  it('does not cache tasks with a fixture', () => {
-    expect(isTaskCacheable(makeTask({ fixture: { state: 'dirty', setup: 'setup.sh' } }))).toBe(false);
+  it('does not cache tasks with a verifier', () => {
+    expect(isTaskCacheable(makeTask(), { hasVerifier: true })).toBe(false);
   });
 
-  it('does not cache tasks with fixture.state only (still fs-stateful by author claim)', () => {
-    expect(isTaskCacheable(makeTask({ fixture: { state: 'clean' } }))).toBe(false);
+  it('does not cache tasks with a workspace seed', () => {
+    expect(isTaskCacheable(makeTask(), { hasWorkspaceSeed: true })).toBe(false);
   });
 
   it('does not cache tasks with expectFileExists assertions', () => {
@@ -226,7 +226,7 @@ describe('isTaskCacheable', () => {
   });
 });
 
-describe('ResponseCache.hashFixtures', () => {
+describe('ResponseCache.hashEnvironment', () => {
   const tmpDirs: string[] = [];
 
   afterEach(async () => {
@@ -236,70 +236,45 @@ describe('ResponseCache.hashFixtures', () => {
     tmpDirs.length = 0;
   });
 
-  it('returns sentinel when fixture is undefined', async () => {
-    expect(await ResponseCache.hashFixtures(undefined, process.cwd())).toBe('no-fixture');
+  it('returns sentinel when seed dir is undefined', async () => {
+    expect(await ResponseCache.hashEnvironment(undefined)).toBe('no-environment');
   });
 
-  it('returns sentinel when fixture has only a state marker (no scripts)', async () => {
-    expect(await ResponseCache.hashFixtures({ state: 'clean' }, process.cwd())).toBe('no-fixture');
+  it('returns sentinel for a nonexistent seed dir', async () => {
+    expect(await ResponseCache.hashEnvironment('/nonexistent/seed')).toBe('no-environment');
   });
 
-  it('produces a stable hash for the same script contents', async () => {
+  it('returns sentinel for an empty seed dir', async () => {
     const dir = makeTmpDir();
     tmpDirs.push(dir);
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(path.join(dir, 'setup.sh'), '#!/bin/sh\necho hi');
+    expect(await ResponseCache.hashEnvironment(dir)).toBe('no-environment');
+  });
 
-    const h1 = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
-    const h2 = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
+  it('produces a stable hash for the same seed contents', async () => {
+    const dir = makeTmpDir();
+    tmpDirs.push(dir);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'data.csv'), 'a,b\n1,2');
+
+    const h1 = await ResponseCache.hashEnvironment(dir);
+    const h2 = await ResponseCache.hashEnvironment(dir);
     expect(h1).toBe(h2);
     expect(h1).toHaveLength(64);
   });
 
-  it('changes hash when setup script contents change', async () => {
+  it('changes hash when seed contents change', async () => {
     const dir = makeTmpDir();
     tmpDirs.push(dir);
     await fs.mkdir(dir, { recursive: true });
 
-    await fs.writeFile(path.join(dir, 'setup.sh'), 'v1');
-    const h1 = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
+    await fs.writeFile(path.join(dir, 'data.csv'), 'v1');
+    const h1 = await ResponseCache.hashEnvironment(dir);
 
-    await fs.writeFile(path.join(dir, 'setup.sh'), 'v2');
-    const h2 = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
+    await fs.writeFile(path.join(dir, 'data.csv'), 'v2');
+    const h2 = await ResponseCache.hashEnvironment(dir);
 
     expect(h1).not.toBe(h2);
-  });
-
-  it('changes hash when teardown script contents change', async () => {
-    const dir = makeTmpDir();
-    tmpDirs.push(dir);
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(path.join(dir, 'setup.sh'), 'setup');
-
-    await fs.writeFile(path.join(dir, 'teardown.sh'), 't1');
-    const h1 = await ResponseCache.hashFixtures(
-      { state: 's', setup: 'setup.sh', teardown: 'teardown.sh' }, dir,
-    );
-
-    await fs.writeFile(path.join(dir, 'teardown.sh'), 't2');
-    const h2 = await ResponseCache.hashFixtures(
-      { state: 's', setup: 'setup.sh', teardown: 'teardown.sh' }, dir,
-    );
-
-    expect(h1).not.toBe(h2);
-  });
-
-  it('distinguishes between a missing script and a present one', async () => {
-    const dir = makeTmpDir();
-    tmpDirs.push(dir);
-    await fs.mkdir(dir, { recursive: true });
-
-    const hMissing = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
-
-    await fs.writeFile(path.join(dir, 'setup.sh'), 'content');
-    const hPresent = await ResponseCache.hashFixtures({ state: 's', setup: 'setup.sh' }, dir);
-
-    expect(hMissing).not.toBe(hPresent);
   });
 });
 

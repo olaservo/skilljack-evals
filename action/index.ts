@@ -53,31 +53,6 @@ async function run(): Promise<void> {
       core.setSecret(anthropicKey);
     }
 
-    const openaiKey = core.getInput('openai-api-key') || process.env.OPENAI_API_KEY;
-    if (openaiKey) {
-      process.env.OPENAI_API_KEY = openaiKey;
-      core.setSecret(openaiKey);
-    }
-
-    const googleKey = core.getInput('google-api-key') || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (googleKey) {
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY = googleKey;
-      core.setSecret(googleKey);
-    }
-
-    const openrouterKey = core.getInput('openrouter-api-key') || process.env.OPENROUTER_API_KEY;
-    if (openrouterKey) {
-      process.env.OPENROUTER_API_KEY = openrouterKey;
-      core.setSecret(openrouterKey);
-    }
-
-    const githubTokenInput = core.getInput('github-token');
-    if (githubTokenInput) {
-      // Only set COPILOT_GITHUB_TOKEN from explicit github-token input, not
-      // the generic GITHUB_TOKEN which typically lacks Copilot permissions
-      process.env.COPILOT_GITHUB_TOKEN = githubTokenInput;
-    }
-
     // Build config overrides
     const configOverrides: Partial<EvalConfig> = {
       runnerType: runner,
@@ -92,7 +67,7 @@ async function run(): Promise<void> {
 
     // Run pipeline
     const result = await runPipeline({
-      tasksFile: tasks,
+      tasksPath: tasks,
       configPath,
       configOverrides,
       cwd,

@@ -15,7 +15,9 @@ export type {
   SkillEvaluation,
   DeterministicCheck,
   DeterministicResult,
-  FixtureConfig,
+  TaskDifficulty,
+  VerifierOutcome,
+  VerifierStatus,
   ToolCallRecord,
   TaskResult,
   TokenUsage,
@@ -51,16 +53,34 @@ export type {
 export { loadConfig, loadConfigSync, DEFAULT_CONFIG, VALID_RUNNER_TYPES } from './config.js';
 export type { EvalConfig, RunnerType } from './config.js';
 
-// Parser
-export { parseEvalFile, createEvalTemplate, validateEvalFile } from './parser.js';
+// Task packages
+export { loadTaskPackages, validateTaskPackages } from './task/load.js';
+export type { LoadedSuite, LoadedTask, LoadTaskOptions, TaskValidationResult } from './task/load.js';
+export type { TaskFrontmatter, TaskChecks, VerifierFrontmatter } from './task/schema.js';
+export { scaffoldTaskPackage } from './task/scaffold.js';
+
+// Workspaces
+export { createTrialWorkspace, applyCleanupPolicy, copyDir, DEFAULT_SKILLS_MOUNT_PATH } from './run/workspace.js';
+export type { TrialWorkspace, CreateTrialWorkspaceOptions, WorkspaceCleanupPolicy } from './run/workspace.js';
+
+// Verifier
+export { runVerifier, executeVerifier, resolveInterpreter, DEFAULT_VERIFIER_TIMEOUT_MS } from './score/verifier.js';
+export type { RunVerifierOptions, ExecuteVerifierOptions, InterpreterResolution, VerifierInvocation } from './score/verifier.js';
 
 // Runner
 export { ClaudeSdkRunner } from './runner/claude-sdk-runner.js';
-export { CopilotSdkRunner } from './runner/copilot-sdk-runner.js';
+export { ClaudeCodeRunner, CLAUDE_CLI_INSTALL_HINT } from './runner/claude-code-runner.js';
 export type { AgentRunner, AgentRunnerOptions } from './runner/agent-runner.js';
 export { createRunner } from './runner/runner-factory.js';
-export { setupLocalSkills, cleanupLocalSkills } from './runner/skill-setup.js';
 export { createToolPolicy, createPreToolUseHook } from './runner/security.js';
+
+// Harness subprocess utilities
+export { runCliJsonl, detectCli, killProcessTree } from './harness/subprocess.js';
+export type { RunCliJsonlOptions, CliJsonlResult, CliDetection } from './harness/subprocess.js';
+
+// Skill nudge
+export { buildNudge, buildNudgeForSkillsDir, NUDGE_LEVELS } from './run/nudge.js';
+export type { NudgeLevel, NudgeSkill } from './run/nudge.js';
 
 // Scorer
 export { scoreTask, scoreAll } from './scorer/scorer.js';
@@ -90,5 +110,5 @@ export { runPipeline, scorePipeline } from './pipeline.js';
 export type { PipelineOptions, PipelineResult } from './pipeline.js';
 
 // Cache
-export { ResponseCache } from './cache/response-cache.js';
-export type { CacheConfig, CacheEntry, CacheKeyParams, CacheKeyInputs } from './cache/response-cache.js';
+export { ResponseCache, isTaskCacheable } from './cache/response-cache.js';
+export type { CacheConfig, CacheEntry, CacheKeyParams, CacheKeyInputs, TaskCacheabilityContext } from './cache/response-cache.js';

@@ -16,10 +16,12 @@ import * as yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DEFAULT_RUNNER_CONCURRENCY } from './utils/concurrency.js';
+import { NUDGE_LEVELS } from './run/nudge.js';
+import type { NudgeLevel } from './run/nudge.js';
 
-export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents' | 'copilot-sdk' | 'google-adk';
+export type RunnerType = 'claude-sdk' | 'claude-code';
 
-export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'vercel-ai', 'openai-agents', 'copilot-sdk', 'google-adk'];
+export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'claude-code'];
 
 export interface EvalConfig {
   // Runner
@@ -45,6 +47,9 @@ export interface EvalConfig {
 
   // Concurrency
   concurrency: number;
+
+  // Skill nudge appended to with-skill prompts (baseline always gets 'off')
+  nudge: NudgeLevel;
 
   // CI/CD behavior
   exitOnFailure: boolean;
@@ -83,6 +88,7 @@ export const DEFAULT_CONFIG: EvalConfig = {
   reportOutputTruncation: 2000,
   taskTimeoutMs: 300000, // 5 minutes
   concurrency: DEFAULT_RUNNER_CONCURRENCY, // sequential by default
+  nudge: 'off',
   exitOnFailure: true,
   outputDir: './results',
   githubSummary: false,
@@ -122,6 +128,7 @@ interface RawConfigFile {
     concurrency?: number;
     allowed_write_dirs?: string[];
   };
+  nudge?: string;
   output?: {
     dir?: string;
     judge_truncation?: number;
@@ -181,6 +188,13 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
     }
     if (raw.runner?.allowed_write_dirs) config.allowedWriteDirs = raw.runner.allowed_write_dirs;
 
+    if (raw.nudge !== undefined) {
+      if (!NUDGE_LEVELS.includes(raw.nudge as NudgeLevel)) {
+        throw new Error(`Invalid nudge "${raw.nudge}" in config file. Valid: ${NUDGE_LEVELS.join(', ')}`);
+      }
+      config.nudge = raw.nudge as NudgeLevel;
+    }
+
     if (raw.output?.dir) config.outputDir = raw.output.dir;
     if (raw.output?.judge_truncation !== undefined) config.judgeOutputTruncation = raw.output.judge_truncation;
     if (raw.output?.report_truncation !== undefined) config.reportOutputTruncation = raw.output.report_truncation;
@@ -218,6 +232,7 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
  * - EVAL_REPORT_TRUNCATION: Max chars in reports (default: 2000)
  * - EVAL_TASK_TIMEOUT_MS: Per-task timeout in ms (default: 300000)
  * - EVAL_RUNNER_CONCURRENCY: Max concurrent tasks (default: 1, 0=unlimited)
+ * - EVAL_NUDGE: Skill nudge level off|name|description|full (default: 'off')
  * - EVAL_EXIT_ON_FAILURE: Exit with code 1 on failures (default: true)
  * - EVAL_OUTPUT_DIR: Directory for results (default: './results')
  * - EVAL_DISCOVERY_THRESHOLD: Min discovery rate 0-1 (default: 0.8)
@@ -256,6 +271,13 @@ function loadEnvConfig(): Partial<EvalConfig> {
       throw new Error(`Invalid EVAL_RUNNER_CONCURRENCY "${concurrencyRaw}". Must be a non-negative integer.`);
     }
     config.concurrency = concurrency;
+  }
+
+  if (process.env.EVAL_NUDGE) {
+    if (!NUDGE_LEVELS.includes(process.env.EVAL_NUDGE as NudgeLevel)) {
+      throw new Error(`Invalid EVAL_NUDGE "${process.env.EVAL_NUDGE}". Valid: ${NUDGE_LEVELS.join(', ')}`);
+    }
+    config.nudge = process.env.EVAL_NUDGE as NudgeLevel;
   }
 
   if (process.env.EVAL_EXIT_ON_FAILURE !== undefined) {

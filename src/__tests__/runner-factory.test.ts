@@ -9,24 +9,6 @@ describe('createRunner', () => {
     expect(runner.providerName).toBe('claude-sdk');
   });
 
-  it('creates a vercel-ai runner', async () => {
-    const runner = await createRunner('vercel-ai', {});
-    expect(runner).toBeDefined();
-    expect(runner.providerName).toBe('vercel-ai');
-  });
-
-  it('creates an openai-agents runner', async () => {
-    const runner = await createRunner('openai-agents', {});
-    expect(runner).toBeDefined();
-    expect(runner.providerName).toBe('openai-agents');
-  });
-
-  it('creates a copilot-sdk runner', async () => {
-    const runner = await createRunner('copilot-sdk', {});
-    expect(runner).toBeDefined();
-    expect(runner.providerName).toBe('copilot-sdk');
-  });
-
   it('throws for unknown runner type', async () => {
     await expect(
       createRunner('invalid-runner' as RunnerType, {}),

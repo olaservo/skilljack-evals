@@ -48,7 +48,7 @@ export interface AgentRunnerOptions {
  * 3. Handling skill discovery via the framework's native mechanism
  */
 export interface AgentRunner {
-  /** Human-readable provider name (e.g., 'claude-sdk', 'vercel-ai', 'openai-agents', 'copilot-sdk') */
+  /** Human-readable provider name (e.g., 'claude-sdk') */
   readonly providerName: string;
 
   /** Run a single task and produce a TaskResult */

@@ -34,6 +34,16 @@ export function parseFrontmatter(content: string): { name?: string; description?
 }
 
 /**
+ * Extract the raw YAML frontmatter block (between the --- fences) from a
+ * markdown file, or null when the file has no frontmatter. Callers that need
+ * structured (non-flat) frontmatter can parse the returned block with js-yaml.
+ */
+export function extractFrontmatterBlock(content: string): string | null {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  return match?.[1] ?? null;
+}
+
+/**
  * Strip YAML frontmatter from a SKILL.md file, returning the body content.
  */
 export function stripFrontmatter(content: string): string {

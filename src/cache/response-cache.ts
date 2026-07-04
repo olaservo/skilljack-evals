@@ -9,17 +9,24 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { EvalTask, FixtureConfig, TaskResult } from '../types.js';
-import type { RunnerType } from '../config.js';
+import type { EvalTask, TaskResult } from '../types.js';
+
+export interface TaskCacheabilityContext {
+  /** True when the task package has a verifier script or command. */
+  hasVerifier?: boolean;
+  /** True when the task package has an environment/workspace/ seed dir. */
+  hasWorkspaceSeed?: boolean;
+}
 
 /**
- * Tasks whose outcome depends on filesystem state (fixtures or file-exists
- * assertions) can't be safely cached: a cached TaskResult doesn't represent
- * the current filesystem, so replaying it alongside fresh deterministic
- * scoring would produce wrong scores.
+ * Tasks whose outcome depends on filesystem state (verifiers, workspace seeds,
+ * or file-exists assertions) can't be safely cached: a cached TaskResult
+ * doesn't represent the current filesystem, so replaying it alongside fresh
+ * deterministic scoring would produce wrong scores.
  */
-export function isTaskCacheable(task: EvalTask): boolean {
-  if (task.fixture) return false;
+export function isTaskCacheable(task: EvalTask, context: TaskCacheabilityContext = {}): boolean {
+  if (context.hasVerifier) return false;
+  if (context.hasWorkspaceSeed) return false;
   if (task.deterministic?.expectFileExists && task.deterministic.expectFileExists.length > 0) {
     return false;
   }
@@ -36,10 +43,10 @@ export interface CacheKeyParams {
   taskId: string;
   prompt: string;
   model: string;
-  runnerType: RunnerType;
+  runnerType: string;
   skillsHash: string;
-  /** Hash of fixture setup/teardown script contents. 'no-fixture' when task has no fixture. */
-  fixturesHash: string;
+  /** Hash of the task's environment/workspace/ seed contents. 'no-environment' when absent. */
+  environmentHash: string;
   taskTimeoutMs: number;
   allowedWriteDirs: string[];
   runIndex?: number;
@@ -155,7 +162,7 @@ export class ResponseCache {
       model: params.model,
       runnerType: params.runnerType,
       skillsHash: params.skillsHash,
-      fixturesHash: params.fixturesHash,
+      environmentHash: params.environmentHash,
       taskTimeoutMs: params.taskTimeoutMs,
       allowedWriteDirs: [...params.allowedWriteDirs].sort(),
     };
@@ -167,34 +174,13 @@ export class ResponseCache {
   }
 
   /**
-   * Compute a content hash of a task's fixture setup/teardown scripts.
-   *
-   * Script paths are resolved relative to `cwd` (same resolution the runner uses).
-   * Missing files produce a stable "missing" marker so cache behavior is deterministic.
-   * Returns 'no-fixture' when the task has no fixture.
+   * Compute a content hash of a task's environment/workspace/ seed directory.
+   * Returns 'no-environment' when the task has no seed dir.
    */
-  static async hashFixtures(
-    fixture: FixtureConfig | undefined,
-    cwd: string,
-  ): Promise<string> {
-    if (!fixture?.setup && !fixture?.teardown) return 'no-fixture';
-
-    const hash = crypto.createHash('sha256');
-    for (const [label, scriptPath] of [['setup', fixture.setup], ['teardown', fixture.teardown]] as const) {
-      if (!scriptPath) continue;
-      hash.update(label);
-      hash.update('\0');
-      hash.update(scriptPath);
-      hash.update('\0');
-      try {
-        const content = await fs.readFile(path.resolve(cwd, scriptPath));
-        hash.update(content);
-      } catch {
-        hash.update('<missing>');
-      }
-      hash.update('\0');
-    }
-    return hash.digest('hex');
+  static async hashEnvironment(seedDir: string | undefined): Promise<string> {
+    if (!seedDir) return 'no-environment';
+    const hash = await ResponseCache.hashSkillsDir(seedDir);
+    return hash === 'no-skills' ? 'no-environment' : hash;
   }
 
   /**

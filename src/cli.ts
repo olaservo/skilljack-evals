@@ -3,15 +3,19 @@
 /**
  * CLI for skill evaluation framework.
  *
- * Primary command: `skilljack-evals run` — runs the full evaluation pipeline.
- * Also supports: score, report, create-eval, validate.
+ * Primary command: `skilljack-evals run` — runs the full evaluation pipeline
+ * against a task package (or suite of task packages).
+ * Also supports: score, report, create-task, validate, cache.
  */
 
 import 'dotenv/config';
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
-import { parseEvalFile, createEvalTemplate, validateEvalFile } from './parser.js';
+import { validateTaskPackages } from './task/load.js';
+import type { LoadedTask } from './task/load.js';
+import { scaffoldTaskPackage } from './task/scaffold.js';
 import { runPipeline, scorePipeline } from './pipeline.js';
 import { generateReport, generateJsonResults } from './report/report.js';
 import { generateHtmlReport } from './report/html-report.js';
@@ -20,6 +24,11 @@ import { validateFeedback } from './feedback.js';
 import { VALID_RUNNER_TYPES, loadConfig } from './config.js';
 import type { EvalConfig, RunnerType } from './config.js';
 import { ResponseCache } from './cache/response-cache.js';
+import { createTrialWorkspace } from './run/workspace.js';
+import type { WorkspaceCleanupPolicy } from './run/workspace.js';
+import { NUDGE_LEVELS } from './run/nudge.js';
+import type { NudgeLevel } from './run/nudge.js';
+import { executeVerifier } from './score/verifier.js';
 
 const program = new Command();
 
@@ -35,22 +44,24 @@ program
 program
   .command('run')
   .description('Run the full evaluation pipeline: execute tasks → score → report')
-  .argument('<tasks>', 'Path to tasks YAML file')
-  .option('--runner <type>', 'Runner type: claude-sdk, vercel-ai, openai-agents, copilot-sdk, google-adk (default: claude-sdk)')
+  .argument('<path>', 'Path to a task-package dir or suite dir of task packages')
+  .option('--runner <type>', 'Runner type: claude-sdk | claude-code (default: claude-sdk)')
   .option('--model <model>', 'Agent model (default: sonnet)')
   .option('--judge-model <model>', 'Judge model (default: haiku)')
   .option('--config <path>', 'Path to eval.config.yaml')
   .option('--output-dir <dir>', 'Output directory for results')
   .option('--timeout <ms>', 'Per-task timeout in milliseconds')
   .option('--tasks <ids>', 'Comma-separated task IDs to run')
-  .option('--skills-dir <path>', 'Path to skills directory for local setup')
-  .option('--cwd <path>', 'Working directory for agent execution')
+  .option('--skills-dir <path>', 'Skills directory override applied to all tasks')
+  .option('--cwd <path>', 'Fallback working directory (trial workspaces take precedence)')
   .option('--threshold-discovery <rate>', 'Min discovery rate (0-1)')
   .option('--threshold-score <score>', 'Min avg score (1-5)')
   .option('--no-judge', 'Skip LLM judge scoring (deterministic only)')
   .option('--no-deterministic', 'Skip deterministic scoring (LLM judge only)')
   .option('--concurrency <number>', 'Max concurrent tasks (1=sequential, 0=unlimited)')
   .option('--runs <number>', 'Number of times to run each task (default: 3)')
+  .option('--nudge <level>', 'Skill nudge appended to with-skill prompts: off|name|description|full (default: off)')
+  .option('--keep-workspaces <policy>', 'Workspace retention: all|failures|none (default: failures)')
   .option('--generate-feedback <path>', 'Generate feedback template JSON with task IDs after run')
   .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
   .option('--github-summary', 'Write GitHub Actions step summary')
@@ -64,7 +75,7 @@ program
   .option('--blind-compare', 'Run blind A/B comparison alongside --compare')
   .option('--skip-cache', 'Skip cached results and re-execute all tasks (cache writes still occur)')
   .option('--bust-cache', 'Disable caching entirely (skip both reads and writes)')
-  .action(async (tasksFile: string, options: {
+  .action(async (tasksPath: string, options: {
     runner?: string;
     model?: string;
     judgeModel?: string;
@@ -80,6 +91,8 @@ program
     deterministic?: boolean;
     concurrency?: string;
     runs?: string;
+    nudge?: string;
+    keepWorkspaces?: string;
     generateFeedback?: string;
     feedback?: string;
     githubSummary?: boolean;
@@ -96,6 +109,16 @@ program
     try {
       if (options.runner && !VALID_RUNNER_TYPES.includes(options.runner as RunnerType)) {
         console.error(`Error: Invalid runner "${options.runner}". Valid options: ${VALID_RUNNER_TYPES.join(', ')}`);
+        process.exit(1);
+      }
+
+      if (options.keepWorkspaces && !['all', 'failures', 'none'].includes(options.keepWorkspaces)) {
+        console.error('Error: --keep-workspaces must be one of: all, failures, none');
+        process.exit(1);
+      }
+
+      if (options.nudge && !NUDGE_LEVELS.includes(options.nudge as NudgeLevel)) {
+        console.error(`Error: --nudge must be one of: ${NUDGE_LEVELS.join(', ')}`);
         process.exit(1);
       }
 
@@ -119,7 +142,7 @@ program
       }
 
       const result = await runPipeline({
-        tasksFile,
+        tasksPath,
         configPath: options.config,
         configOverrides,
         cwd: options.cwd,
@@ -128,6 +151,8 @@ program
         noJudge: options.judge === false,
         noDeterministic: options.deterministic === false,
         numRuns: options.runs ? parseInt(options.runs, 10) : undefined,
+        nudge: options.nudge as NudgeLevel | undefined,
+        keepWorkspaces: options.keepWorkspaces as WorkspaceCleanupPolicy | undefined,
         generateFeedbackPath: options.generateFeedback,
         feedbackPath: options.feedback,
         compareResultsPath: options.compareResults,
@@ -254,58 +279,155 @@ program
   });
 
 // ============================================
-// Create eval template
+// Create task package
 // ============================================
 
 program
-  .command('create-eval')
-  .description('Create an evaluation template for a skill')
-  .argument('<skill_name>', 'Name of the skill')
-  .option('-o, --output <path>', 'Output path for template')
-  .option('-n, --num-tasks <number>', 'Total number of tasks to generate (includes 1 false-positive)', '10')
-  .action(async (skillName: string, options: {
-    output?: string;
-    numTasks: string;
-  }) => {
-    const outputPath = options.output || path.join(process.cwd(), 'evals', skillName, 'tasks.yaml');
-    const numTasks = parseInt(options.numTasks, 10);
-    if (isNaN(numTasks) || numTasks < 1) {
-      console.error('Error: --num-tasks must be a positive integer');
+  .command('create-task')
+  .description('Scaffold a new task package (task.md, verifier, oracle, skills dir)')
+  .argument('<id>', 'Task id — becomes the package directory name')
+  .option('-o, --output <dir>', 'Parent directory for the task package (default: ./evals)')
+  .action(async (id: string, options: { output?: string }) => {
+    try {
+      const baseDir = options.output || path.join(process.cwd(), 'evals');
+      const { taskDir, files } = await scaffoldTaskPackage(id, baseDir);
+
+      console.log(`Created task package: ${taskDir}`);
+      for (const file of files) {
+        console.log(`  ${path.relative(process.cwd(), file)}`);
+      }
+      console.log();
+      console.log('Next steps:');
+      console.log(`1. Edit ${path.join(taskDir, 'task.md')} — write the prompt and checks`);
+      console.log(`2. Add the skill under ${path.join(taskDir, 'environment', 'skills')} (or use a suite-level skills/ dir)`);
+      console.log(`3. Flesh out verifier/verify.mjs and oracle/solve.mjs, then run: skilljack-evals validate ${taskDir}`);
+      console.log(`4. Run: skilljack-evals run ${taskDir}`);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
     }
-
-    await fs.mkdir(path.dirname(outputPath), { recursive: true });
-
-    const template = createEvalTemplate(skillName, numTasks);
-    await fs.writeFile(outputPath, template);
-
-    const numPositive = Math.max(1, numTasks - 1);
-    console.log(`Created evaluation template: ${outputPath} (${numPositive} positive tasks + 1 false-positive)`);
-    console.log();
-    console.log('Next steps:');
-    console.log(`1. Edit ${outputPath} to add real evaluation tasks`);
-    console.log(`2. Run: skilljack-evals run ${outputPath}`);
   });
 
 // ============================================
 // Validate
 // ============================================
 
+/**
+ * Run the oracle gate for a single task: execute the oracle in a fresh seeded
+ * workspace (skills mounted), then require the verifier to yield reward 1.0.
+ */
+async function runOracleGate(lt: LoadedTask): Promise<{ ok: boolean; detail: string }> {
+  const scratchBase = await fs.mkdtemp(path.join(os.tmpdir(), 'skilljack-oracle-'));
+  try {
+    const workspace = await createTrialWorkspace({
+      baseDir: scratchBase,
+      taskId: lt.task.id,
+      runIndex: 0,
+      seedDir: lt.workspaceSeedDir,
+      skillsDir: lt.skillsDir,
+    });
+
+    const outputFile = path.join(scratchBase, 'output.txt');
+    const trajectoryFile = path.join(scratchBase, 'trajectory.json');
+    const rewardFile = path.join(scratchBase, 'reward.txt');
+    await fs.writeFile(outputFile, '', 'utf-8');
+    await fs.writeFile(trajectoryFile, '[]', 'utf-8');
+
+    const shared = {
+      workspaceDir: workspace.dir,
+      taskDir: lt.taskDir,
+      outputFile,
+      trajectoryFile,
+      rewardFile,
+      timeoutMs: lt.verifierTimeoutMs,
+    };
+
+    const oracle = await executeVerifier({ ...shared, scriptPath: lt.oracleScript });
+    if (oracle.status !== 'ok' || oracle.exitCode !== 0) {
+      return {
+        ok: false,
+        detail: `oracle failed (status ${oracle.status}, exit ${oracle.exitCode})${oracle.stderr ? `: ${oracle.stderr.slice(0, 200)}` : ''}`,
+      };
+    }
+
+    // Oracle may have written a reward — remove it so the verifier's own result counts.
+    await fs.rm(rewardFile, { force: true }).catch(() => {});
+
+    const verifier = await executeVerifier({
+      ...shared,
+      scriptPath: lt.verifierScript,
+      command: lt.verifierCommand,
+    });
+    if (verifier.reward < 1) {
+      return {
+        ok: false,
+        detail: `verifier reward ${verifier.reward} after oracle (status ${verifier.status})${verifier.stderr ? `: ${verifier.stderr.slice(0, 200)}` : ''}`,
+      };
+    }
+
+    return { ok: true, detail: 'oracle → verifier reward 1.0' };
+  } finally {
+    await fs.rm(scratchBase, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 program
   .command('validate')
-  .description('Validate a tasks YAML file')
-  .argument('<file>', 'Path to tasks YAML file')
-  .action(async (file: string) => {
-    const errors = await validateEvalFile(file);
+  .description('Validate task package(s): schema checks, plus the oracle gate when oracle + verifier exist')
+  .argument('<path>', 'Path to a task-package dir or suite dir')
+  .option('--skills-dir <path>', 'Skills directory override applied to all tasks')
+  .option('--no-oracle', 'Skip the oracle gate (schema validation only)')
+  .action(async (inputPath: string, options: { skillsDir?: string; oracle?: boolean }) => {
+    try {
+      const { errors, warnings, suite } = await validateTaskPackages(inputPath, {
+        skillsDirOverride: options.skillsDir,
+      });
 
-    if (errors.length === 0) {
-      const evaluation = await parseEvalFile(file);
-      console.log(`Valid: ${evaluation.tasks.length} task(s) for skill '${evaluation.skillName}'`);
-    } else {
-      console.error(`Validation errors in ${file}:`);
-      for (const error of errors) {
-        console.error(`  - ${error}`);
+      for (const warning of warnings) {
+        console.warn(`Warning: ${warning}`);
       }
+
+      if (errors.length > 0 || !suite) {
+        console.error(`Validation errors in ${inputPath}:`);
+        for (const error of errors) {
+          console.error(`  - ${error}`);
+        }
+        process.exit(1);
+      }
+
+      console.log(`Valid: ${suite.tasks.length} task(s) for skill '${suite.skillName}'`);
+
+      if (options.oracle === false) {
+        return;
+      }
+
+      let oracleFailures = 0;
+      for (const lt of suite.tasks) {
+        const hasVerifier = !!(lt.verifierScript || lt.verifierCommand);
+        if (!lt.oracleScript) {
+          console.log(`  ${lt.task.id}: no oracle — skipping oracle gate`);
+          continue;
+        }
+        if (!hasVerifier) {
+          console.warn(`  ${lt.task.id}: WARN — oracle present but no verifier to gate against`);
+          continue;
+        }
+
+        const { ok, detail } = await runOracleGate(lt);
+        if (ok) {
+          console.log(`  ${lt.task.id}: PASS — ${detail}`);
+        } else {
+          oracleFailures++;
+          console.error(`  ${lt.task.id}: FAIL — ${detail}`);
+        }
+      }
+
+      if (oracleFailures > 0) {
+        console.error(`\n${oracleFailures} task(s) failed the oracle gate`);
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
     }
   });
