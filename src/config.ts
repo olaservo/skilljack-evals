@@ -12,7 +12,7 @@
  * - Bedrock: Set CLAUDE_CODE_USE_BEDROCK=1, AWS_REGION, AWS_PROFILE
  */
 
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DEFAULT_RUNNER_CONCURRENCY } from './utils/concurrency.js';

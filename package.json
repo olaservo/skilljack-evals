@@ -40,14 +40,13 @@
     "bundle:action": "npm run build && esbuild dist/action/index.js --bundle --platform=node --target=node20 --format=cjs --outfile=action/dist/index.cjs --external:@openai/agents --external:openai --external:ai --external:@ai-sdk/* --external:@openrouter/* --external:zod --external:@github/copilot-sdk"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "~0.1.76",
-    "commander": "^12.0.0",
-    "dotenv": "^16.4.0",
-    "js-yaml": "^4.1.0"
+    "@anthropic-ai/claude-agent-sdk": "^0.3.201",
+    "commander": "^15.0.0",
+    "dotenv": "^17.4.2",
+    "js-yaml": "^5.2.1"
   },
   "devDependencies": {
     "@actions/core": "^1.10.0",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.1.0",
     "esbuild": "^0.28.1",
     "tsx": "^4.0.0",

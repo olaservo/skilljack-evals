@@ -7,7 +7,7 @@
  * - fixture block (setup/teardown scripts per task)
  */
 
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import type {
   EvalTask,
