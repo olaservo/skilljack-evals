@@ -1,8 +1,8 @@
 {
   "name": "@skilljack/evals",
-  "version": "2.0.0-alpha.0",
+  "version": "2.0.0-alpha.1",
   "type": "module",
-  "description": "CLI for evaluating AI agent skill discoverability, adherence, and output quality. Runs as standalone CLI or GitHub Action.",
+  "description": "Agent Skills evaluation CLI: SkillsBench-style task packages run through real agent harnesses (Claude Code, Codex, and more) with deterministic rewards, paired baselines, and Skill Lift — as a fast authoring loop or a CI gate.",
   "author": "Ola Hungerford",
   "license": "MIT",
   "repository": {

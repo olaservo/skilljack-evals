@@ -15,6 +15,7 @@ import type {
 import { loadConfigSync } from '../config.js';
 import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
+import { DEFAULT_SKILLS_MOUNT_PATH } from '../run/workspace.js';
 
 /**
  * Rough per-token cost for runners without per-model pricing data. Calibrated
@@ -61,6 +62,14 @@ export function skillNameFromReadPath(filePath: string): string | undefined {
 
 export abstract class BaseRunner implements AgentRunner {
   abstract readonly providerName: string;
+
+  /**
+   * Workspace-relative skill discovery path for this harness. Claude runners
+   * use '.claude/skills'; CLI harnesses with a different convention (Codex:
+   * '.agents/skills', OpenCode: '.opencode/skill') override this.
+   */
+  readonly skillsMountPath: string = DEFAULT_SKILLS_MOUNT_PATH;
+
   protected options: AgentRunnerOptions;
 
   /** Read-only access to resolved runner options (for testing and introspection). */

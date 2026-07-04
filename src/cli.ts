@@ -21,8 +21,10 @@ import { generateReport, generateJsonResults } from './report/report.js';
 import { generateHtmlReport } from './report/html-report.js';
 import type { EvalTask, TaskResult, SkillEvaluation, CombinedScore } from './types.js';
 import { validateFeedback } from './feedback.js';
-import { VALID_RUNNER_TYPES, loadConfig } from './config.js';
-import type { EvalConfig, RunnerType } from './config.js';
+import { VALID_RUNNER_TYPES, SANDBOX_MODES, loadConfig } from './config.js';
+import type { EvalConfig, RunnerType, SandboxMode } from './config.js';
+import { importSkillsBenchTask } from './task/import-skillsbench.js';
+import { exportSkillsBenchTask } from './task/export-skillsbench.js';
 import { ResponseCache } from './cache/response-cache.js';
 import { createTrialWorkspace } from './run/workspace.js';
 import type { WorkspaceCleanupPolicy } from './run/workspace.js';
@@ -35,7 +37,7 @@ const program = new Command();
 program
   .name('skilljack-evals')
   .description('Skill evaluation CLI — run evaluations, score results, generate reports')
-  .version('2.0.0-alpha.0');
+  .version('2.0.0-alpha.1');
 
 // ============================================
 // Primary command: run
@@ -45,7 +47,7 @@ program
   .command('run')
   .description('Run the full evaluation pipeline: execute tasks → score → report')
   .argument('<path>', 'Path to a task-package dir or suite dir of task packages')
-  .option('--runner <type>', 'Runner type: claude-sdk | claude-code (default: claude-sdk)')
+  .option('--runner <type>', 'Runner type: claude-sdk | claude-code | codex | gemini (experimental) | opencode (experimental) (default: claude-sdk)')
   .option('--model <model>', 'Agent model (default: sonnet)')
   .option('--judge-model <model>', 'Judge model (default: haiku)')
   .option('--config <path>', 'Path to eval.config.yaml')
@@ -66,6 +68,7 @@ program
   .option('-k, --trials <number>', 'Number of trials per task per condition (default: 3)')
   .option('--runs <number>', 'Alias of --trials')
   .option('--nudge <level>', 'Skill nudge appended to with-skill prompts: off|name|description|full (default: off)')
+  .option('--sandbox <mode>', 'Verifier/oracle sandbox: host | docker (default: host). Docker containerizes the VERIFIER, not the agent.')
   .option('--keep-workspaces <policy>', 'Workspace retention: all|failures|none (default: failures)')
   .option('--generate-feedback <path>', 'Generate feedback template JSON with task IDs after run')
   .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment (requires --judge)')
@@ -100,6 +103,7 @@ program
     trials?: string;
     runs?: string;
     nudge?: string;
+    sandbox?: string;
     keepWorkspaces?: string;
     generateFeedback?: string;
     feedback?: string;
@@ -135,6 +139,11 @@ program
         process.exit(1);
       }
 
+      if (options.sandbox && !SANDBOX_MODES.includes(options.sandbox as SandboxMode)) {
+        console.error(`Error: --sandbox must be one of: ${SANDBOX_MODES.join(', ')}`);
+        process.exit(1);
+      }
+
       // Deprecated flags: keep accepting them, print a note.
       if (options.judge === false) {
         console.log('Note: --no-judge is deprecated — the judge is off by default. Use --judge to enable diagnostics.');
@@ -151,6 +160,7 @@ program
       if (options.timeout) configOverrides.taskTimeoutMs = parseInt(options.timeout, 10);
       if (options.thresholdResolution) configOverrides.resolutionThreshold = parseFloat(options.thresholdResolution);
       if (options.thresholdLift) configOverrides.liftThreshold = parseFloat(options.thresholdLift);
+      if (options.sandbox) configOverrides.sandbox = options.sandbox as SandboxMode;
       if (options.githubSummary) configOverrides.githubSummary = true;
       if (options.html !== undefined) configOverrides.htmlReport = options.html;
       if (options.concurrency !== undefined) {
@@ -453,6 +463,47 @@ program
         console.error(`\n${oracleFailures} task(s) failed the oracle gate`);
         process.exit(1);
       }
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
+  });
+
+// ============================================
+// SkillsBench/BenchFlow interop: import / export
+// ============================================
+
+program
+  .command('import')
+  .description('Import a SkillsBench-native task package into our task-package format (tolerant frontmatter mapping)')
+  .argument('<dir>', 'Path to a SkillsBench task package directory (contains task.md)')
+  .option('--out <evalsDir>', 'Parent directory for the imported package (default: ./evals)')
+  .action(async (dir: string, options: { out?: string }) => {
+    try {
+      const { taskDir, warnings } = await importSkillsBenchTask(dir, { outDir: options.out });
+      for (const warning of warnings) {
+        console.warn(`Warning: ${warning}`);
+      }
+      console.log(`Imported task package: ${taskDir}`);
+      console.log(`Validate it with: skilljack-evals validate ${path.relative(process.cwd(), taskDir)}`);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('export')
+  .description('Export one of our task packages as a BenchFlow/SkillsBench-native package (verifier/test.sh wrapper, Dockerfile stub)')
+  .argument('<taskDir>', 'Path to a task-package directory (contains task.md)')
+  .option('--out <dir>', 'Output directory (default: ./export/<task-id>)')
+  .action(async (taskDir: string, options: { out?: string }) => {
+    try {
+      const { outDir, warnings } = await exportSkillsBenchTask(taskDir, { outDir: options.out });
+      for (const warning of warnings) {
+        console.warn(`Warning: ${warning}`);
+      }
+      console.log(`Exported BenchFlow-native package: ${outDir}`);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);

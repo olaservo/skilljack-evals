@@ -9,6 +9,23 @@ describe('createRunner', () => {
     expect(runner.providerName).toBe('claude-sdk');
   });
 
+  it('creates the CLI runners with their harness-specific skills mount paths', async () => {
+    const codex = await createRunner('codex', {});
+    expect(codex.providerName).toBe('codex');
+    expect(codex.skillsMountPath).toContain('.agents');
+
+    const gemini = await createRunner('gemini', {});
+    expect(gemini.providerName).toBe('gemini');
+    expect(gemini.skillsMountPath).toContain('.gemini');
+
+    const opencode = await createRunner('opencode', {});
+    expect(opencode.providerName).toBe('opencode');
+    expect(opencode.skillsMountPath).toContain('.opencode');
+
+    const claudeCode = await createRunner('claude-code', {});
+    expect(claudeCode.skillsMountPath).toContain('.claude');
+  });
+
   it('throws for unknown runner type', async () => {
     await expect(
       createRunner('invalid-runner' as RunnerType, {}),

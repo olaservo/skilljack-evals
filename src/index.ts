@@ -55,14 +55,18 @@ export type {
 } from './types.js';
 
 // Config
-export { loadConfig, loadConfigSync, DEFAULT_CONFIG, VALID_RUNNER_TYPES } from './config.js';
-export type { EvalConfig, RunnerType } from './config.js';
+export { loadConfig, loadConfigSync, DEFAULT_CONFIG, VALID_RUNNER_TYPES, SANDBOX_MODES } from './config.js';
+export type { EvalConfig, RunnerType, SandboxMode } from './config.js';
 
 // Task packages
 export { loadTaskPackages, validateTaskPackages } from './task/load.js';
 export type { LoadedSuite, LoadedTask, LoadTaskOptions, TaskValidationResult } from './task/load.js';
 export type { TaskFrontmatter, TaskChecks, VerifierFrontmatter } from './task/schema.js';
 export { scaffoldTaskPackage } from './task/scaffold.js';
+export { importSkillsBenchTask } from './task/import-skillsbench.js';
+export type { ImportOptions, ImportResult } from './task/import-skillsbench.js';
+export { exportSkillsBenchTask } from './task/export-skillsbench.js';
+export type { ExportOptions, ExportResult } from './task/export-skillsbench.js';
 
 // Workspaces
 export { createTrialWorkspace, applyCleanupPolicy, copyDir, DEFAULT_SKILLS_MOUNT_PATH } from './run/workspace.js';
@@ -75,9 +79,16 @@ export type { RunVerifierOptions, ExecuteVerifierOptions, InterpreterResolution,
 // Runner
 export { ClaudeSdkRunner } from './runner/claude-sdk-runner.js';
 export { ClaudeCodeRunner, CLAUDE_CLI_INSTALL_HINT } from './runner/claude-code-runner.js';
+export { CodexRunner, CODEX_CLI_INSTALL_HINT, skillNameFromCommand } from './runner/codex-runner.js';
+export { GeminiRunner, GEMINI_CLI_INSTALL_HINT } from './runner/gemini-runner.js';
+export { OpenCodeRunner, OPENCODE_CLI_INSTALL_HINT } from './runner/opencode-runner.js';
 export type { AgentRunner, AgentRunnerOptions } from './runner/agent-runner.js';
 export { createRunner } from './runner/runner-factory.js';
 export { createToolPolicy, createPreToolUseHook } from './runner/security.js';
+
+// Docker sandbox (verifier/oracle containerization — the agent runs on the host)
+export { runVerifierInDocker, resolveContainerInterpreter, dockerImageTag, DEFAULT_DOCKER_IMAGE, DOCKER_UNAVAILABLE_HINT } from './sandbox/docker.js';
+export type { RunVerifierInDockerOptions, DockerExecFn, DockerExecResult } from './sandbox/docker.js';
 
 // Harness subprocess utilities
 export { runCliJsonl, detectCli, killProcessTree } from './harness/subprocess.js';

@@ -19,9 +19,14 @@ import { DEFAULT_RUNNER_CONCURRENCY } from './utils/concurrency.js';
 import { NUDGE_LEVELS } from './run/nudge.js';
 import type { NudgeLevel } from './run/nudge.js';
 
-export type RunnerType = 'claude-sdk' | 'claude-code';
+export type RunnerType = 'claude-sdk' | 'claude-code' | 'codex' | 'gemini' | 'opencode';
 
-export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'claude-code'];
+export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'claude-code', 'codex', 'gemini', 'opencode'];
+
+/** Verifier/oracle sandbox: run on the host (default) or inside Docker. */
+export type SandboxMode = 'host' | 'docker';
+
+export const SANDBOX_MODES: SandboxMode[] = ['host', 'docker'];
 
 export interface EvalConfig {
   // Runner
@@ -53,6 +58,9 @@ export interface EvalConfig {
 
   // Skill nudge appended to with-skill prompts (baseline always gets 'off')
   nudge: NudgeLevel;
+
+  // Verifier/oracle sandbox mode (host default; docker containerizes verifiers)
+  sandbox: SandboxMode;
 
   // CI/CD behavior
   exitOnFailure: boolean;
@@ -93,6 +101,7 @@ export const DEFAULT_CONFIG: EvalConfig = {
   taskTimeoutMs: 300000, // 5 minutes
   concurrency: DEFAULT_RUNNER_CONCURRENCY, // sequential by default
   nudge: 'off',
+  sandbox: 'host',
   exitOnFailure: true,
   outputDir: './results',
   githubSummary: false,
@@ -137,6 +146,7 @@ interface RawConfigFile {
     allowed_write_dirs?: string[];
   };
   nudge?: string;
+  sandbox?: string;
   output?: {
     dir?: string;
     judge_truncation?: number;
@@ -206,6 +216,13 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
       config.nudge = raw.nudge as NudgeLevel;
     }
 
+    if (raw.sandbox !== undefined) {
+      if (!SANDBOX_MODES.includes(raw.sandbox as SandboxMode)) {
+        throw new Error(`Invalid sandbox "${raw.sandbox}" in config file. Valid: ${SANDBOX_MODES.join(', ')}`);
+      }
+      config.sandbox = raw.sandbox as SandboxMode;
+    }
+
     if (raw.output?.dir) config.outputDir = raw.output.dir;
     if (raw.output?.judge_truncation !== undefined) config.judgeOutputTruncation = raw.output.judge_truncation;
     if (raw.output?.report_truncation !== undefined) config.reportOutputTruncation = raw.output.report_truncation;
@@ -244,6 +261,7 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
  * - EVAL_TASK_TIMEOUT_MS: Per-task timeout in ms (default: 300000)
  * - EVAL_RUNNER_CONCURRENCY: Max concurrent tasks (default: 1, 0=unlimited)
  * - EVAL_NUDGE: Skill nudge level off|name|description|full (default: 'off')
+ * - EVAL_SANDBOX: Verifier/oracle sandbox host|docker (default: 'host')
  * - EVAL_EXIT_ON_FAILURE: Exit with code 1 on failures (default: true)
  * - EVAL_OUTPUT_DIR: Directory for results (default: './results')
  * - EVAL_JUDGE: Enable LLM judge diagnostics (default: false)
@@ -290,6 +308,13 @@ function loadEnvConfig(): Partial<EvalConfig> {
       throw new Error(`Invalid EVAL_NUDGE "${process.env.EVAL_NUDGE}". Valid: ${NUDGE_LEVELS.join(', ')}`);
     }
     config.nudge = process.env.EVAL_NUDGE as NudgeLevel;
+  }
+
+  if (process.env.EVAL_SANDBOX) {
+    if (!SANDBOX_MODES.includes(process.env.EVAL_SANDBOX as SandboxMode)) {
+      throw new Error(`Invalid EVAL_SANDBOX "${process.env.EVAL_SANDBOX}". Valid: ${SANDBOX_MODES.join(', ')}`);
+    }
+    config.sandbox = process.env.EVAL_SANDBOX as SandboxMode;
   }
 
   if (process.env.EVAL_EXIT_ON_FAILURE !== undefined) {

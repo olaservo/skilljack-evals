@@ -18,6 +18,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import type { ToolCallRecord, VerifierOutcome } from '../types.js';
+import { runVerifierInDocker } from '../sandbox/docker.js';
 
 export type { VerifierOutcome, VerifierStatus } from '../types.js';
 
@@ -244,13 +245,45 @@ export interface RunVerifierOptions {
   /** Agent's tool calls — written as JSON to SKILLJACK_TRAJECTORY_FILE. */
   toolCalls: ToolCallRecord[];
   timeoutMs?: number;
+  /**
+   * 'docker' runs the verifier inside a container with the workspace
+   * bind-mounted (see src/sandbox/docker.ts — verifier-only containerization,
+   * the agent always runs on the host). Default: 'host'.
+   */
+  sandbox?: 'host' | 'docker';
 }
 
 /**
  * Run a task's verifier: materializes the contract files in a temp dir,
  * executes the script, and cleans up. Never throws.
+ *
+ * With sandbox: 'docker' the script is dispatched into a container instead
+ * (`.sh` verifiers always run under bash there — the Windows escape hatch).
  */
 export async function runVerifier(options: RunVerifierOptions): Promise<VerifierOutcome> {
+  if (options.sandbox === 'docker') {
+    const errorOutcome = (stderr: string): VerifierOutcome => ({
+      reward: 0, passed: false, exitCode: null, status: 'error', stdout: '', stderr, durationMs: 0,
+    });
+    if (options.command) {
+      return errorOutcome('verifier.command is not supported with --sandbox docker — provide a verifier script (verify.mjs/.py/.sh) instead.');
+    }
+    if (!options.scriptPath) {
+      return errorOutcome('No verifier script provided');
+    }
+    const verifierRelPath = path.relative(options.taskDir, options.scriptPath);
+    if (verifierRelPath.startsWith('..')) {
+      return errorOutcome(`Verifier script ${options.scriptPath} is outside the task dir ${options.taskDir} — cannot mount it into the container.`);
+    }
+    return runVerifierInDocker({
+      taskDir: options.taskDir,
+      workspaceDir: options.workspaceDir,
+      verifierRelPath,
+      timeoutMs: options.timeoutMs,
+      output: options.output,
+      toolCalls: options.toolCalls,
+    });
+  }
   let contractDir: string;
   try {
     contractDir = await fs.mkdtemp(path.join(os.tmpdir(), 'skilljack-verifier-'));

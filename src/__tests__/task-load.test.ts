@@ -399,4 +399,39 @@ describe('loadTaskPackages — warnings', () => {
     const { warnings } = await validateTaskPackages(taskDir);
     expect(warnings.some((w) => w.includes('missing-skill'))).toBe(true);
   });
+
+  it('warns when the only signal is skill invocation (baseline trivially passes)', async () => {
+    const suiteDir = await makeTmpDir();
+    const taskDir = path.join(suiteDir, 't1');
+    // Skills present, invocation expected, but no output checks and no verifier
+    // — only judge assertions. Lift would be meaningless.
+    await writeTask(taskDir, `---\nassertions: ["Did the thing"]\n---\n\nPrompt.\n`);
+    await writeSkill(path.join(taskDir, 'environment', 'skills'), 'my-skill');
+
+    const { errors, warnings } = await validateTaskPackages(taskDir);
+    expect(errors).toEqual([]);
+    expect(warnings.some((w) => w.includes('trivially passes'))).toBe(true);
+  });
+
+  it('does not warn about trivial baselines when output checks exist', async () => {
+    const suiteDir = await makeTmpDir();
+    const taskDir = path.join(suiteDir, 't1');
+    await writeTask(taskDir, BASIC_TASK);
+    await writeSkill(path.join(taskDir, 'environment', 'skills'), 'my-skill');
+
+    const { warnings } = await validateTaskPackages(taskDir);
+    expect(warnings.some((w) => w.includes('trivially passes'))).toBe(false);
+  });
+
+  it('does not warn about trivial baselines for tool_calls-only checks with a verifier', async () => {
+    const suiteDir = await makeTmpDir();
+    const taskDir = path.join(suiteDir, 't1');
+    await writeTask(taskDir, `---\nchecks: { tool_calls: [Write] }\n---\n\nPrompt.\n`);
+    await writeSkill(path.join(taskDir, 'environment', 'skills'), 'my-skill');
+    await fs.mkdir(path.join(taskDir, 'verifier'), { recursive: true });
+    await fs.writeFile(path.join(taskDir, 'verifier', 'verify.mjs'), 'process.exit(0)');
+
+    const { warnings } = await validateTaskPackages(taskDir);
+    expect(warnings.some((w) => w.includes('trivially passes'))).toBe(false);
+  });
 });

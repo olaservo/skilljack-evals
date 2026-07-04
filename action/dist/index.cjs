@@ -94,11 +94,11 @@ var require_command = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.issue = exports2.issueCommand = void 0;
-    var os3 = __importStar(require("os"));
+    var os4 = __importStar(require("os"));
     var utils_1 = require_utils();
     function issueCommand(command, properties, message) {
       const cmd = new Command(command, properties, message);
-      process.stdout.write(cmd.toString() + os3.EOL);
+      process.stdout.write(cmd.toString() + os4.EOL);
     }
     exports2.issueCommand = issueCommand;
     function issue(name, message = "") {
@@ -181,18 +181,18 @@ var require_file_command = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.prepareKeyValueMessage = exports2.issueFileCommand = void 0;
     var crypto2 = __importStar(require("crypto"));
-    var fs18 = __importStar(require("fs"));
-    var os3 = __importStar(require("os"));
+    var fs19 = __importStar(require("fs"));
+    var os4 = __importStar(require("os"));
     var utils_1 = require_utils();
     function issueFileCommand(command, message) {
       const filePath = process.env[`GITHUB_${command}`];
       if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
       }
-      if (!fs18.existsSync(filePath)) {
+      if (!fs19.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
       }
-      fs18.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os3.EOL}`, {
+      fs19.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os4.EOL}`, {
         encoding: "utf8"
       });
     }
@@ -206,7 +206,7 @@ var require_file_command = __commonJS({
       if (convertedValue.includes(delimiter)) {
         throw new Error(`Unexpected input: value should not contain the delimiter "${delimiter}"`);
       }
-      return `${key}<<${delimiter}${os3.EOL}${convertedValue}${os3.EOL}${delimiter}`;
+      return `${key}<<${delimiter}${os4.EOL}${convertedValue}${os4.EOL}${delimiter}`;
     }
     exports2.prepareKeyValueMessage = prepareKeyValueMessage;
   }
@@ -995,14 +995,14 @@ var require_util = __commonJS({
         }
         const port = url.port != null ? url.port : url.protocol === "https:" ? 443 : 80;
         let origin = url.origin != null ? url.origin : `${url.protocol}//${url.hostname}:${port}`;
-        let path16 = url.path != null ? url.path : `${url.pathname || ""}${url.search || ""}`;
+        let path20 = url.path != null ? url.path : `${url.pathname || ""}${url.search || ""}`;
         if (origin.endsWith("/")) {
           origin = origin.substring(0, origin.length - 1);
         }
-        if (path16 && !path16.startsWith("/")) {
-          path16 = `/${path16}`;
+        if (path20 && !path20.startsWith("/")) {
+          path20 = `/${path20}`;
         }
-        url = new URL(origin + path16);
+        url = new URL(origin + path20);
       }
       return url;
     }
@@ -2616,20 +2616,20 @@ var require_parseParams = __commonJS({
 var require_basename = __commonJS({
   "node_modules/@fastify/busboy/lib/utils/basename.js"(exports2, module2) {
     "use strict";
-    module2.exports = function basename3(path16) {
-      if (typeof path16 !== "string") {
+    module2.exports = function basename4(path20) {
+      if (typeof path20 !== "string") {
         return "";
       }
-      for (var i = path16.length - 1; i >= 0; --i) {
-        switch (path16.charCodeAt(i)) {
+      for (var i = path20.length - 1; i >= 0; --i) {
+        switch (path20.charCodeAt(i)) {
           case 47:
           // '/'
           case 92:
-            path16 = path16.slice(i + 1);
-            return path16 === ".." || path16 === "." ? "" : path16;
+            path20 = path20.slice(i + 1);
+            return path20 === ".." || path20 === "." ? "" : path20;
         }
       }
-      return path16 === ".." || path16 === "." ? "" : path16;
+      return path20 === ".." || path20 === "." ? "" : path20;
     };
   }
 });
@@ -2643,7 +2643,7 @@ var require_multipart = __commonJS({
     var Dicer = require_Dicer();
     var parseParams = require_parseParams();
     var decodeText = require_decodeText();
-    var basename3 = require_basename();
+    var basename4 = require_basename();
     var getLimit = require_getLimit();
     var RE_BOUNDARY = /^boundary$/i;
     var RE_FIELD = /^form-data$/i;
@@ -2760,7 +2760,7 @@ var require_multipart = __commonJS({
               } else if (RE_FILENAME.test(parsed[i][0])) {
                 filename = parsed[i][1];
                 if (!preservePath) {
-                  filename = basename3(filename);
+                  filename = basename4(filename);
                 }
               }
             }
@@ -5659,7 +5659,7 @@ var require_request = __commonJS({
     }
     var Request = class _Request {
       constructor(origin, {
-        path: path16,
+        path: path20,
         method,
         body,
         headers,
@@ -5673,11 +5673,11 @@ var require_request = __commonJS({
         throwOnError,
         expectContinue
       }, handler) {
-        if (typeof path16 !== "string") {
+        if (typeof path20 !== "string") {
           throw new InvalidArgumentError("path must be a string");
-        } else if (path16[0] !== "/" && !(path16.startsWith("http://") || path16.startsWith("https://")) && method !== "CONNECT") {
+        } else if (path20[0] !== "/" && !(path20.startsWith("http://") || path20.startsWith("https://")) && method !== "CONNECT") {
           throw new InvalidArgumentError("path must be an absolute URL or start with a slash");
-        } else if (invalidPathRegex.exec(path16) !== null) {
+        } else if (invalidPathRegex.exec(path20) !== null) {
           throw new InvalidArgumentError("invalid request path");
         }
         if (typeof method !== "string") {
@@ -5740,7 +5740,7 @@ var require_request = __commonJS({
         this.completed = false;
         this.aborted = false;
         this.upgrade = upgrade || null;
-        this.path = query ? util.buildURL(path16, query) : path16;
+        this.path = query ? util.buildURL(path20, query) : path20;
         this.origin = origin;
         this.idempotent = idempotent == null ? method === "HEAD" || method === "GET" : idempotent;
         this.blocking = blocking == null ? false : blocking;
@@ -6748,9 +6748,9 @@ var require_RedirectHandler = __commonJS({
           return this.handler.onHeaders(statusCode, headers, resume, statusText);
         }
         const { origin, pathname, search } = util.parseURL(new URL(this.location, this.opts.origin && new URL(this.opts.path, this.opts.origin)));
-        const path16 = search ? `${pathname}${search}` : pathname;
+        const path20 = search ? `${pathname}${search}` : pathname;
         this.opts.headers = cleanRequestHeaders(this.opts.headers, statusCode === 303, this.opts.origin !== origin);
-        this.opts.path = path16;
+        this.opts.path = path20;
         this.opts.origin = origin;
         this.opts.maxRedirections = 0;
         this.opts.query = null;
@@ -7990,7 +7990,7 @@ var require_client = __commonJS({
         writeH2(client, client[kHTTP2Session], request);
         return;
       }
-      const { body, method, path: path16, host, upgrade, headers, blocking, reset } = request;
+      const { body, method, path: path20, host, upgrade, headers, blocking, reset } = request;
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body && typeof body.read === "function") {
         body.read(0);
@@ -8040,7 +8040,7 @@ var require_client = __commonJS({
       if (blocking) {
         socket[kBlocking] = true;
       }
-      let header = `${method} ${path16} HTTP/1.1\r
+      let header = `${method} ${path20} HTTP/1.1\r
 `;
       if (typeof host === "string") {
         header += `host: ${host}\r
@@ -8103,7 +8103,7 @@ upgrade: ${upgrade}\r
       return true;
     }
     function writeH2(client, session, request) {
-      const { body, method, path: path16, host, upgrade, expectContinue, signal, headers: reqHeaders } = request;
+      const { body, method, path: path20, host, upgrade, expectContinue, signal, headers: reqHeaders } = request;
       let headers;
       if (typeof reqHeaders === "string") headers = Request[kHTTP2CopyHeaders](reqHeaders.trim());
       else headers = reqHeaders;
@@ -8146,7 +8146,7 @@ upgrade: ${upgrade}\r
         });
         return true;
       }
-      headers[HTTP2_HEADER_PATH] = path16;
+      headers[HTTP2_HEADER_PATH] = path20;
       headers[HTTP2_HEADER_SCHEME] = "https";
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body && typeof body.read === "function") {
@@ -10386,20 +10386,20 @@ var require_mock_utils = __commonJS({
       }
       return true;
     }
-    function safeUrl(path16) {
-      if (typeof path16 !== "string") {
-        return path16;
+    function safeUrl(path20) {
+      if (typeof path20 !== "string") {
+        return path20;
       }
-      const pathSegments = path16.split("?");
+      const pathSegments = path20.split("?");
       if (pathSegments.length !== 2) {
-        return path16;
+        return path20;
       }
       const qp2 = new URLSearchParams(pathSegments.pop());
       qp2.sort();
       return [...pathSegments, qp2.toString()].join("?");
     }
-    function matchKey(mockDispatch2, { path: path16, method, body, headers }) {
-      const pathMatch = matchValue(mockDispatch2.path, path16);
+    function matchKey(mockDispatch2, { path: path20, method, body, headers }) {
+      const pathMatch = matchValue(mockDispatch2.path, path20);
       const methodMatch = matchValue(mockDispatch2.method, method);
       const bodyMatch = typeof mockDispatch2.body !== "undefined" ? matchValue(mockDispatch2.body, body) : true;
       const headersMatch = matchHeaders(mockDispatch2, headers);
@@ -10417,7 +10417,7 @@ var require_mock_utils = __commonJS({
     function getMockDispatch(mockDispatches, key) {
       const basePath = key.query ? buildURL(key.path, key.query) : key.path;
       const resolvedPath = typeof basePath === "string" ? safeUrl(basePath) : basePath;
-      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path16 }) => matchValue(safeUrl(path16), resolvedPath));
+      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path20 }) => matchValue(safeUrl(path20), resolvedPath));
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for path '${resolvedPath}'`);
       }
@@ -10454,9 +10454,9 @@ var require_mock_utils = __commonJS({
       }
     }
     function buildKey(opts) {
-      const { path: path16, method, body, headers, query } = opts;
+      const { path: path20, method, body, headers, query } = opts;
       return {
-        path: path16,
+        path: path20,
         method,
         body,
         headers,
@@ -10905,10 +10905,10 @@ var require_pending_interceptors_formatter = __commonJS({
       }
       format(pendingInterceptors) {
         const withPrettyHeaders = pendingInterceptors.map(
-          ({ method, path: path16, data: { statusCode }, persist, times, timesInvoked, origin }) => ({
+          ({ method, path: path20, data: { statusCode }, persist, times, timesInvoked, origin }) => ({
             Method: method,
             Origin: origin,
-            Path: path16,
+            Path: path20,
             "Status code": statusCode,
             Persistent: persist ? "\u2705" : "\u274C",
             Invocations: timesInvoked,
@@ -15528,8 +15528,8 @@ var require_util6 = __commonJS({
         }
       }
     }
-    function validateCookiePath(path16) {
-      for (const char of path16) {
+    function validateCookiePath(path20) {
+      for (const char of path20) {
         const code = char.charCodeAt(0);
         if (code < 33 || char === ";") {
           throw new Error("Invalid cookie path");
@@ -17209,11 +17209,11 @@ var require_undici = __commonJS({
           if (typeof opts.path !== "string") {
             throw new InvalidArgumentError("invalid opts.path");
           }
-          let path16 = opts.path;
+          let path20 = opts.path;
           if (!opts.path.startsWith("/")) {
-            path16 = `/${path16}`;
+            path20 = `/${path20}`;
           }
-          url = new URL(util.parseOrigin(url).origin + path16);
+          url = new URL(util.parseOrigin(url).origin + path20);
         } else {
           if (!opts) {
             opts = typeof url === "object" ? url : {};
@@ -18144,7 +18144,7 @@ var require_summary = __commonJS({
     exports2.summary = exports2.markdownSummary = exports2.SUMMARY_DOCS_URL = exports2.SUMMARY_ENV_VAR = void 0;
     var os_1 = require("os");
     var fs_1 = require("fs");
-    var { access, appendFile: appendFile2, writeFile: writeFile8 } = fs_1.promises;
+    var { access, appendFile: appendFile2, writeFile: writeFile9 } = fs_1.promises;
     exports2.SUMMARY_ENV_VAR = "GITHUB_STEP_SUMMARY";
     exports2.SUMMARY_DOCS_URL = "https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary";
     var Summary = class {
@@ -18202,7 +18202,7 @@ var require_summary = __commonJS({
         return __awaiter(this, void 0, void 0, function* () {
           const overwrite = !!(options === null || options === void 0 ? void 0 : options.overwrite);
           const filePath = yield this.filePath();
-          const writeFunc = overwrite ? writeFile8 : appendFile2;
+          const writeFunc = overwrite ? writeFile9 : appendFile2;
           yield writeFunc(filePath, this._buffer, { encoding: "utf8" });
           return this.emptyBuffer();
         });
@@ -18436,7 +18436,7 @@ var require_path_utils = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.toPlatformPath = exports2.toWin32Path = exports2.toPosixPath = void 0;
-    var path16 = __importStar(require("path"));
+    var path20 = __importStar(require("path"));
     function toPosixPath(pth) {
       return pth.replace(/[\\]/g, "/");
     }
@@ -18446,7 +18446,7 @@ var require_path_utils = __commonJS({
     }
     exports2.toWin32Path = toWin32Path;
     function toPlatformPath(pth) {
-      return pth.replace(/[/\\]/g, path16.sep);
+      return pth.replace(/[/\\]/g, path20.sep);
     }
     exports2.toPlatformPath = toPlatformPath;
   }
@@ -18509,12 +18509,12 @@ var require_io_util = __commonJS({
     var _a2;
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getCmdPath = exports2.tryGetExecutablePath = exports2.isRooted = exports2.isDirectory = exports2.exists = exports2.READONLY = exports2.UV_FS_O_EXLOCK = exports2.IS_WINDOWS = exports2.unlink = exports2.symlink = exports2.stat = exports2.rmdir = exports2.rm = exports2.rename = exports2.readlink = exports2.readdir = exports2.open = exports2.mkdir = exports2.lstat = exports2.copyFile = exports2.chmod = void 0;
-    var fs18 = __importStar(require("fs"));
-    var path16 = __importStar(require("path"));
-    _a2 = fs18.promises, exports2.chmod = _a2.chmod, exports2.copyFile = _a2.copyFile, exports2.lstat = _a2.lstat, exports2.mkdir = _a2.mkdir, exports2.open = _a2.open, exports2.readdir = _a2.readdir, exports2.readlink = _a2.readlink, exports2.rename = _a2.rename, exports2.rm = _a2.rm, exports2.rmdir = _a2.rmdir, exports2.stat = _a2.stat, exports2.symlink = _a2.symlink, exports2.unlink = _a2.unlink;
+    var fs19 = __importStar(require("fs"));
+    var path20 = __importStar(require("path"));
+    _a2 = fs19.promises, exports2.chmod = _a2.chmod, exports2.copyFile = _a2.copyFile, exports2.lstat = _a2.lstat, exports2.mkdir = _a2.mkdir, exports2.open = _a2.open, exports2.readdir = _a2.readdir, exports2.readlink = _a2.readlink, exports2.rename = _a2.rename, exports2.rm = _a2.rm, exports2.rmdir = _a2.rmdir, exports2.stat = _a2.stat, exports2.symlink = _a2.symlink, exports2.unlink = _a2.unlink;
     exports2.IS_WINDOWS = process.platform === "win32";
     exports2.UV_FS_O_EXLOCK = 268435456;
-    exports2.READONLY = fs18.constants.O_RDONLY;
+    exports2.READONLY = fs19.constants.O_RDONLY;
     function exists(fsPath) {
       return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -18529,13 +18529,13 @@ var require_io_util = __commonJS({
       });
     }
     exports2.exists = exists;
-    function isDirectory2(fsPath, useStat = false) {
+    function isDirectory3(fsPath, useStat = false) {
       return __awaiter(this, void 0, void 0, function* () {
         const stats = useStat ? yield exports2.stat(fsPath) : yield exports2.lstat(fsPath);
         return stats.isDirectory();
       });
     }
-    exports2.isDirectory = isDirectory2;
+    exports2.isDirectory = isDirectory3;
     function isRooted(p) {
       p = normalizeSeparators(p);
       if (!p) {
@@ -18559,7 +18559,7 @@ var require_io_util = __commonJS({
         }
         if (stats && stats.isFile()) {
           if (exports2.IS_WINDOWS) {
-            const upperExt = path16.extname(filePath).toUpperCase();
+            const upperExt = path20.extname(filePath).toUpperCase();
             if (extensions.some((validExt) => validExt.toUpperCase() === upperExt)) {
               return filePath;
             }
@@ -18583,11 +18583,11 @@ var require_io_util = __commonJS({
           if (stats && stats.isFile()) {
             if (exports2.IS_WINDOWS) {
               try {
-                const directory = path16.dirname(filePath);
-                const upperName = path16.basename(filePath).toUpperCase();
+                const directory = path20.dirname(filePath);
+                const upperName = path20.basename(filePath).toUpperCase();
                 for (const actualName of yield exports2.readdir(directory)) {
                   if (upperName === actualName.toUpperCase()) {
-                    filePath = path16.join(directory, actualName);
+                    filePath = path20.join(directory, actualName);
                     break;
                   }
                 }
@@ -18682,7 +18682,7 @@ var require_io = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.findInPath = exports2.which = exports2.mkdirP = exports2.rmRF = exports2.mv = exports2.cp = void 0;
     var assert_1 = require("assert");
-    var path16 = __importStar(require("path"));
+    var path20 = __importStar(require("path"));
     var ioUtil = __importStar(require_io_util());
     function cp(source, dest, options = {}) {
       return __awaiter(this, void 0, void 0, function* () {
@@ -18691,7 +18691,7 @@ var require_io = __commonJS({
         if (destStat && destStat.isFile() && !force) {
           return;
         }
-        const newDest = destStat && destStat.isDirectory() && copySourceDirectory ? path16.join(dest, path16.basename(source)) : dest;
+        const newDest = destStat && destStat.isDirectory() && copySourceDirectory ? path20.join(dest, path20.basename(source)) : dest;
         if (!(yield ioUtil.exists(source))) {
           throw new Error(`no such file or directory: ${source}`);
         }
@@ -18703,7 +18703,7 @@ var require_io = __commonJS({
             yield cpDirRecursive(source, newDest, 0, force);
           }
         } else {
-          if (path16.relative(source, newDest) === "") {
+          if (path20.relative(source, newDest) === "") {
             throw new Error(`'${newDest}' and '${source}' are the same file`);
           }
           yield copyFile2(source, newDest, force);
@@ -18716,7 +18716,7 @@ var require_io = __commonJS({
         if (yield ioUtil.exists(dest)) {
           let destExists = true;
           if (yield ioUtil.isDirectory(dest)) {
-            dest = path16.join(dest, path16.basename(source));
+            dest = path20.join(dest, path20.basename(source));
             destExists = yield ioUtil.exists(dest);
           }
           if (destExists) {
@@ -18727,7 +18727,7 @@ var require_io = __commonJS({
             }
           }
         }
-        yield mkdirP(path16.dirname(dest));
+        yield mkdirP(path20.dirname(dest));
         yield ioUtil.rename(source, dest);
       });
     }
@@ -18790,7 +18790,7 @@ var require_io = __commonJS({
         }
         const extensions = [];
         if (ioUtil.IS_WINDOWS && process.env["PATHEXT"]) {
-          for (const extension of process.env["PATHEXT"].split(path16.delimiter)) {
+          for (const extension of process.env["PATHEXT"].split(path20.delimiter)) {
             if (extension) {
               extensions.push(extension);
             }
@@ -18803,12 +18803,12 @@ var require_io = __commonJS({
           }
           return [];
         }
-        if (tool.includes(path16.sep)) {
+        if (tool.includes(path20.sep)) {
           return [];
         }
         const directories = [];
         if (process.env.PATH) {
-          for (const p of process.env.PATH.split(path16.delimiter)) {
+          for (const p of process.env.PATH.split(path20.delimiter)) {
             if (p) {
               directories.push(p);
             }
@@ -18816,7 +18816,7 @@ var require_io = __commonJS({
         }
         const matches = [];
         for (const directory of directories) {
-          const filePath = yield ioUtil.tryGetExecutablePath(path16.join(directory, tool), extensions);
+          const filePath = yield ioUtil.tryGetExecutablePath(path20.join(directory, tool), extensions);
           if (filePath) {
             matches.push(filePath);
           }
@@ -18929,10 +18929,10 @@ var require_toolrunner = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.argStringToArray = exports2.ToolRunner = void 0;
-    var os3 = __importStar(require("os"));
+    var os4 = __importStar(require("os"));
     var events = __importStar(require("events"));
     var child = __importStar(require("child_process"));
-    var path16 = __importStar(require("path"));
+    var path20 = __importStar(require("path"));
     var io = __importStar(require_io());
     var ioUtil = __importStar(require_io_util());
     var timers_1 = require("timers");
@@ -18984,12 +18984,12 @@ var require_toolrunner = __commonJS({
       _processLineBuffer(data, strBuffer, onLine) {
         try {
           let s = strBuffer + data.toString();
-          let n = s.indexOf(os3.EOL);
+          let n = s.indexOf(os4.EOL);
           while (n > -1) {
             const line = s.substring(0, n);
             onLine(line);
-            s = s.substring(n + os3.EOL.length);
-            n = s.indexOf(os3.EOL);
+            s = s.substring(n + os4.EOL.length);
+            n = s.indexOf(os4.EOL);
           }
           return s;
         } catch (err) {
@@ -19147,7 +19147,7 @@ var require_toolrunner = __commonJS({
       exec() {
         return __awaiter(this, void 0, void 0, function* () {
           if (!ioUtil.isRooted(this.toolPath) && (this.toolPath.includes("/") || IS_WINDOWS && this.toolPath.includes("\\"))) {
-            this.toolPath = path16.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
+            this.toolPath = path20.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
           }
           this.toolPath = yield io.which(this.toolPath, true);
           return new Promise((resolve6, reject) => __awaiter(this, void 0, void 0, function* () {
@@ -19158,7 +19158,7 @@ var require_toolrunner = __commonJS({
             }
             const optionsNonNull = this._cloneExecOptions(this.options);
             if (!optionsNonNull.silent && optionsNonNull.outStream) {
-              optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + os3.EOL);
+              optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + os4.EOL);
             }
             const state = new ExecState(optionsNonNull, this.toolPath);
             state.on("debug", (message) => {
@@ -19646,8 +19646,8 @@ var require_core = __commonJS({
     var command_1 = require_command();
     var file_command_1 = require_file_command();
     var utils_1 = require_utils();
-    var os3 = __importStar(require("os"));
-    var path16 = __importStar(require("path"));
+    var os4 = __importStar(require("os"));
+    var path20 = __importStar(require("path"));
     var oidc_utils_1 = require_oidc_utils();
     var ExitCode;
     (function(ExitCode2) {
@@ -19675,7 +19675,7 @@ var require_core = __commonJS({
       } else {
         (0, command_1.issueCommand)("add-path", {}, inputPath);
       }
-      process.env["PATH"] = `${inputPath}${path16.delimiter}${process.env["PATH"]}`;
+      process.env["PATH"] = `${inputPath}${path20.delimiter}${process.env["PATH"]}`;
     }
     exports2.addPath = addPath;
     function getInput2(name, options) {
@@ -19714,7 +19714,7 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       if (filePath) {
         return (0, file_command_1.issueFileCommand)("OUTPUT", (0, file_command_1.prepareKeyValueMessage)(name, value));
       }
-      process.stdout.write(os3.EOL);
+      process.stdout.write(os4.EOL);
       (0, command_1.issueCommand)("set-output", { name }, (0, utils_1.toCommandValue)(value));
     }
     exports2.setOutput = setOutput2;
@@ -19748,7 +19748,7 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
     }
     exports2.notice = notice;
     function info(message) {
-      process.stdout.write(message + os3.EOL);
+      process.stdout.write(message + os4.EOL);
     }
     exports2.info = info;
     function startGroup(name) {
@@ -19816,8 +19816,8 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 var core = __toESM(require_core(), 1);
 
 // dist/src/pipeline.js
-var path15 = __toESM(require("path"), 1);
-var fs17 = __toESM(require("fs/promises"), 1);
+var path19 = __toESM(require("path"), 1);
+var fs18 = __toESM(require("fs/promises"), 1);
 
 // dist/src/utils/format.js
 var ARROW_DIRECTION_EPSILON = 1e-3;
@@ -22192,7 +22192,9 @@ var KNOWN_FRONTMATTER_KEYS = /* @__PURE__ */ new Set([
   "timeout_ms",
   "verifier",
   "checks",
-  "assertions"
+  "assertions",
+  "requires_docker",
+  "x_skillsbench"
 ]);
 var KNOWN_CHECK_KEYS = /* @__PURE__ */ new Set([
   "contains",
@@ -22272,7 +22274,8 @@ async function buildNudgeForSkillsDir(level, skillsDir) {
 }
 
 // dist/src/config.js
-var VALID_RUNNER_TYPES = ["claude-sdk", "claude-code"];
+var VALID_RUNNER_TYPES = ["claude-sdk", "claude-code", "codex", "gemini", "opencode"];
+var SANDBOX_MODES = ["host", "docker"];
 var DEFAULT_CONFIG = {
   runnerType: "claude-sdk",
   defaultAgentModel: "sonnet",
@@ -22290,6 +22293,7 @@ var DEFAULT_CONFIG = {
   concurrency: DEFAULT_RUNNER_CONCURRENCY,
   // sequential by default
   nudge: "off",
+  sandbox: "host",
   exitOnFailure: true,
   outputDir: "./results",
   githubSummary: false,
@@ -22352,6 +22356,12 @@ async function loadConfigFile(configPath) {
       }
       config.nudge = raw.nudge;
     }
+    if (raw.sandbox !== void 0) {
+      if (!SANDBOX_MODES.includes(raw.sandbox)) {
+        throw new Error(`Invalid sandbox "${raw.sandbox}" in config file. Valid: ${SANDBOX_MODES.join(", ")}`);
+      }
+      config.sandbox = raw.sandbox;
+    }
     if (raw.output?.dir)
       config.outputDir = raw.output.dir;
     if (raw.output?.judge_truncation !== void 0)
@@ -22413,6 +22423,12 @@ function loadEnvConfig() {
       throw new Error(`Invalid EVAL_NUDGE "${process.env.EVAL_NUDGE}". Valid: ${NUDGE_LEVELS.join(", ")}`);
     }
     config.nudge = process.env.EVAL_NUDGE;
+  }
+  if (process.env.EVAL_SANDBOX) {
+    if (!SANDBOX_MODES.includes(process.env.EVAL_SANDBOX)) {
+      throw new Error(`Invalid EVAL_SANDBOX "${process.env.EVAL_SANDBOX}". Valid: ${SANDBOX_MODES.join(", ")}`);
+    }
+    config.sandbox = process.env.EVAL_SANDBOX;
   }
   if (process.env.EVAL_EXIT_ON_FAILURE !== void 0) {
     config.exitOnFailure = process.env.EVAL_EXIT_ON_FAILURE !== "false";
@@ -22693,6 +22709,13 @@ async function loadTaskPackage(taskDir, suiteSkillsDir, options, errors, warning
   const hasChecks = fm2.checks != null && typeof fm2.checks === "object" && Object.keys(fm2.checks).length > 0;
   if (!hasChecks && !hasVerifier && assertions.length === 0 && fm2.expect_skill_invocation !== false) {
     errors.push(`${label}: task must define at least one of checks:, verifier, or assertions:`);
+  }
+  if (expectInvocation && skillsDir && !hasVerifier) {
+    const outputCheckKeys = ["contains", "not_contains", "regex", "marker", "javascript", "files_exist"];
+    const hasOutputChecks = fm2.checks != null && outputCheckKeys.some((k3) => fm2.checks[k3] !== void 0);
+    if (!hasOutputChecks) {
+      warnings.push(`${label}: task only checks skill invocation (no output checks or verifier) \u2014 the no-skill baseline trivially passes, making Skill Lift meaningless. Add checks: or a verifier/ script.`);
+    }
   }
   if (fm2.expect_skill_invocation === false && fm2.checks) {
     const outputChecks = ["contains", "not_contains", "regex", "javascript", "files_exist"].filter((k3) => fm2.checks[k3] !== void 0);
@@ -42593,7 +42616,71 @@ function createPreToolUseHook(allowedWriteDirs, cwd) {
   };
 }
 
+// dist/src/run/workspace.js
+var fs6 = __toESM(require("fs/promises"), 1);
+var path6 = __toESM(require("path"), 1);
+var DEFAULT_SKILLS_MOUNT_PATH = path6.join(".claude", "skills");
+async function copyDir(src, dest) {
+  await fs6.mkdir(dest, { recursive: true });
+  const entries = await fs6.readdir(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path6.join(src, entry.name);
+    const destPath = path6.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      await copyDir(srcPath, destPath);
+    } else {
+      await fs6.copyFile(srcPath, destPath);
+    }
+  }
+}
+async function mountSkills(skillsSourceDir, targetDir) {
+  await fs6.mkdir(targetDir, { recursive: true });
+  const skillNames = [];
+  const entries = await fs6.readdir(skillsSourceDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      await copyDir(path6.join(skillsSourceDir, entry.name), path6.join(targetDir, entry.name));
+      skillNames.push(entry.name);
+    } else if (entry.name === "SKILL.md") {
+      const skillName = path6.basename(skillsSourceDir);
+      await fs6.mkdir(path6.join(targetDir, skillName), { recursive: true });
+      await fs6.copyFile(path6.join(skillsSourceDir, entry.name), path6.join(targetDir, skillName, "SKILL.md"));
+      skillNames.push(skillName);
+    }
+  }
+  return skillNames;
+}
+async function createTrialWorkspace(options) {
+  const dir = path6.resolve(options.baseDir, "workspaces", options.taskId, `run-${options.runIndex + 1}`);
+  await fs6.rm(dir, { recursive: true, force: true });
+  await fs6.mkdir(dir, { recursive: true });
+  if (options.seedDir) {
+    await copyDir(options.seedDir, dir);
+  }
+  let skillNames = [];
+  if (options.skillsDir) {
+    const mountPath = path6.join(dir, options.skillsMountPath ?? DEFAULT_SKILLS_MOUNT_PATH);
+    skillNames = await mountSkills(options.skillsDir, mountPath);
+  }
+  return {
+    dir,
+    skillNames,
+    cleanup: async () => {
+      await fs6.rm(dir, { recursive: true, force: true }).catch(() => {
+      });
+    }
+  };
+}
+async function applyCleanupPolicy(workspace, policy, trialFailed) {
+  if (policy === "all")
+    return;
+  if (policy === "failures" && trialFailed)
+    return;
+  await workspace.cleanup();
+}
+
 // dist/src/runner/base-runner.js
+var ROUGH_COST_PER_TOKEN = 3e-6;
 function buildTokenUsage(raw) {
   if (!raw)
     return void 0;
@@ -42619,6 +42706,12 @@ function skillNameFromReadPath(filePath) {
   return match ? match[1] : void 0;
 }
 var BaseRunner = class {
+  /**
+   * Workspace-relative skill discovery path for this harness. Claude runners
+   * use '.claude/skills'; CLI harnesses with a different convention (Codex:
+   * '.agents/skills', OpenCode: '.opencode/skill') override this.
+   */
+  skillsMountPath = DEFAULT_SKILLS_MOUNT_PATH;
   options;
   /** Read-only access to resolved runner options (for testing and introspection). */
   get runnerOptions() {
@@ -43165,6 +43258,493 @@ var ClaudeCodeRunner = class extends BaseRunner {
   }
 };
 
+// dist/src/runner/codex-runner.js
+var path7 = __toESM(require("path"), 1);
+var CODEX_CLI_INSTALL_HINT = "Codex CLI not found on PATH. Install: npm install -g @openai/codex";
+function skillNameFromCommand(command) {
+  if (!command || !command.includes("SKILL.md"))
+    return void 0;
+  const normalized = command.replace(/[\\/]+/g, "/");
+  const match = normalized.match(/skills\/([^/'"\s]+)\/SKILL\.md/);
+  return match ? match[1] : void 0;
+}
+var CodexRunner = class extends BaseRunner {
+  providerName = "codex";
+  /** Codex discovers project-level skills from .agents/skills/ (spike-verified). */
+  skillsMountPath = path7.join(".agents", "skills");
+  /** Lazy preflight result, shared across tasks. */
+  cliDetection;
+  /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
+  runCli(options) {
+    return runCliJsonl(options);
+  }
+  /** Detect the CLI. Protected so tests can bypass the preflight. */
+  detect() {
+    return detectCli("codex", ["--version"], { installHint: CODEX_CLI_INSTALL_HINT });
+  }
+  async ensureCliAvailable() {
+    this.cliDetection ??= this.detect();
+    const detection = await this.cliDetection;
+    if (!detection.available) {
+      throw new Error(detection.reason ?? CODEX_CLI_INSTALL_HINT);
+    }
+  }
+  /**
+   * Execute a single evaluation task via the Codex CLI.
+   */
+  async runTask(task, logger) {
+    const startTime = Date.now();
+    try {
+      await this.ensureCliAvailable();
+      const cwd = task.workspaceDir ?? this.options.cwd ?? process.cwd();
+      const timeoutMs = task.timeoutMs ?? this.options.taskTimeoutMs ?? 3e5;
+      const args = [
+        "exec",
+        "--json",
+        "--skip-git-repo-check",
+        // Isolation: skip the user's ~/.codex config.toml (MCP servers etc.)
+        // while keeping CODEX_HOME-based auth. Verified against the spike leak.
+        "--ignore-user-config",
+        // Don't persist eval-trial session files to the user's machine.
+        "--ephemeral"
+      ];
+      const model = this.options.model;
+      if (model && model !== DEFAULT_CONFIG.defaultAgentModel) {
+        args.push("-m", model);
+      }
+      args.push(task.prompt);
+      const cli = await this.runCli({
+        command: "codex",
+        args,
+        cwd,
+        env: process.env,
+        timeoutMs
+      });
+      if (cli.timedOut) {
+        return this.createErrorResult(task, `Task ${task.id} timed out after ${timeoutMs}ms`, cli.durationMs);
+      }
+      const parsed = this.parseEvents(cli.events, logger);
+      if (cli.exitCode !== 0 || !parsed.sawTurnCompleted) {
+        const problem = cli.exitCode !== 0 ? `exited with code ${cli.exitCode}` : "exited without a completed turn";
+        const stderrExcerpt = cli.stderr.trim().slice(0, 500);
+        return this.createErrorResult(task, `codex CLI ${problem}${stderrExcerpt ? `: ${stderrExcerpt}` : ""}`, cli.durationMs);
+      }
+      return this.buildTaskResult(task, {
+        output: parsed.output,
+        durationMs: cli.durationMs,
+        numTurns: parsed.numTurns,
+        // Codex does not report cost; estimate from tokens when available.
+        costUsd: parsed.tokens ? parsed.tokens.total * ROUGH_COST_PER_TOKEN : 0,
+        skillLoads: parsed.skillLoads,
+        toolCalls: parsed.toolCalls,
+        tokens: parsed.tokens
+      });
+    } catch (error) {
+      return this.handleRunError(task, error, startTime, logger);
+    }
+  }
+  /**
+   * Parse codex exec --json events into TaskResult fields.
+   */
+  parseEvents(events, logger) {
+    const parsed = {
+      output: "",
+      numTurns: 0,
+      skillLoads: [],
+      toolCalls: [],
+      sawTurnCompleted: false
+    };
+    const messages = [];
+    for (const event of events) {
+      if (typeof event !== "object" || event === null)
+        continue;
+      const record = event;
+      if (record.type === "item.completed") {
+        const item = record.item;
+        if (!item)
+          continue;
+        if (item.type === "agent_message" && typeof item.text === "string") {
+          messages.push(item.text);
+          logger?.addTextMessage(item.text);
+        }
+        if (item.type === "command_execution" && typeof item.command === "string") {
+          parsed.toolCalls.push({
+            tool: "command_execution",
+            toolUseId: typeof item.id === "string" ? item.id : "",
+            timestamp: Date.now(),
+            input: { command: item.command }
+          });
+          logger?.addToolUse("command_execution", { command: item.command });
+          const skillName = skillNameFromCommand(item.command);
+          if (skillName) {
+            parsed.skillLoads.push(skillName);
+          }
+        }
+      }
+      if (record.type === "turn.completed") {
+        parsed.sawTurnCompleted = true;
+        parsed.numTurns++;
+        const usage = record.usage;
+        if (usage) {
+          const cached = usage.cached_input_tokens ?? 0;
+          parsed.tokens = buildTokenUsage({
+            input: Math.max(0, (usage.input_tokens ?? 0) - cached),
+            output: usage.output_tokens,
+            cacheRead: cached
+          });
+        }
+      }
+    }
+    parsed.output = messages.join("\n\n");
+    return parsed;
+  }
+};
+
+// dist/src/runner/gemini-runner.js
+var path8 = __toESM(require("path"), 1);
+var GEMINI_CLI_INSTALL_HINT = "Gemini CLI not found on PATH. Install: npm install -g @google/gemini-cli";
+var EXPERIMENTAL_WARNING = "Warning: the gemini runner is EXPERIMENTAL \u2014 built from documented output formats; not yet verified against a live CLI. Captured transcripts wanted (see src/__tests__/fixtures/transcripts/README.md).";
+var warnedExperimental = false;
+function skillNameFromParameters(parameters) {
+  if (typeof parameters === "string")
+    return skillNameFromCommand(parameters);
+  if (typeof parameters !== "object" || parameters === null)
+    return void 0;
+  for (const value of Object.values(parameters)) {
+    if (typeof value === "string") {
+      const name = skillNameFromCommand(value);
+      if (name)
+        return name;
+    }
+  }
+  return void 0;
+}
+var GeminiRunner = class extends BaseRunner {
+  providerName = "gemini";
+  /** Canonical documented project-level skills dir (`.agents/skills` is an alias). */
+  skillsMountPath = path8.join(".gemini", "skills");
+  cliDetection;
+  /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
+  runCli(options) {
+    return runCliJsonl(options);
+  }
+  /** Detect the CLI. Protected so tests can bypass the preflight. */
+  detect() {
+    return detectCli("gemini", ["--version"], { installHint: GEMINI_CLI_INSTALL_HINT });
+  }
+  async ensureCliAvailable() {
+    this.cliDetection ??= this.detect();
+    const detection = await this.cliDetection;
+    if (!detection.available) {
+      throw new Error(detection.reason ?? GEMINI_CLI_INSTALL_HINT);
+    }
+  }
+  async runTask(task, logger) {
+    const startTime = Date.now();
+    if (!warnedExperimental) {
+      warnedExperimental = true;
+      console.warn(EXPERIMENTAL_WARNING);
+    }
+    try {
+      await this.ensureCliAvailable();
+      const cwd = task.workspaceDir ?? this.options.cwd ?? process.cwd();
+      const timeoutMs = task.timeoutMs ?? this.options.taskTimeoutMs ?? 3e5;
+      const args = [
+        "-p",
+        task.prompt,
+        "--output-format",
+        "stream-json",
+        // Auto-approve tool use, incl. the activate_skill consent prompt.
+        "--approval-mode",
+        "yolo"
+      ];
+      const model = this.options.model;
+      if (model && model !== DEFAULT_CONFIG.defaultAgentModel) {
+        args.push("-m", model);
+      }
+      const cli = await this.runCli({
+        command: "gemini",
+        args,
+        cwd,
+        env: process.env,
+        timeoutMs
+      });
+      if (cli.timedOut) {
+        return this.createErrorResult(task, `Task ${task.id} timed out after ${timeoutMs}ms`, cli.durationMs);
+      }
+      const parsed = this.parseEvents(cli.events, logger);
+      if (cli.exitCode !== 0 || !parsed.sawResult || parsed.errorMessage) {
+        const problem = parsed.errorMessage ? `reported an error: ${parsed.errorMessage}` : cli.exitCode !== 0 ? `exited with code ${cli.exitCode}` : "exited without a result event";
+        const stderrExcerpt = cli.stderr.trim().slice(0, 500);
+        return this.createErrorResult(task, `gemini CLI ${problem}${stderrExcerpt ? `: ${stderrExcerpt}` : ""}`, cli.durationMs);
+      }
+      return this.buildTaskResult(task, {
+        output: parsed.output,
+        durationMs: cli.durationMs,
+        numTurns: parsed.numTurns,
+        costUsd: parsed.tokens ? parsed.tokens.total * ROUGH_COST_PER_TOKEN : 0,
+        skillLoads: parsed.skillLoads,
+        toolCalls: parsed.toolCalls,
+        tokens: parsed.tokens
+      });
+    } catch (error) {
+      return this.handleRunError(task, error, startTime, logger);
+    }
+  }
+  /**
+   * Best-effort parse of Gemini stream-json events. Field names for message
+   * chunks are not fully documented, so several shapes are tolerated.
+   */
+  parseEvents(events, logger) {
+    const parsed = {
+      output: "",
+      numTurns: 0,
+      skillLoads: [],
+      toolCalls: [],
+      sawResult: false
+    };
+    const texts = [];
+    for (const event of events) {
+      if (typeof event !== "object" || event === null)
+        continue;
+      const record = event;
+      if (typeof record.response === "string" && record.type === void 0) {
+        texts.push(record.response);
+        parsed.sawResult = true;
+        continue;
+      }
+      switch (record.type) {
+        case "message": {
+          const role = record.role ?? "assistant";
+          const content = record.content ?? record.text ?? record.message?.content;
+          if (role === "assistant" && typeof content === "string" && content) {
+            texts.push(content);
+            logger?.addTextMessage(content);
+          }
+          break;
+        }
+        case "tool_use": {
+          const toolName = record.tool_name ?? record.name ?? "unknown";
+          const parameters = record.parameters ?? record.input;
+          parsed.toolCalls.push({
+            tool: toolName,
+            toolUseId: record.tool_id ?? "",
+            timestamp: Date.now(),
+            input: parameters
+          });
+          logger?.addToolUse(toolName, parameters);
+          if (toolName === "activate_skill") {
+            const params = parameters;
+            const skillName = params?.skill ?? params?.name;
+            if (skillName)
+              parsed.skillLoads.push(skillName);
+          } else {
+            const skillName = skillNameFromParameters(parameters);
+            if (skillName)
+              parsed.skillLoads.push(skillName);
+          }
+          break;
+        }
+        case "error": {
+          const message = record.message ?? record.error;
+          parsed.errorMessage = message ? String(message) : "unknown error event";
+          break;
+        }
+        case "result": {
+          parsed.sawResult = true;
+          if (typeof record.response === "string" && record.response) {
+            texts.push(record.response);
+          }
+          const stats = record.stats;
+          if (stats && (stats.input_tokens !== void 0 || stats.output_tokens !== void 0)) {
+            parsed.tokens = buildTokenUsage({
+              input: stats.input_tokens,
+              output: stats.output_tokens
+            });
+          }
+          parsed.numTurns = 1;
+          break;
+        }
+      }
+    }
+    parsed.output = texts.join("\n\n");
+    return parsed;
+  }
+};
+
+// dist/src/runner/opencode-runner.js
+var path9 = __toESM(require("path"), 1);
+var OPENCODE_CLI_INSTALL_HINT = "OpenCode CLI not found on PATH. Install: npm install -g opencode-ai";
+var EXPERIMENTAL_WARNING2 = "Warning: the opencode runner is EXPERIMENTAL \u2014 built from documented output formats; not yet verified against a live CLI. Captured transcripts wanted (see src/__tests__/fixtures/transcripts/README.md).";
+var warnedExperimental2 = false;
+function skillNameFromInput(input) {
+  if (typeof input === "string")
+    return skillNameFromCommand(input);
+  if (typeof input !== "object" || input === null)
+    return void 0;
+  for (const value of Object.values(input)) {
+    if (typeof value === "string") {
+      const name = skillNameFromCommand(value);
+      if (name)
+        return name;
+    }
+  }
+  return void 0;
+}
+var OpenCodeRunner = class extends BaseRunner {
+  providerName = "opencode";
+  /** OpenCode's native project-level skills dir (docs: plural `skills`). */
+  skillsMountPath = path9.join(".opencode", "skills");
+  cliDetection;
+  /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
+  runCli(options) {
+    return runCliJsonl(options);
+  }
+  /** Detect the CLI. Protected so tests can bypass the preflight. */
+  detect() {
+    return detectCli("opencode", ["--version"], { installHint: OPENCODE_CLI_INSTALL_HINT });
+  }
+  async ensureCliAvailable() {
+    this.cliDetection ??= this.detect();
+    const detection = await this.cliDetection;
+    if (!detection.available) {
+      throw new Error(detection.reason ?? OPENCODE_CLI_INSTALL_HINT);
+    }
+  }
+  async runTask(task, logger) {
+    const startTime = Date.now();
+    if (!warnedExperimental2) {
+      warnedExperimental2 = true;
+      console.warn(EXPERIMENTAL_WARNING2);
+    }
+    try {
+      await this.ensureCliAvailable();
+      const cwd = task.workspaceDir ?? this.options.cwd ?? process.cwd();
+      const timeoutMs = task.timeoutMs ?? this.options.taskTimeoutMs ?? 3e5;
+      const args = [
+        "run",
+        "--format",
+        "json",
+        // Auto-approve permissions not explicitly denied; without this,
+        // non-interactive permission requests are rejected.
+        "--auto"
+      ];
+      const model = this.options.model;
+      if (model && model !== DEFAULT_CONFIG.defaultAgentModel) {
+        args.push("--model", model);
+      }
+      args.push(task.prompt);
+      const cli = await this.runCli({
+        command: "opencode",
+        args,
+        cwd,
+        env: process.env,
+        timeoutMs
+      });
+      if (cli.timedOut) {
+        return this.createErrorResult(task, `Task ${task.id} timed out after ${timeoutMs}ms`, cli.durationMs);
+      }
+      const parsed = this.parseEvents(cli.events, logger);
+      if (cli.exitCode !== 0 || !parsed.sawCompletion || parsed.errorMessage) {
+        const problem = parsed.errorMessage ? `reported an error: ${parsed.errorMessage}` : cli.exitCode !== 0 ? `exited with code ${cli.exitCode}` : "exited without completing a step";
+        const stderrExcerpt = cli.stderr.trim().slice(0, 500);
+        return this.createErrorResult(task, `opencode CLI ${problem}${stderrExcerpt ? `: ${stderrExcerpt}` : ""}`, cli.durationMs);
+      }
+      return this.buildTaskResult(task, {
+        output: parsed.output,
+        durationMs: cli.durationMs,
+        numTurns: parsed.numTurns,
+        costUsd: parsed.costUsd,
+        skillLoads: parsed.skillLoads,
+        toolCalls: parsed.toolCalls,
+        tokens: parsed.tokens
+      });
+    } catch (error) {
+      return this.handleRunError(task, error, startTime, logger);
+    }
+  }
+  /**
+   * Best-effort parse of OpenCode --format json events. Events are the
+   * message parts spread into `{type, timestamp, sessionID, ...part}`; a
+   * nested `part` object is also tolerated.
+   */
+  parseEvents(events, logger) {
+    const parsed = {
+      output: "",
+      numTurns: 0,
+      costUsd: 0,
+      skillLoads: [],
+      toolCalls: [],
+      sawCompletion: false
+    };
+    const texts = [];
+    for (const event of events) {
+      if (typeof event !== "object" || event === null)
+        continue;
+      const record = event;
+      const part = record.part ?? record;
+      switch (record.type) {
+        case "text": {
+          const text = part.text ?? record.text;
+          if (typeof text === "string" && text) {
+            texts.push(text);
+            logger?.addTextMessage(text);
+          }
+          parsed.sawCompletion = true;
+          break;
+        }
+        case "tool_use": {
+          const toolName = part.tool ?? record.tool ?? "unknown";
+          const state = part.state;
+          const input = state?.input ?? part.input;
+          parsed.toolCalls.push({
+            tool: toolName,
+            toolUseId: part.callID ?? "",
+            timestamp: Date.now(),
+            input
+          });
+          logger?.addToolUse(toolName, input);
+          if (toolName === "skill") {
+            const skillName = input?.name;
+            if (typeof skillName === "string" && skillName) {
+              parsed.skillLoads.push(skillName);
+            }
+          } else {
+            const skillName = skillNameFromInput(input);
+            if (skillName)
+              parsed.skillLoads.push(skillName);
+          }
+          break;
+        }
+        case "step_finish": {
+          parsed.sawCompletion = true;
+          parsed.numTurns++;
+          const cost = part.cost ?? record.cost;
+          if (typeof cost === "number")
+            parsed.costUsd += cost;
+          const tokens = part.tokens ?? record.tokens;
+          if (tokens) {
+            parsed.tokens = buildTokenUsage({
+              input: tokens.input,
+              output: tokens.output,
+              cacheRead: tokens.cache?.read,
+              cacheCreation: tokens.cache?.write
+            });
+          }
+          break;
+        }
+        case "error": {
+          const message = part.message ?? record.error;
+          parsed.errorMessage = message ? String(message) : "unknown error event";
+          break;
+        }
+      }
+    }
+    parsed.output = texts.join("\n\n");
+    return parsed;
+  }
+};
+
 // dist/src/runner/runner-factory.js
 async function createRunner(type, options, config) {
   switch (type) {
@@ -43172,14 +43752,20 @@ async function createRunner(type, options, config) {
       return new ClaudeSdkRunner(options, config);
     case "claude-code":
       return new ClaudeCodeRunner(options, config);
+    case "codex":
+      return new CodexRunner(options, config);
+    case "gemini":
+      return new GeminiRunner(options, config);
+    case "opencode":
+      return new OpenCodeRunner(options, config);
     default:
       throw new Error(`Unknown runner type: ${type}`);
   }
 }
 
 // dist/src/scorer/deterministic.js
-var fs6 = __toESM(require("fs"), 1);
-var path6 = __toESM(require("path"), 1);
+var fs7 = __toESM(require("fs"), 1);
+var path10 = __toESM(require("path"), 1);
 var vm2 = __toESM(require("vm"), 1);
 function isSkillTool(toolName) {
   return toolName === "Skill" || toolName.includes("skill") && !toolName.includes("skill-resource");
@@ -43350,20 +43936,20 @@ function scoreDeterministic(task, result, options) {
     }
     if (Array.isArray(check.expectFileExists) && check.expectFileExists.length > 0) {
       const cwd = options?.cwd ?? process.cwd();
-      const resolvedCwd = path6.resolve(cwd);
-      if (!fs6.existsSync(resolvedCwd)) {
+      const resolvedCwd = path10.resolve(cwd);
+      if (!fs7.existsSync(resolvedCwd)) {
         fileExistsCheckPassed = false;
         details.push(`Working directory does not exist: ${resolvedCwd}`);
       } else {
-        const cwdPrefix = resolvedCwd.endsWith(path6.sep) ? resolvedCwd : resolvedCwd + path6.sep;
+        const cwdPrefix = resolvedCwd.endsWith(path10.sep) ? resolvedCwd : resolvedCwd + path10.sep;
         const missing = [];
         for (const filePath of check.expectFileExists) {
-          const resolved = path6.resolve(cwd, filePath);
+          const resolved = path10.resolve(cwd, filePath);
           if (!resolved.startsWith(cwdPrefix) && resolved !== resolvedCwd) {
             missing.push(`${filePath} (outside working directory)`);
             continue;
           }
-          if (!fs6.existsSync(resolved)) {
+          if (!fs7.existsSync(resolved)) {
             missing.push(filePath);
           }
         }
@@ -43454,8 +44040,8 @@ function scoreDeterministic(task, result, options) {
 }
 
 // dist/src/feedback.js
-var fs7 = __toESM(require("fs/promises"), 1);
-var path7 = __toESM(require("path"), 1);
+var fs8 = __toESM(require("fs/promises"), 1);
+var path11 = __toESM(require("path"), 1);
 function generateFeedbackTemplate(tasks) {
   const template = {};
   for (const task of tasks) {
@@ -43465,11 +44051,11 @@ function generateFeedbackTemplate(tasks) {
 }
 async function writeFeedbackTemplate(tasks, outputPath) {
   const template = generateFeedbackTemplate(tasks);
-  await fs7.mkdir(path7.dirname(outputPath), { recursive: true });
-  await fs7.writeFile(outputPath, JSON.stringify(template, null, 2) + "\n");
+  await fs8.mkdir(path11.dirname(outputPath), { recursive: true });
+  await fs8.writeFile(outputPath, JSON.stringify(template, null, 2) + "\n");
 }
 async function loadFeedback(feedbackPath, taskIds) {
-  const content = await fs7.readFile(feedbackPath, "utf-8");
+  const content = await fs8.readFile(feedbackPath, "utf-8");
   const raw = JSON.parse(content);
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new Error("Invalid feedback file: expected a JSON object with task IDs as keys");
@@ -44100,8 +44686,8 @@ function mergeScores(task, result, det, judge, isBaseline) {
 }
 
 // dist/src/session/session-logger.js
-var fs8 = __toESM(require("fs/promises"), 1);
-var path8 = __toESM(require("path"), 1);
+var fs9 = __toESM(require("fs/promises"), 1);
+var path12 = __toESM(require("path"), 1);
 var SessionLogger = class {
   log;
   logDir;
@@ -44153,13 +44739,13 @@ var SessionLogger = class {
    */
   async save() {
     this.log.endTime = (/* @__PURE__ */ new Date()).toISOString();
-    await fs8.mkdir(this.logDir, { recursive: true });
+    await fs9.mkdir(this.logDir, { recursive: true });
     const prefix = this.log.status === "error" ? "FAILED__" : "";
     const baseName = `${prefix}${this.log.sessionId}`;
-    const jsonPath = path8.join(this.logDir, `${baseName}.json`);
-    const mdPath = path8.join(this.logDir, `${baseName}.md`);
-    await fs8.writeFile(jsonPath, JSON.stringify(this.log, null, 2));
-    await fs8.writeFile(mdPath, this.generateReadableLog());
+    const jsonPath = path12.join(this.logDir, `${baseName}.json`);
+    const mdPath = path12.join(this.logDir, `${baseName}.md`);
+    await fs9.writeFile(jsonPath, JSON.stringify(this.log, null, 2));
+    await fs9.writeFile(mdPath, this.generateReadableLog());
     return { jsonPath, mdPath };
   }
   generateReadableLog() {
@@ -44251,8 +44837,8 @@ function formatDuration(ms2) {
 }
 
 // dist/src/report/report.js
-var fs10 = __toESM(require("fs/promises"), 1);
-var path9 = __toESM(require("path"), 1);
+var fs11 = __toESM(require("fs/promises"), 1);
+var path13 = __toESM(require("path"), 1);
 
 // dist/src/scorer/aggregator.js
 var FLAKY_STDDEV_THRESHOLD = 1;
@@ -44395,12 +44981,12 @@ function aggregateScores(allScores) {
 }
 
 // dist/src/report/comparison.js
-var fs9 = __toESM(require("fs/promises"), 1);
+var fs10 = __toESM(require("fs/promises"), 1);
 var SIGNIFICANCE_THRESHOLD_RESOLUTION = 0.2;
 async function loadPreviousRunSummary(filePath) {
   let raw;
   try {
-    raw = await fs9.readFile(filePath, "utf-8");
+    raw = await fs10.readFile(filePath, "utf-8");
   } catch (err) {
     if (err.code === "ENOENT") {
       throw new Error(`Comparison file not found: ${filePath}`);
@@ -44795,8 +45381,8 @@ ${result.output.slice(0, config.reportOutputTruncation) || "(no output)"}
 `;
   }
   if (outputPath) {
-    await fs10.mkdir(path9.dirname(outputPath), { recursive: true });
-    await fs10.writeFile(outputPath, report);
+    await fs11.mkdir(path13.dirname(outputPath), { recursive: true });
+    await fs11.writeFile(outputPath, report);
     console.log(`Report saved to: ${outputPath}`);
   }
   return report;
@@ -44838,8 +45424,8 @@ async function generateJsonResults(options) {
     crossIterationComparison
   };
   if (outputPath) {
-    await fs10.mkdir(path9.dirname(outputPath), { recursive: true });
-    await fs10.writeFile(outputPath, JSON.stringify(report, null, 2));
+    await fs11.mkdir(path13.dirname(outputPath), { recursive: true });
+    await fs11.writeFile(outputPath, JSON.stringify(report, null, 2));
     console.log(`JSON results saved to: ${outputPath}`);
   }
   return report;
@@ -45039,8 +45625,8 @@ Assignment shows the label order: with-skill / without-skill (e.g. A/B means A =
 }
 
 // dist/src/report/html-report.js
-var fs11 = __toESM(require("fs/promises"), 1);
-var path10 = __toESM(require("path"), 1);
+var fs12 = __toESM(require("fs/promises"), 1);
+var path14 = __toESM(require("path"), 1);
 function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -45107,8 +45693,8 @@ ${renderScript()}
 </body>
 </html>`;
   if (outputPath) {
-    await fs11.mkdir(path10.dirname(outputPath), { recursive: true });
-    await fs11.writeFile(outputPath, html);
+    await fs12.mkdir(path14.dirname(outputPath), { recursive: true });
+    await fs12.writeFile(outputPath, html);
     console.log(`HTML report saved to: ${outputPath}`);
   }
   return html;
@@ -45859,7 +46445,7 @@ function renderScript() {
 }
 
 // dist/src/report/github-summary.js
-var fs12 = __toESM(require("fs/promises"), 1);
+var fs13 = __toESM(require("fs/promises"), 1);
 function generateGitHubSummary(report, config) {
   const resolvedConfig = config ?? loadConfigSync();
   const { summary: summary2, tasks } = report;
@@ -46029,13 +46615,13 @@ async function writeGitHubSummary(report, config) {
   if (!summaryPath)
     return false;
   const summary2 = generateGitHubSummary(report, config);
-  await fs12.appendFile(summaryPath, summary2 + "\n");
+  await fs13.appendFile(summaryPath, summary2 + "\n");
   return true;
 }
 
 // dist/src/results/summary.js
-var fs13 = __toESM(require("fs/promises"), 1);
-var path11 = __toESM(require("path"), 1);
+var fs14 = __toESM(require("fs/promises"), 1);
+var path15 = __toESM(require("path"), 1);
 var VERIFIER_STDERR_EXCERPT = 400;
 var FAILURE_DETAIL_PREFIXES = [
   "Expected skill activation",
@@ -46215,83 +46801,208 @@ function buildRunSummary(options) {
   };
 }
 async function writeRunSummary(summary2, outputDir) {
-  const summaryPath = path11.join(outputDir, "summary.json");
-  await fs13.mkdir(outputDir, { recursive: true });
-  await fs13.writeFile(summaryPath, JSON.stringify(summary2, null, 2));
+  const summaryPath = path15.join(outputDir, "summary.json");
+  await fs14.mkdir(outputDir, { recursive: true });
+  await fs14.writeFile(summaryPath, JSON.stringify(summary2, null, 2));
   return summaryPath;
 }
 
-// dist/src/run/workspace.js
-var fs14 = __toESM(require("fs/promises"), 1);
-var path12 = __toESM(require("path"), 1);
-var DEFAULT_SKILLS_MOUNT_PATH = path12.join(".claude", "skills");
-async function copyDir(src, dest) {
-  await fs14.mkdir(dest, { recursive: true });
-  const entries = await fs14.readdir(src, { withFileTypes: true });
-  for (const entry of entries) {
-    const srcPath = path12.join(src, entry.name);
-    const destPath = path12.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      await copyDir(srcPath, destPath);
+// dist/src/score/verifier.js
+var import_child_process6 = require("child_process");
+var fs16 = __toESM(require("fs/promises"), 1);
+var os3 = __toESM(require("os"), 1);
+var path17 = __toESM(require("path"), 1);
+
+// dist/src/sandbox/docker.js
+var import_child_process5 = require("child_process");
+var import_crypto7 = require("crypto");
+var fs15 = __toESM(require("fs/promises"), 1);
+var os2 = __toESM(require("os"), 1);
+var path16 = __toESM(require("path"), 1);
+var DEFAULT_DOCKER_IMAGE = "node:20-slim";
+var DOCKER_UNAVAILABLE_HINT = "Docker is required for --sandbox docker but the `docker` CLI could not be run. Install Docker (https://docs.docker.com/get-docker/), make sure the daemon is running, or drop --sandbox docker to run verifiers on the host.";
+function defaultDockerExec(args, options) {
+  return new Promise((resolve6) => {
+    (0, import_child_process5.execFile)("docker", args, { timeout: options.timeoutMs, encoding: "utf-8", maxBuffer: 10 * 1024 * 1024, shell: false }, (err, stdout, stderr) => {
+      if (!err) {
+        resolve6({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: 0, timedOut: false });
+        return;
+      }
+      const execErr = err;
+      resolve6({
+        stdout: stdout ?? "",
+        stderr: stderr ?? "",
+        exitCode: typeof execErr.code === "number" ? execErr.code : null,
+        timedOut: execErr.killed === true,
+        spawnErrorCode: typeof execErr.code === "string" ? execErr.code : void 0
+      });
+    });
+  });
+}
+function resolveContainerInterpreter(scriptRelPath) {
+  const ext = path16.extname(scriptRelPath).toLowerCase();
+  switch (ext) {
+    case ".mjs":
+    case ".js":
+      return { interpreter: "node" };
+    case ".py":
+      return { interpreter: "python3" };
+    case ".sh":
+      return { interpreter: "bash" };
+    default:
+      return {
+        error: `Unsupported verifier extension '${ext}' for --sandbox docker (${scriptRelPath}). Supported in-container: .mjs, .js, .py, .sh.`
+      };
+  }
+}
+function dockerImageTag(taskId, dockerfileContent) {
+  const hash = (0, import_crypto7.createHash)("sha256").update(dockerfileContent).digest("hex").slice(0, 12);
+  const safeId = taskId.toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 40) || "task";
+  return `skilljack-eval-${safeId}-${hash}`;
+}
+var BUILD_TIMEOUT_MS = 6e5;
+async function fileExists(p) {
+  try {
+    return (await fs15.stat(p)).isFile();
+  } catch {
+    return false;
+  }
+}
+async function isDirectory2(p) {
+  try {
+    return (await fs15.stat(p)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+async function readRewardFile(p) {
+  let raw;
+  try {
+    raw = await fs15.readFile(p, "utf-8");
+  } catch {
+    return null;
+  }
+  const parsed = parseFloat(raw.trim());
+  if (Number.isNaN(parsed))
+    return 0;
+  return Math.min(1, Math.max(0, parsed));
+}
+async function runVerifierInDocker(options) {
+  const started = Date.now();
+  const execFn = options.execFn ?? defaultDockerExec;
+  const timeoutMs = options.timeoutMs ?? 6e4;
+  const outcome = (partial) => {
+    const reward = partial.reward ?? 0;
+    return {
+      exitCode: null,
+      stdout: "",
+      stderr: "",
+      durationMs: Date.now() - started,
+      ...partial,
+      reward,
+      passed: reward >= 1
+    };
+  };
+  const { interpreter, error: interpError } = resolveContainerInterpreter(options.verifierRelPath);
+  if (!interpreter) {
+    return outcome({ status: "error", stderr: interpError ?? "No container interpreter" });
+  }
+  let image = options.image;
+  if (!image) {
+    const dockerfile = options.dockerfile ?? path16.join(options.taskDir, "environment", "Dockerfile");
+    if (await fileExists(dockerfile)) {
+      const content = await fs15.readFile(dockerfile, "utf-8");
+      const tag = dockerImageTag(options.taskId ?? path16.basename(options.taskDir), content);
+      const inspect = await execFn(["image", "inspect", tag], { timeoutMs: 3e4 });
+      if (inspect.spawnErrorCode === "ENOENT") {
+        return outcome({ status: "error", stderr: DOCKER_UNAVAILABLE_HINT });
+      }
+      if (inspect.exitCode !== 0) {
+        const build = await execFn(["build", "-t", tag, "-f", dockerfile, path16.dirname(dockerfile)], { timeoutMs: BUILD_TIMEOUT_MS });
+        if (build.spawnErrorCode === "ENOENT") {
+          return outcome({ status: "error", stderr: DOCKER_UNAVAILABLE_HINT });
+        }
+        if (build.exitCode !== 0) {
+          return outcome({
+            status: "error",
+            exitCode: build.exitCode,
+            stdout: build.stdout,
+            stderr: `docker build failed for ${dockerfile}: ${build.stderr.slice(0, 1e3)}`
+          });
+        }
+      }
+      image = tag;
     } else {
-      await fs14.copyFile(srcPath, destPath);
+      image = DEFAULT_DOCKER_IMAGE;
     }
   }
-}
-async function mountSkills(skillsSourceDir, targetDir) {
-  await fs14.mkdir(targetDir, { recursive: true });
-  const skillNames = [];
-  const entries = await fs14.readdir(skillsSourceDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      await copyDir(path12.join(skillsSourceDir, entry.name), path12.join(targetDir, entry.name));
-      skillNames.push(entry.name);
-    } else if (entry.name === "SKILL.md") {
-      const skillName = path12.basename(skillsSourceDir);
-      await fs14.mkdir(path12.join(targetDir, skillName), { recursive: true });
-      await fs14.copyFile(path12.join(skillsSourceDir, entry.name), path12.join(targetDir, skillName, "SKILL.md"));
-      skillNames.push(skillName);
+  let logsTmp;
+  try {
+    logsTmp = await fs15.mkdtemp(path16.join(os2.tmpdir(), "skilljack-docker-"));
+  } catch (err) {
+    return outcome({
+      status: "error",
+      stderr: `Failed to create docker logs temp dir: ${err instanceof Error ? err.message : String(err)}`
+    });
+  }
+  try {
+    const contractDir = path16.join(logsTmp, "contract");
+    await fs15.mkdir(contractDir, { recursive: true });
+    await fs15.mkdir(path16.join(logsTmp, "verifier"), { recursive: true });
+    await fs15.writeFile(path16.join(contractDir, "output.txt"), options.output, "utf-8");
+    await fs15.writeFile(path16.join(contractDir, "trajectory.json"), JSON.stringify(options.toolCalls, null, 2), "utf-8");
+    const scriptContainerPath = "/task/" + options.verifierRelPath.split(path16.sep).join("/");
+    const args = [
+      "run",
+      "--rm",
+      "-v",
+      `${options.workspaceDir}:/workspace`,
+      "-v",
+      `${options.taskDir}:/task:ro`,
+      "-v",
+      `${logsTmp}:/logs`
+    ];
+    const verifierDir = path16.join(options.taskDir, path16.dirname(options.verifierRelPath));
+    if (path16.basename(verifierDir) === "verifier" && await isDirectory2(verifierDir)) {
+      args.push("-v", `${verifierDir}:/verifier:ro`);
     }
-  }
-  return skillNames;
-}
-async function createTrialWorkspace(options) {
-  const dir = path12.resolve(options.baseDir, "workspaces", options.taskId, `run-${options.runIndex + 1}`);
-  await fs14.rm(dir, { recursive: true, force: true });
-  await fs14.mkdir(dir, { recursive: true });
-  if (options.seedDir) {
-    await copyDir(options.seedDir, dir);
-  }
-  let skillNames = [];
-  if (options.skillsDir) {
-    const mountPath = path12.join(dir, options.skillsMountPath ?? DEFAULT_SKILLS_MOUNT_PATH);
-    skillNames = await mountSkills(options.skillsDir, mountPath);
-  }
-  return {
-    dir,
-    skillNames,
-    cleanup: async () => {
-      await fs14.rm(dir, { recursive: true, force: true }).catch(() => {
+    args.push("-w", "/workspace", "-e", "SKILLJACK_OUTPUT_FILE=/logs/contract/output.txt", "-e", "SKILLJACK_TRAJECTORY_FILE=/logs/contract/trajectory.json", "-e", "SKILLJACK_TASK_DIR=/task", "-e", "SKILLJACK_REWARD_FILE=/logs/contract/reward.txt");
+    for (const [key, value] of Object.entries(options.env ?? {})) {
+      args.push("-e", `${key}=${value}`);
+    }
+    args.push(image, interpreter, scriptContainerPath);
+    const run2 = await execFn(args, { timeoutMs });
+    if (run2.spawnErrorCode === "ENOENT") {
+      return outcome({ status: "error", stderr: DOCKER_UNAVAILABLE_HINT });
+    }
+    if (run2.timedOut) {
+      return outcome({
+        status: "timeout",
+        exitCode: run2.exitCode,
+        stdout: run2.stdout,
+        stderr: run2.stderr || `Docker verifier timed out after ${timeoutMs}ms`
       });
     }
-  };
-}
-async function applyCleanupPolicy(workspace, policy, trialFailed) {
-  if (policy === "all")
-    return;
-  if (policy === "failures" && trialFailed)
-    return;
-  await workspace.cleanup();
+    const skillsBenchReward = await readRewardFile(path16.join(logsTmp, "verifier", "reward.txt"));
+    const contractReward = await readRewardFile(path16.join(contractDir, "reward.txt"));
+    const reward = skillsBenchReward ?? contractReward ?? (run2.exitCode === 0 ? 1 : 0);
+    return outcome({
+      status: "ok",
+      reward,
+      exitCode: run2.exitCode,
+      stdout: run2.stdout,
+      stderr: run2.stderr
+    });
+  } finally {
+    await fs15.rm(logsTmp, { recursive: true, force: true }).catch(() => {
+    });
+  }
 }
 
 // dist/src/score/verifier.js
-var import_child_process5 = require("child_process");
-var fs15 = __toESM(require("fs/promises"), 1);
-var os2 = __toESM(require("os"), 1);
-var path13 = __toESM(require("path"), 1);
 var DEFAULT_VERIFIER_TIMEOUT_MS = 6e4;
 function resolveInterpreter(scriptPath, platform = process.platform) {
-  const ext = path13.extname(scriptPath).toLowerCase();
+  const ext = path17.extname(scriptPath).toLowerCase();
   switch (ext) {
     case ".mjs":
     case ".js":
@@ -46325,7 +47036,7 @@ function resolveInterpreter(scriptPath, platform = process.platform) {
 }
 function execAttempt(invocation, cwd, env, timeoutMs) {
   return new Promise((resolve6) => {
-    (0, import_child_process5.execFile)(invocation.file, invocation.args, { cwd, env, timeout: timeoutMs, encoding: "utf-8", maxBuffer: 10 * 1024 * 1024, shell: false }, (err, stdout, stderr) => {
+    (0, import_child_process6.execFile)(invocation.file, invocation.args, { cwd, env, timeout: timeoutMs, encoding: "utf-8", maxBuffer: 10 * 1024 * 1024, shell: false }, (err, stdout, stderr) => {
       if (!err) {
         resolve6({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: 0, timedOut: false, enoent: false });
         return;
@@ -46348,7 +47059,7 @@ function execAttempt(invocation, cwd, env, timeoutMs) {
 async function readReward(rewardFile) {
   let raw;
   try {
-    raw = await fs15.readFile(rewardFile, "utf-8");
+    raw = await fs16.readFile(rewardFile, "utf-8");
   } catch {
     return null;
   }
@@ -46425,9 +47136,38 @@ async function executeVerifier(options) {
   });
 }
 async function runVerifier(options) {
+  if (options.sandbox === "docker") {
+    const errorOutcome = (stderr) => ({
+      reward: 0,
+      passed: false,
+      exitCode: null,
+      status: "error",
+      stdout: "",
+      stderr,
+      durationMs: 0
+    });
+    if (options.command) {
+      return errorOutcome("verifier.command is not supported with --sandbox docker \u2014 provide a verifier script (verify.mjs/.py/.sh) instead.");
+    }
+    if (!options.scriptPath) {
+      return errorOutcome("No verifier script provided");
+    }
+    const verifierRelPath = path17.relative(options.taskDir, options.scriptPath);
+    if (verifierRelPath.startsWith("..")) {
+      return errorOutcome(`Verifier script ${options.scriptPath} is outside the task dir ${options.taskDir} \u2014 cannot mount it into the container.`);
+    }
+    return runVerifierInDocker({
+      taskDir: options.taskDir,
+      workspaceDir: options.workspaceDir,
+      verifierRelPath,
+      timeoutMs: options.timeoutMs,
+      output: options.output,
+      toolCalls: options.toolCalls
+    });
+  }
   let contractDir;
   try {
-    contractDir = await fs15.mkdtemp(path13.join(os2.tmpdir(), "skilljack-verifier-"));
+    contractDir = await fs16.mkdtemp(path17.join(os3.tmpdir(), "skilljack-verifier-"));
   } catch (err) {
     return {
       reward: 0,
@@ -46439,12 +47179,12 @@ async function runVerifier(options) {
       durationMs: 0
     };
   }
-  const outputFile = path13.join(contractDir, "output.txt");
-  const trajectoryFile = path13.join(contractDir, "trajectory.json");
-  const rewardFile = path13.join(contractDir, "reward.txt");
+  const outputFile = path17.join(contractDir, "output.txt");
+  const trajectoryFile = path17.join(contractDir, "trajectory.json");
+  const rewardFile = path17.join(contractDir, "reward.txt");
   try {
-    await fs15.writeFile(outputFile, options.output, "utf-8");
-    await fs15.writeFile(trajectoryFile, JSON.stringify(options.toolCalls, null, 2), "utf-8");
+    await fs16.writeFile(outputFile, options.output, "utf-8");
+    await fs16.writeFile(trajectoryFile, JSON.stringify(options.toolCalls, null, 2), "utf-8");
     return await executeVerifier({
       scriptPath: options.scriptPath,
       command: options.command,
@@ -46456,15 +47196,15 @@ async function runVerifier(options) {
       timeoutMs: options.timeoutMs
     });
   } finally {
-    await fs15.rm(contractDir, { recursive: true, force: true }).catch(() => {
+    await fs16.rm(contractDir, { recursive: true, force: true }).catch(() => {
     });
   }
 }
 
 // dist/src/cache/response-cache.js
 var crypto = __toESM(require("crypto"), 1);
-var fs16 = __toESM(require("fs/promises"), 1);
-var path14 = __toESM(require("path"), 1);
+var fs17 = __toESM(require("fs/promises"), 1);
+var path18 = __toESM(require("path"), 1);
 function isTaskCacheable(task, context = {}) {
   if (context.hasVerifier)
     return false;
@@ -46493,8 +47233,8 @@ var ResponseCache = class _ResponseCache {
       return null;
     }
     try {
-      const filePath = path14.join(this.config.dir, `${key}.json`);
-      const content = await fs16.readFile(filePath, "utf-8");
+      const filePath = path18.join(this.config.dir, `${key}.json`);
+      const content = await fs17.readFile(filePath, "utf-8");
       const entry = JSON.parse(content);
       if (!entry?.taskResult?.taskId || !entry?.cachedAt) {
         return null;
@@ -46518,16 +47258,16 @@ var ResponseCache = class _ResponseCache {
       return;
     }
     try {
-      await fs16.mkdir(this.config.dir, { recursive: true });
+      await fs17.mkdir(this.config.dir, { recursive: true });
       const entry = {
         taskResult: result,
         cachedAt: (/* @__PURE__ */ new Date()).toISOString(),
         cacheKeyInputs: keyInputs
       };
-      const filePath = path14.join(this.config.dir, `${key}.json`);
+      const filePath = path18.join(this.config.dir, `${key}.json`);
       const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-      await fs16.writeFile(tmpPath, JSON.stringify(entry, null, 2));
-      await fs16.rename(tmpPath, filePath);
+      await fs17.writeFile(tmpPath, JSON.stringify(entry, null, 2));
+      await fs17.rename(tmpPath, filePath);
     } catch (err) {
       console.warn(`Cache write failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -46537,9 +47277,9 @@ var ResponseCache = class _ResponseCache {
    */
   async clear() {
     try {
-      const entries = await fs16.readdir(this.config.dir);
+      const entries = await fs17.readdir(this.config.dir);
       const cacheFiles = entries.filter((e) => /^[a-f0-9]{64}\.json$/.test(e));
-      await Promise.all(cacheFiles.map((f) => fs16.unlink(path14.join(this.config.dir, f))));
+      await Promise.all(cacheFiles.map((f) => fs17.unlink(path18.join(this.config.dir, f))));
       return { deletedCount: cacheFiles.length };
     } catch (err) {
       if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
@@ -46591,11 +47331,11 @@ var ResponseCache = class _ResponseCache {
       const files = await collectFiles(skillsDir);
       if (files.length === 0)
         return "no-skills";
-      const relativePaths = files.map((f) => path14.relative(skillsDir, f).split(path14.sep).join("/"));
+      const relativePaths = files.map((f) => path18.relative(skillsDir, f).split(path18.sep).join("/"));
       relativePaths.sort();
       const hash = crypto.createHash("sha256");
       for (const relPath of relativePaths) {
-        const content = await fs16.readFile(path14.join(skillsDir, relPath));
+        const content = await fs17.readFile(path18.join(skillsDir, relPath));
         hash.update(relPath);
         hash.update("\0");
         hash.update(content);
@@ -46611,9 +47351,9 @@ var ResponseCache = class _ResponseCache {
 };
 async function collectFiles(dir) {
   const results = [];
-  const entries = await fs16.readdir(dir, { withFileTypes: true });
+  const entries = await fs17.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
-    const fullPath = path14.join(dir, entry.name);
+    const fullPath = path18.join(dir, entry.name);
     if (entry.isDirectory()) {
       results.push(...await collectFiles(fullPath));
     } else {
@@ -46638,7 +47378,7 @@ async function loadHumanFeedback(feedbackPath, tasks) {
   return feedback;
 }
 function smartLabel(skillPath) {
-  const parts = path15.normalize(skillPath).split(path15.sep).filter(Boolean);
+  const parts = path19.normalize(skillPath).split(path19.sep).filter(Boolean);
   return parts.length >= 2 ? parts.slice(-2).join("/") : parts[parts.length - 1] || skillPath;
 }
 function phaseSkillsDirFor(lt2, phaseSkills) {
@@ -46666,7 +47406,7 @@ async function runPhase(phaseLabel, suiteTasks, config, numRuns, scorerOptions, 
 --- ${phaseLabel}: Running Tasks (${config.runnerType}) ---
 `);
     }
-    const runLogDir = numRuns > 1 ? path15.join(logBaseDir, `run-${run2 + 1}`) : logBaseDir;
+    const runLogDir = numRuns > 1 ? path19.join(logBaseDir, `run-${run2 + 1}`) : logBaseDir;
     let cacheHits = 0;
     const cacheConcurrent = config.concurrency ?? 1;
     const effectiveTasks = suiteTasks.map((lt2) => lt2.task);
@@ -46710,7 +47450,8 @@ async function runPhase(phaseLabel, suiteTasks, config, numRuns, scorerOptions, 
         taskId: task.id,
         runIndex: run2,
         seedDir: lt2.workspaceSeedDir,
-        skillsDir: effSkillsDir
+        skillsDir: effSkillsDir,
+        skillsMountPath: runner.skillsMountPath
       });
       workspaces[index] = workspace;
       const effectiveTask = { ...task, prompt: effectivePrompt, workspaceDir: workspace.dir };
@@ -46731,7 +47472,8 @@ async function runPhase(phaseLabel, suiteTasks, config, numRuns, scorerOptions, 
           taskDir: lt2.taskDir,
           output: result.output,
           toolCalls: result.toolCalls,
-          timeoutMs: lt2.verifierTimeoutMs
+          timeoutMs: lt2.verifierTimeoutMs,
+          sandbox: config.sandbox
         });
         console.log(`  Task ${task.id}: Verifier ${result.verifier.passed ? "passed" : "FAILED"} (reward ${result.verifier.reward}, status ${result.verifier.status})`);
       }
@@ -46881,22 +47623,22 @@ async function runPipeline(options) {
     console.log("Comparison file validated successfully");
   }
   if (options.compareSkillPath) {
-    let stat3;
+    let stat4;
     try {
-      stat3 = await fs17.stat(options.compareSkillPath);
+      stat4 = await fs18.stat(options.compareSkillPath);
     } catch (err) {
       if (err.code === "ENOENT") {
         throw new Error(`--compare-skill path not found: ${options.compareSkillPath}`);
       }
       throw err;
     }
-    if (!stat3.isDirectory()) {
+    if (!stat4.isDirectory()) {
       throw new Error(`--compare-skill path is not a directory: ${options.compareSkillPath}`);
     }
   }
   const numRuns = options.numRuns ?? 3;
   const nudgeLevel = options.nudge ?? config.nudge;
-  const logDir = path15.join(config.outputDir, "logs");
+  const logDir = path19.join(config.outputDir, "logs");
   const scorerOptions = {
     judgeEnabled,
     judgeOptions: { model: config.defaultJudgeModel },
@@ -46919,7 +47661,7 @@ Paired baseline: running each task with skill AND "${baselineLabel}"`);
     console.log(`Total trials per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)
 `);
     console.log("=== Phase 1/2: With Skill ===");
-    const withPhase = await runPhase("With Skill", suiteTasks, config, numRuns, scorerOptions, path15.join(logDir, "with-skill"), { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: "task", nudgeLevel }, cacheOpts);
+    const withPhase = await runPhase("With Skill", suiteTasks, config, numRuns, scorerOptions, path19.join(logDir, "with-skill"), { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: "task", nudgeLevel }, cacheOpts);
     console.log(`
 === Phase 2/2: ${baselineLabel} ===`);
     const isNoSkillBaseline = !options.compareSkillPath;
@@ -46927,8 +47669,8 @@ Paired baseline: running each task with skill AND "${baselineLabel}"`);
       ...scorerOptions,
       isBaseline: isNoSkillBaseline
     };
-    basePhase = await runPhase(baselineLabel, suiteTasks, config, numRuns, baselineScorerOptions, path15.join(logDir, "baseline"), {
-      workspaceBaseDir: path15.join(config.outputDir, "baseline"),
+    basePhase = await runPhase(baselineLabel, suiteTasks, config, numRuns, baselineScorerOptions, path19.join(logDir, "baseline"), {
+      workspaceBaseDir: path19.join(config.outputDir, "baseline"),
       keepWorkspaces,
       phaseSkills: options.compareSkillPath ? { dir: options.compareSkillPath } : "none",
       // Baseline always gets the bare prompt — no nudge.
@@ -46984,8 +47726,8 @@ Run summary saved to: ${summaryJsonPath}`);
   const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
   const suffix = comparison ? "paired" : "";
   const reportBaseName = [evaluation.skillName, suffix, timestamp].filter(Boolean).join("-");
-  const reportPath = path15.join(config.outputDir, `${reportBaseName}.md`);
-  const jsonPath = path15.join(config.outputDir, `${reportBaseName}.json`);
+  const reportPath = path19.join(config.outputDir, `${reportBaseName}.md`);
+  const jsonPath = path19.join(config.outputDir, `${reportBaseName}.json`);
   const metadata = {
     skillPath: options.tasksPath,
     runnerType: config.runnerType,
@@ -47047,7 +47789,7 @@ async function maybeGenerateHtmlReport(config, reportBaseName, reportOptions) {
   if (!config.htmlReport)
     return void 0;
   try {
-    const htmlPath = path15.join(config.outputDir, `${reportBaseName}.html`);
+    const htmlPath = path19.join(config.outputDir, `${reportBaseName}.html`);
     await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
     return htmlPath;
   } catch (err) {

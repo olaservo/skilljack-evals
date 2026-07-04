@@ -345,6 +345,19 @@ async function loadTaskPackage(
     errors.push(`${label}: task must define at least one of checks:, verifier, or assertions:`);
   }
 
+  // Trivial-baseline warning: when the only scoring signal is skill
+  // activation itself (no output checks, no verifier), the paired no-skill
+  // baseline has nothing to fail on — it trivially passes and Skill Lift is
+  // meaningless. Flagged during Phase 4 of the v2 redesign.
+  if (expectInvocation && skillsDir && !hasVerifier) {
+    const outputCheckKeys = ['contains', 'not_contains', 'regex', 'marker', 'javascript', 'files_exist'];
+    const hasOutputChecks = fm.checks != null
+      && outputCheckKeys.some((k) => (fm.checks as Record<string, unknown>)[k] !== undefined);
+    if (!hasOutputChecks) {
+      warnings.push(`${label}: task only checks skill invocation (no output checks or verifier) — the no-skill baseline trivially passes, making Skill Lift meaningless. Add checks: or a verifier/ script.`);
+    }
+  }
+
   // Port of the old negative-test warning: output checks have no effect on
   // pass/fail when the skill is expected NOT to activate.
   if (fm.expect_skill_invocation === false && fm.checks) {

@@ -3,8 +3,10 @@
  *
  * Each trial (task x run) gets a throwaway workspace directory seeded from the
  * task package's environment/workspace/ files, with skills mounted at the
- * harness's skill discovery path (.claude/skills by default). Workspaces
- * replace the old global setupSkills + fixture scripts.
+ * harness's skill discovery path. The pipeline passes each runner's
+ * `skillsMountPath` ('.claude/skills' for Claude runners, '.agents/skills' for
+ * Codex, etc.); DEFAULT_SKILLS_MOUNT_PATH is only a fallback for direct API
+ * callers. Workspaces replace the old global setupSkills + fixture scripts.
  */
 
 import * as fs from 'fs/promises';
@@ -33,7 +35,10 @@ export interface CreateTrialWorkspaceOptions {
   seedDir?: string;
   /** Optional skills directory (skill folders, or a single skill with root SKILL.md). */
   skillsDir?: string;
-  /** Mount path for skills inside the workspace (default: .claude/skills). */
+  /**
+   * Mount path for skills inside the workspace. The pipeline always passes the
+   * runner's skillsMountPath; defaults to .claude/skills for direct callers.
+   */
   skillsMountPath?: string;
 }
 

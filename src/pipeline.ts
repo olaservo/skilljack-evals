@@ -269,13 +269,15 @@ async function runPhase(
         }
       }
 
-      // Create the per-trial workspace (seed files + mounted skills).
+      // Create the per-trial workspace (seed files + skills mounted at the
+      // runner's skill discovery path).
       const workspace = await createTrialWorkspace({
         baseDir: env.workspaceBaseDir,
         taskId: task.id,
         runIndex: run,
         seedDir: lt.workspaceSeedDir,
         skillsDir: effSkillsDir,
+        skillsMountPath: runner.skillsMountPath,
       });
       workspaces[index] = workspace;
 
@@ -302,6 +304,7 @@ async function runPhase(
           output: result.output,
           toolCalls: result.toolCalls,
           timeoutMs: lt.verifierTimeoutMs,
+          sandbox: config.sandbox,
         });
         console.log(`  Task ${task.id}: Verifier ${result.verifier.passed ? 'passed' : 'FAILED'} (reward ${result.verifier.reward}, status ${result.verifier.status})`);
       }

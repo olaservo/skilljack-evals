@@ -9,7 +9,7 @@ inputs:
     description: 'Path to a task-package directory or a suite directory of task packages'
     required: true
   runner:
-    description: 'Runner type: claude-sdk or claude-code (requires Claude Code CLI on the runner)'
+    description: 'Runner type: claude-sdk, claude-code, codex, gemini (experimental), or opencode (experimental). CLI runners require the corresponding CLI installed and authenticated on the GitHub runner.'
     required: false
     default: 'claude-sdk'
   model:

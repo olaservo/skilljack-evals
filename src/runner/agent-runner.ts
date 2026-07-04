@@ -51,6 +51,13 @@ export interface AgentRunner {
   /** Human-readable provider name (e.g., 'claude-sdk') */
   readonly providerName: string;
 
+  /**
+   * Workspace-relative directory where this harness discovers Agent Skills
+   * (e.g. '.claude/skills' for Claude runners, '.agents/skills' for Codex).
+   * The pipeline mounts each task's skills here when creating trial workspaces.
+   */
+  readonly skillsMountPath: string;
+
   /** Run a single task and produce a TaskResult */
   runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult>;
 

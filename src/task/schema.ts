@@ -37,6 +37,10 @@ export interface TaskFrontmatter {
   verifier?: VerifierFrontmatter;
   checks?: TaskChecks;
   assertions?: string[];
+  /** Set by `skilljack-evals import` when the verifier needs --sandbox docker (.sh script). */
+  requires_docker?: boolean;
+  /** Unmapped SkillsBench frontmatter preserved by `skilljack-evals import`. */
+  x_skillsbench?: Record<string, unknown>;
 }
 
 export const KNOWN_FRONTMATTER_KEYS = new Set<string>([
@@ -50,6 +54,8 @@ export const KNOWN_FRONTMATTER_KEYS = new Set<string>([
   'verifier',
   'checks',
   'assertions',
+  'requires_docker',
+  'x_skillsbench',
 ]);
 
 export const KNOWN_CHECK_KEYS = new Set<string>([

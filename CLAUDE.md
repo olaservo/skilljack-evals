@@ -4,17 +4,23 @@ CLI for evaluating [Agent Skills](https://agentskills.io/home) - a format for ex
 
 ## Key Files
 
-- `src/cli.ts` - CLI entry point (run, score, report, validate, create-task, cache)
+- `src/cli.ts` - CLI entry point (run, score, report, validate, create-task, import, export, cache)
 - `src/types.ts` - TypeScript interfaces
 - `src/config.ts` - Centralized config (file + env + CLI precedence)
 - `src/task/schema.ts` - Task-package frontmatter schema (checks, verifier, metadata)
 - `src/task/load.ts` - Task-package loader/validator (task.md frontmatter + prompt body)
 - `src/task/scaffold.ts` - `create-task` scaffolding (task.md, verifier, oracle stubs)
+- `src/task/import-skillsbench.ts` + `src/task/export-skillsbench.ts` - SkillsBench/BenchFlow interop (tolerant import, native-package export)
 - `src/pipeline.ts` - Full pipeline orchestrator (load → workspace → run → verify → score → report)
 - `src/run/workspace.ts` - Per-trial throwaway workspaces (seed files + skills mount)
-- `src/score/verifier.ts` - Cross-platform verifier/oracle executor (reward contract)
+- `src/score/verifier.ts` - Cross-platform verifier/oracle executor (reward contract; routes to docker when `--sandbox docker`)
+- `src/sandbox/docker.ts` - Docker verifier sandbox (verifier-only containerization; SkillsBench reward.txt convention)
 - `src/runner/claude-sdk-runner.ts` - Claude Agent SDK runner
-- `src/runner/base-runner.ts` - Shared runner base class (timeout wrapper)
+- `src/runner/claude-code-runner.ts` - Claude Code CLI runner (stream-json subprocess)
+- `src/runner/codex-runner.ts` - Codex CLI runner (`codex exec --json`, e2e-verified)
+- `src/runner/gemini-runner.ts` + `src/runner/opencode-runner.ts` - EXPERIMENTAL CLI runners (docs-derived, synthetic-fixture tested)
+- `src/harness/subprocess.ts` - Shared CLI spawn/JSONL/process-tree-kill plumbing
+- `src/runner/base-runner.ts` - Shared runner base class (timeout wrapper, skillsMountPath)
 - `src/runner/runner-factory.ts` - Runner selection factory
 - `src/runner/security.ts` - PreToolUse write restrictions
 - `src/scorer/scorer.ts` - Score orchestrator (deterministic reward + opt-in judge diagnostics)
@@ -51,19 +57,28 @@ Task packages → Config → Per-trial workspace → Runner (with-skill + baseli
 
 ## Task packages
 
-A task is a directory containing `task.md` (YAML frontmatter + markdown prompt body). `skilljack-evals run <path>` accepts a single task-package dir or a suite dir of task packages. Frontmatter: `id` (defaults to dir name), `difficulty`/`category`/`tags`, `expected_skill`, `expect_skill_invocation` (false = anti-trigger test), `timeout_ms`, `verifier: { timeout_ms, command }`, `checks:` (lite checks: `contains`, `not_contains`, `regex`, `marker`, `tool_calls`, `no_tool_calls`, `files_exist`, `javascript`), `assertions:` (judge-graded checklist). Optional dirs: `environment/skills/` (task-level skills; falls back to suite-level `<suite>/skills/`), `environment/workspace/` (seed files), `verifier/verify.*`, `oracle/solve.*`. `--skills-dir` overrides skills for all tasks (candidate injection). `validate <path>` runs schema checks plus the oracle gate (oracle → verifier must yield reward 1.0; skip with `--no-oracle`).
+A task is a directory containing `task.md` (YAML frontmatter + markdown prompt body). `skilljack-evals run <path>` accepts a single task-package dir or a suite dir of task packages. Frontmatter: `id` (defaults to dir name), `difficulty`/`category`/`tags`, `expected_skill`, `expect_skill_invocation` (false = anti-trigger test), `timeout_ms`, `verifier: { timeout_ms, command }`, `checks:` (lite checks: `contains`, `not_contains`, `regex`, `marker`, `tool_calls`, `no_tool_calls`, `files_exist`, `javascript`), `assertions:` (judge-graded checklist), plus interop keys `requires_docker` and `x_skillsbench` (written by `import`). Optional dirs: `environment/skills/` (task-level skills; falls back to suite-level `<suite>/skills/`), `environment/workspace/` (seed files), `verifier/verify.*`, `oracle/solve.*`. `--skills-dir` overrides skills for all tasks (candidate injection). `validate <path>` runs schema checks plus the oracle gate (oracle → verifier must yield reward 1.0; skip with `--no-oracle`); it warns when a task's only signal is skill invocation (baseline would trivially pass → lift meaningless).
+
+## SkillsBench/BenchFlow interop
+
+`skilljack-evals import <dir>` converts a SkillsBench-native package (tolerant frontmatter mapping, unknowns preserved under `x_skillsbench:`, `.sh` verifiers tagged `requires_docker: true`); `skilljack-evals export <taskDir>` emits a BenchFlow-native package (their 1.3 frontmatter, `verifier/test.sh` wrapper writing `/logs/verifier/reward.txt`, Dockerfile stub, our fields round-tripped via `x_skilljack:`). Division of labor: we own the inner loop (host TDD, lite checks, judge diagnostics, CI gating); BenchFlow (Apache-2.0) owns big containerized sweeps.
 
 ## Workspaces and verifiers
 
-Each trial runs in a throwaway workspace (`<output>/workspaces/<taskId>/run-<n>/`) with seed files copied in and skills mounted at `.claude/skills/`; retention via `--keep-workspaces all|failures|none` (default failures). Verifiers run with cwd = workspace and env contract `SKILLJACK_OUTPUT_FILE`, `SKILLJACK_TRAJECTORY_FILE`, `SKILLJACK_TASK_DIR`, `SKILLJACK_REWARD_FILE`; reward = reward-file float 0..1 if written, else exit code (0→1). Dispatch by extension: `.mjs`/`.js` → node, `.py` → py/python, `.sh` → bash (error with docker hint when missing), `.ps1` → powershell; `verifier.command` overrides.
+Each trial runs in a throwaway workspace (`<output>/workspaces/<taskId>/run-<n>/`) with seed files copied in and skills mounted at the runner's `skillsMountPath` (`.claude/skills` for Claude runners, `.agents/skills` for codex, `.gemini/skills` for gemini, `.opencode/skills` for opencode); retention via `--keep-workspaces all|failures|none` (default failures). Verifiers run with cwd = workspace and env contract `SKILLJACK_OUTPUT_FILE`, `SKILLJACK_TRAJECTORY_FILE`, `SKILLJACK_TASK_DIR`, `SKILLJACK_REWARD_FILE`; reward = reward-file float 0..1 if written, else exit code (0→1). Dispatch by extension: `.mjs`/`.js` → node, `.py` → py/python, `.sh` → bash (error with docker hint when missing), `.ps1` → powershell; `verifier.command` overrides.
 
-Note: a v2 redesign is in progress (SkillsBench-aligned task packages + real-harness CLI adapters). The four non-Claude SDK runners (vercel-ai, openai-agents, copilot-sdk, google-adk) were removed in v2 Phase 1; real-harness adapters (claude-code, codex, gemini, opencode) land in later phases.
+## Sandbox
+
+`--sandbox docker` (config `sandbox:`, env `EVAL_SANDBOX`) containerizes the VERIFIER only — the agent always runs on the host. The workspace is bind-mounted at `/workspace`, the task dir at `/task` (+ `/verifier`), a logs temp dir at `/logs`; `.sh` verifiers always run under bash in the container (Windows escape hatch for imported SkillsBench tasks), and `/logs/verifier/reward.txt` (SkillsBench convention) wins as the reward source. Task `environment/Dockerfile` is built once (content-hashed tag), else `node:20-slim`. Agent-in-container is out of scope — that's BenchFlow's territory (`skilljack-evals export`).
 
 ## Runners
 
-Two runners selected via `--runner` flag:
+Five runners selected via `--runner` flag:
 - `claude-sdk` (default) — uses Claude Agent SDK, model aliases like `sonnet`, `haiku`, `opus`
 - `claude-code` — drives the real Claude Code CLI (`claude -p --output-format stream-json --setting-sources project`) as a subprocess per task; requires `claude` on PATH (`npm install -g @anthropic-ai/claude-code`); timeouts kill the whole CLI process tree (`src/harness/subprocess.ts`)
+- `codex` — drives the Codex CLI (`codex exec --json --skip-git-repo-check --ignore-user-config --ephemeral`); skills mount at `.agents/skills/`; invocation detected from SKILL.md shell reads; token usage from `turn.completed`; requires `codex` on PATH (`npm install -g @openai/codex`) and Codex auth. `--model` is only forwarded when set to something other than the framework default (codex picks its own default model otherwise)
+- `gemini` (EXPERIMENTAL) — `gemini -p --output-format stream-json --approval-mode yolo`; skills mount at `.gemini/skills/`; built from official docs, not yet verified against a live CLI
+- `opencode` (EXPERIMENTAL) — `opencode run --format json --auto`; skills mount at `.opencode/skills/`; built from official docs, not yet verified against a live CLI
 
 ## Scoring
 
@@ -100,7 +115,7 @@ Deterministic reward is authoritative; the judge is opt-in diagnostics and never
 
 ## Environment
 
-Requires `ANTHROPIC_API_KEY` in environment or `.env` file.
+Requires `ANTHROPIC_API_KEY` in environment or `.env` file for the `claude-sdk` runner and the judge. CLI runners (`claude-code`, `codex`, `gemini`, `opencode`) instead need the corresponding CLI installed and authenticated on PATH.
 
 For Bedrock: set `CLAUDE_CODE_USE_BEDROCK=1` + AWS env vars.
 
