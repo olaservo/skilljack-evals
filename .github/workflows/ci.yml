@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      # Fail if the committed Action bundle is out of sync with source.
+      # action/dist/index.cjs is pinned to LF via .gitattributes, so this diff
+      # is deterministic across platforms.
+      - name: Verify Action bundle is in sync
+        run: |
+          npm run bundle:action
+          if ! git diff --exit-code -- action/dist/index.cjs; then
+            echo "::error::action/dist/index.cjs is out of date. Run 'npm run bundle:action' and commit the result."
+            exit 1
+          fi
