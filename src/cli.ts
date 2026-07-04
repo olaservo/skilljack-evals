@@ -36,7 +36,7 @@ program
   .command('run')
   .description('Run the full evaluation pipeline: execute tasks → score → report')
   .argument('<tasks>', 'Path to tasks YAML file')
-  .option('--runner <type>', 'Runner type: claude-sdk, vercel-ai, openai-agents, copilot-sdk (default: claude-sdk)')
+  .option('--runner <type>', 'Runner type: claude-sdk, vercel-ai, openai-agents, copilot-sdk, google-adk (default: claude-sdk)')
   .option('--model <model>', 'Agent model (default: sonnet)')
   .option('--judge-model <model>', 'Judge model (default: haiku)')
   .option('--config <path>', 'Path to eval.config.yaml')
