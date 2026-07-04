@@ -79,12 +79,6 @@ describe('extractJsonObject', () => {
 });
 
 describe('parseJudgeResponseJson', () => {
-  const defaultWeights = new Map([
-    ['discovery', 0.3],
-    ['adherence', 0.4],
-    ['output', 0.3],
-  ]);
-
   it('parses a complete judge response with checklist results', () => {
     const response = JSON.stringify({
       discovery: 1,
@@ -97,7 +91,7 @@ describe('parseJudgeResponseJson', () => {
         { item: 'Included header', passed: false, evidence: 'Header was missing' },
       ],
     });
-    const score = parseJudgeResponseJson(response, 'task-1', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'task-1');
 
     expect(score.taskId).toBe('task-1');
     expect(score.discovery).toBe(1);
@@ -126,7 +120,7 @@ describe('parseJudgeResponseJson', () => {
       failure_category: 'none',
       reasoning: 'Decent output',
     });
-    const score = parseJudgeResponseJson(response, 'task-2', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'task-2');
 
     expect(score.checklistResults).toEqual([]);
     expect(score.adherence).toBe(4);
@@ -149,7 +143,7 @@ describe('parseJudgeResponseJson', () => {
         { item: 'Also valid', passed: false },
       ],
     });
-    const score = parseJudgeResponseJson(response, 'task-3', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'task-3');
 
     expect(score.checklistResults).toHaveLength(2);
     expect(score.checklistResults[0].item).toBe('Valid item');
@@ -169,7 +163,7 @@ describe('parseJudgeResponseJson', () => {
         { item: 'text', passed: 0 },
       ],
     });
-    const score = parseJudgeResponseJson(response, 'task-4', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'task-4');
 
     expect(score.checklistResults).toHaveLength(2);
     expect(score.checklistResults[0].item).toBe('123');
@@ -181,25 +175,24 @@ describe('parseJudgeResponseJson', () => {
   });
 
   it('returns error score for unparseable response', () => {
-    const score = parseJudgeResponseJson('no json here', 'task-5', defaultWeights);
+    const score = parseJudgeResponseJson('no json here', 'task-5');
 
     expect(score.discovery).toBe(0);
     expect(score.adherence).toBe(1);
     expect(score.outputQuality).toBe(1);
-    expect(score.weightedScore).toBe(0);
     expect(score.failureCategory).toBe('agent_error');
     expect(score.reasoning).toContain('Failed to parse');
   });
 
   it('returns error score for invalid JSON', () => {
-    const score = parseJudgeResponseJson('{not valid json}', 'task-6', defaultWeights);
+    const score = parseJudgeResponseJson('{not valid json}', 'task-6');
 
     expect(score.failureCategory).toBe('agent_error');
     expect(score.reasoning).toContain('Invalid JSON');
   });
 
   it('returns error score for single-quoted JSON', () => {
-    const score = parseJudgeResponseJson("{'discovery': 1}", 'task-sq', defaultWeights);
+    const score = parseJudgeResponseJson("{'discovery': 1}", 'task-sq');
 
     expect(score.failureCategory).toBe('agent_error');
     expect(score.reasoning).toContain('Invalid JSON');
@@ -207,15 +200,14 @@ describe('parseJudgeResponseJson', () => {
 
   it('returns error score for single-quoted JSON with valid structure', () => {
     const response = "{'discovery': 1, 'adherence': 5, 'output_quality': 4, 'failure_category': 'none', 'reasoning': 'Good'}";
-    const score = parseJudgeResponseJson(response, 'task-sq2', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'task-sq2');
 
     expect(score.failureCategory).toBe('agent_error');
     expect(score.reasoning).toContain('Invalid JSON');
     expect(score.discovery).toBe(0);
-    expect(score.weightedScore).toBe(0);
   });
 
-  it('computes weighted score correctly', () => {
+  it('does not compute a weighted score (deleted in the reward-authoritative model)', () => {
     const response = JSON.stringify({
       discovery: 1,
       adherence: 5,
@@ -223,13 +215,11 @@ describe('parseJudgeResponseJson', () => {
       failure_category: 'none',
       reasoning: 'Perfect',
     });
-    const score = parseJudgeResponseJson(response, 'task-7', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'task-7');
 
-    // discovery=1: 0.3*1 = 0.3
-    // adherence=5: 0.4*((5-1)/4) = 0.4*1 = 0.4
-    // output=5: 0.3*((5-1)/4) = 0.3*1 = 0.3
-    // total = 1.0
-    expect(score.weightedScore).toBeCloseTo(1.0);
+    expect(score.adherence).toBe(5);
+    expect(score.outputQuality).toBe(5);
+    expect('weightedScore' in score).toBe(false);
   });
 
   it('falls back to agent_error for unknown failure category', () => {
@@ -240,7 +230,7 @@ describe('parseJudgeResponseJson', () => {
       failure_category: 'hallucinated_category',
       reasoning: 'Some issue',
     });
-    const score = parseJudgeResponseJson(response, 'task-fc', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'task-fc');
 
     expect(score.failureCategory).toBe('agent_error');
   });
@@ -262,7 +252,7 @@ describe('parseJudgeResponseJson', () => {
         failure_category: cat,
         reasoning: 'test',
       });
-      const score = parseJudgeResponseJson(response, `task-${cat}`, defaultWeights);
+      const score = parseJudgeResponseJson(response, `task-${cat}`);
       expect(score.failureCategory).toBe(cat);
     }
   });
@@ -274,7 +264,7 @@ describe('parseJudgeResponseJson', () => {
       output_quality: 3,
       reasoning: 'No category provided',
     });
-    const score = parseJudgeResponseJson(response, 'task-nocat', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'task-nocat');
 
     expect(score.failureCategory).toBe('agent_error');
   });
@@ -288,7 +278,7 @@ describe('parseJudgeResponseJson', () => {
       reasoning: 'Skill not loaded',
     });
     const response = `Here is my evaluation:\n\`\`\`json\n${json}\n\`\`\`\nThat concludes the review.`;
-    const score = parseJudgeResponseJson(response, 'task-8', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'task-8');
 
     expect(score.discovery).toBe(0);
     expect(score.adherence).toBe(2);
@@ -463,7 +453,6 @@ describe('scoreTask passes isBaseline to SkillJudge', () => {
       discovery: 0,
       adherence: 3,
       outputQuality: 3,
-      weightedScore: 0.5,
       failureCategory: 'none' as const,
       reasoning: 'baseline',
       checklistResults: [],
@@ -477,7 +466,7 @@ describe('scoreTask passes isBaseline to SkillJudge', () => {
     );
 
     const { scoreTask } = await import('../scorer/scorer.js');
-    await scoreTask(task, result, { isBaseline: true });
+    await scoreTask(task, result, { isBaseline: true, judgeEnabled: true });
 
     expect(capturedInstance.options.isBaseline).toBe(true);
     judgeResultSpy.mockRestore();
@@ -489,7 +478,6 @@ describe('scoreTask passes isBaseline to SkillJudge', () => {
       discovery: 0,
       adherence: 3,
       outputQuality: 3,
-      weightedScore: 0.5,
       failureCategory: 'none' as const,
       reasoning: 'standard',
       checklistResults: [],
@@ -503,7 +491,7 @@ describe('scoreTask passes isBaseline to SkillJudge', () => {
     );
 
     const { scoreTask } = await import('../scorer/scorer.js');
-    await scoreTask(task, result, {});
+    await scoreTask(task, result, { judgeEnabled: true });
 
     expect(capturedInstance.options.isBaseline).toBe(false);
     judgeResultSpy.mockRestore();
@@ -511,12 +499,6 @@ describe('scoreTask passes isBaseline to SkillJudge', () => {
 });
 
 describe('parseJudgeResponseJson with baseline-style response', () => {
-  const defaultWeights = new Map([
-    ['discovery', 0.3],
-    ['adherence', 0.4],
-    ['output', 0.3],
-  ]);
-
   it('handles baseline response with discovery=0 and no checklist', () => {
     const response = JSON.stringify({
       discovery: 0,
@@ -525,7 +507,7 @@ describe('parseJudgeResponseJson with baseline-style response', () => {
       failure_category: 'none',
       reasoning: 'Agent followed prompt well without any skill',
     });
-    const score = parseJudgeResponseJson(response, 'baseline-1', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'baseline-1');
 
     expect(score.taskId).toBe('baseline-1');
     expect(score.discovery).toBe(0);
@@ -533,15 +515,9 @@ describe('parseJudgeResponseJson with baseline-style response', () => {
     expect(score.outputQuality).toBe(4);
     expect(score.failureCategory).toBe('none');
     expect(score.checklistResults).toEqual([]);
-
-    // discovery=0: 0.3*0 = 0
-    // adherence=4: 0.4*((4-1)/4) = 0.4*0.75 = 0.3
-    // output=4: 0.3*((4-1)/4) = 0.3*0.75 = 0.225
-    // total = 0.525
-    expect(score.weightedScore).toBeCloseTo(0.525);
   });
 
-  it('computes correct weighted score for high-quality baseline', () => {
+  it('parses high-quality baseline ratings without a weighted score', () => {
     const response = JSON.stringify({
       discovery: 0,
       adherence: 5,
@@ -549,12 +525,10 @@ describe('parseJudgeResponseJson with baseline-style response', () => {
       failure_category: 'none',
       reasoning: 'Excellent output without skill',
     });
-    const score = parseJudgeResponseJson(response, 'baseline-2', defaultWeights);
+    const score = parseJudgeResponseJson(response, 'baseline-2');
 
-    // discovery=0: 0.3*0 = 0
-    // adherence=5: 0.4*1 = 0.4
-    // output=5: 0.3*1 = 0.3
-    // total = 0.7
-    expect(score.weightedScore).toBeCloseTo(0.7);
+    expect(score.adherence).toBe(5);
+    expect(score.outputQuality).toBe(5);
+    expect('weightedScore' in score).toBe(false);
   });
 });

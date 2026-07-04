@@ -1,24 +1,30 @@
 /**
- * Aggregation utilities for multi-run evaluation.
+ * Aggregation utilities for multi-trial evaluation.
  *
- * Merges N independent runs per task into single averaged results and scores.
+ * Merges N independent trials per task into single aggregated results and
+ * scores, preserving per-trial pass/reward outcomes for the metrics layer.
  */
 
 import type { TaskResult, CombinedScore, FailureCategory, ScoreStddev } from '../types.js';
 
 /**
- * Stddev threshold (on the 1-5 scale) above which a task is flagged as "potentially flaky."
+ * Stddev threshold (on the 1-5 scale) above which judge diagnostics are
+ * flagged as "potentially flaky."
  */
 export const FLAKY_STDDEV_THRESHOLD = 1.0;
 
 /**
- * Check whether a score's standard deviation indicates flaky (high-variance) results.
+ * Check whether a score's variance indicates flaky (inconsistent) results.
  *
- * Only adherence and output quality are checked against the threshold since they
- * use the 1-5 scale. Discovery (0/1) and weightedScore (0-1) cannot exceed 1.0.
+ * A task is flaky when its trials disagree on pass/fail (reward stddev > 0),
+ * or — when judge diagnostics are present — when adherence/output quality
+ * vary beyond FLAKY_STDDEV_THRESHOLD on the 1-5 scale.
  */
 export function isFlaky(stddev: ScoreStddev | undefined): boolean {
-  return !!(stddev && (stddev.adherence > FLAKY_STDDEV_THRESHOLD || stddev.outputQuality > FLAKY_STDDEV_THRESHOLD));
+  if (!stddev) return false;
+  if (stddev.reward > 0) return true;
+  return (stddev.adherence ?? 0) > FLAKY_STDDEV_THRESHOLD
+    || (stddev.outputQuality ?? 0) > FLAKY_STDDEV_THRESHOLD;
 }
 
 /**
@@ -39,14 +45,14 @@ export function computeStddev(values: number[], mean?: number): number {
 }
 
 /**
- * Find the index of the run closest to the mean weighted score.
+ * Find the index of the trial closest to the mean reward.
  */
 function findRepresentativeIndex(scores: CombinedScore[]): number {
-  const mean = scores.reduce((sum, s) => sum + s.weightedScore, 0) / scores.length;
+  const mean = scores.reduce((sum, s) => sum + s.reward, 0) / scores.length;
   let repIdx = 0;
   let minDist = Infinity;
   for (let r = 0; r < scores.length; r++) {
-    const dist = Math.abs(scores[r].weightedScore - mean);
+    const dist = Math.abs(scores[r].reward - mean);
     if (dist < minDist) {
       minDist = dist;
       repIdx = r;
@@ -55,11 +61,18 @@ function findRepresentativeIndex(scores: CombinedScore[]): number {
   return repIdx;
 }
 
+/** Average the defined values; undefined when none are defined. */
+function meanOfDefined(values: Array<number | undefined>): number | undefined {
+  const defined = values.filter((v): v is number => v !== undefined);
+  if (defined.length === 0) return undefined;
+  return defined.reduce((sum, v) => sum + v, 0) / defined.length;
+}
+
 /**
  * Aggregate multiple runs of TaskResult[] into a single TaskResult per task.
  *
- * For each task position, picks the "representative" run (closest to median
- * weighted score) for output/toolCalls, and sums duration/cost across all runs.
+ * For each task position, picks the "representative" run (closest to mean
+ * reward) for output/toolCalls, and sums duration/cost across all runs.
  */
 export function aggregateResults(
   allResults: TaskResult[][],
@@ -104,6 +117,7 @@ export function aggregateResults(
       isError: runs.some((r) => r.isError),
       errorMessage: runs.filter((r) => r.isError).map((r) => r.errorMessage).join('; '),
       tokens,
+      verifier: rep.verifier,
     });
   }
 
@@ -111,9 +125,11 @@ export function aggregateResults(
 }
 
 /**
- * Aggregate multiple runs of CombinedScore[] into a single CombinedScore per task.
+ * Aggregate multiple trials of CombinedScore[] into a single CombinedScore per task.
  *
- * Averages all numeric scores across runs.
+ * The aggregate keeps per-trial pass/reward arrays (for pass@k and CI math),
+ * averages reward/discovery/invocation and judge diagnostics, and marks the
+ * task as passed only when every trial passed.
  */
 export function aggregateScores(allScores: CombinedScore[][]): CombinedScore[] {
   const numRuns = allScores.length;
@@ -126,18 +142,33 @@ export function aggregateScores(allScores: CombinedScore[][]): CombinedScore[] {
   for (let t = 0; t < numTasks; t++) {
     const scores = allScores.map((s) => s[t]);
 
+    const trialPassed = scores.map((s) => s.passed);
+    const trialRewards = scores.map((s) => s.reward);
+    const passCount = trialPassed.filter(Boolean).length;
+
+    const avgReward = trialRewards.reduce((sum, v) => sum + v, 0) / numRuns;
     const avgDiscovery = scores.reduce((sum, s) => sum + s.discovery, 0) / numRuns;
-    const avgAdherence = scores.reduce((sum, s) => sum + s.adherence, 0) / numRuns;
-    const avgOutput = scores.reduce((sum, s) => sum + s.outputQuality, 0) / numRuns;
-    const avgWeighted = scores.reduce((sum, s) => sum + s.weightedScore, 0) / numRuns;
+    const avgInvocation = meanOfDefined(scores.map((s) => s.invocation));
+    const avgAdherence = meanOfDefined(scores.map((s) => s.adherence));
+    const avgOutput = meanOfDefined(scores.map((s) => s.outputQuality));
 
     // Compute sample standard deviations
     const stddev: ScoreStddev = {
+      reward: computeStddev(trialRewards, avgReward),
       discovery: computeStddev(scores.map(s => s.discovery), avgDiscovery),
-      adherence: computeStddev(scores.map(s => s.adherence), avgAdherence),
-      outputQuality: computeStddev(scores.map(s => s.outputQuality), avgOutput),
-      weightedScore: computeStddev(scores.map(s => s.weightedScore), avgWeighted),
     };
+    if (avgAdherence !== undefined) {
+      stddev.adherence = computeStddev(
+        scores.map((s) => s.adherence).filter((v): v is number => v !== undefined),
+        avgAdherence,
+      );
+    }
+    if (avgOutput !== undefined) {
+      stddev.outputQuality = computeStddev(
+        scores.map((s) => s.outputQuality).filter((v): v is number => v !== undefined),
+        avgOutput,
+      );
+    }
 
     // Mode of failure categories
     const catCounts = new Map<FailureCategory, number>();
@@ -153,21 +184,22 @@ export function aggregateScores(allScores: CombinedScore[][]): CombinedScore[] {
       }
     }
 
-    const discoveryCount = scores.filter((s) => s.discovery >= 1).length;
-
     const repIdx = findRepresentativeIndex(scores);
 
     aggregated.push({
       taskId: scores[0].taskId,
-      deterministic: null,
-      judge: null,
+      deterministic: scores[repIdx].deterministic,
+      judge: scores[repIdx].judge,
+      passed: passCount === numRuns,
+      reward: avgReward,
       discovery: avgDiscovery,
+      invocation: avgInvocation,
       adherence: avgAdherence,
       outputQuality: avgOutput,
-      weightedScore: avgWeighted,
       failureCategory: modeCategory,
-      reasoning: `Aggregated over ${numRuns} runs: discovery ${discoveryCount}/${numRuns}, mean adherence ${avgAdherence.toFixed(1)}, mean output ${avgOutput.toFixed(1)}`,
+      reasoning: `Aggregated over ${numRuns} trials: passed ${passCount}/${numRuns}, mean reward ${avgReward.toFixed(2)}`,
       checklistResults: scores[repIdx].checklistResults ?? [],
+      trials: { passed: trialPassed, rewards: trialRewards },
       stddev,
     });
   }

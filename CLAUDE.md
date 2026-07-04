@@ -17,9 +17,11 @@ CLI for evaluating [Agent Skills](https://agentskills.io/home) - a format for ex
 - `src/runner/base-runner.ts` - Shared runner base class (timeout wrapper)
 - `src/runner/runner-factory.ts` - Runner selection factory
 - `src/runner/security.ts` - PreToolUse write restrictions
-- `src/scorer/scorer.ts` - Score orchestrator (deterministic + judge merge)
+- `src/scorer/scorer.ts` - Score orchestrator (deterministic reward + opt-in judge diagnostics)
 - `src/scorer/deterministic.ts` - Activation/marker/tool-call/contains/regex/js/file-exists checks
-- `src/scorer/judge.ts` - LLM-as-judge scoring (SkillJudge)
+- `src/scorer/judge.ts` - LLM-as-judge diagnostics (SkillJudge)
+- `src/score/metrics.ts` - Pure metrics: resolution rate, pass@k, skill lift, invocation rate, binomial CI, grouping
+- `src/results/types.ts` + `src/results/summary.ts` - RunSummary contract + summary.json builder
 - `src/cache/response-cache.ts` - Content-addressed cache of TaskResult by execution inputs
 - `src/utils/concurrency.ts` - Bounded-concurrency helper used by runner + judge
 - `src/session/session-logger.ts` - Event capture and session logging
@@ -44,7 +46,7 @@ npm run start           # Run compiled CLI
 ## Architecture
 
 ```
-Task packages → Config → Per-trial workspace → Runner (Claude SDK) → Verifier → Scorer (deterministic + LLM judge) → Report
+Task packages → Config → Per-trial workspace → Runner (with-skill + baseline conditions) → Verifier → Deterministic reward (+ optional judge diagnostics) → summary.json → Report
 ```
 
 ## Task packages
@@ -65,11 +67,15 @@ Two runners selected via `--runner` flag:
 
 ## Scoring
 
-Two methods, run independently or together:
-- **Deterministic** (free): skill activation, lite `checks:` (marker, tool calls, contains/not_contains, regex, sandboxed javascript, files_exist), plus the verifier outcome when the task has one (reward < 1 → failed)
-- **LLM Judge** (~$0.001/task): discovery (0/1), adherence (1-5), output quality (1-5), grading `assertions:` with evidence
-- **Weighted Score** (0-1): `w_d * discovery + w_a * ((adherence-1)/4) + w_o * ((output-1)/4)`
-- **Blind A/B Comparison** (`--blind-compare`, requires `--compare`): anonymized judge evaluation to detect scoring bias
+Deterministic reward is authoritative; the judge is opt-in diagnostics and never affects pass/fail:
+- **Per-trial reward** (free): 1 when all lite `checks:` pass (skill activation, marker, tool calls, contains/not_contains, regex, sandboxed javascript, files_exist) AND the verifier yields reward >= 1 when present; agent error/timeout = 0.
+- **Headline metrics**: Resolution Rate (mean per-task trial pass rate, with 95% binomial CI), Pass@k (any trial passed), Skill Lift (with-skill minus baseline resolution rate, per task + macro), Skill Invocation Rate (share of with-skill trials that loaded the expected skill; anti-trigger tasks excluded).
+- **Paired baseline** is the default when tasks have skills: each task also runs with no skills mounted (nudge off) so lift can be measured. Disable with `--no-baseline`; `--compare-skill <dir>` swaps the baseline for an alternative skill version.
+- **Trials**: `-k, --trials <n>` (alias `--runs`, default 3) trials per task per condition.
+- **LLM Judge diagnostics** (`--judge`, off by default, ~$0.001/task): adherence (1-5), output quality (1-5), `assertions:` grading with evidence, failure-category attribution. Rendered in a Diagnostics section; never gates.
+- **Thresholds**: `--threshold-resolution <0-1>` (default 0.8) gates the with-skill resolution rate; `--threshold-lift <delta>` optionally gates macro lift (unset = not gated). Config file `thresholds: {resolution_rate, min_lift}`, env `EVAL_RESOLUTION_THRESHOLD` / `EVAL_LIFT_THRESHOLD`. Judge on/off: config `judge: {enabled, model}`, env `EVAL_JUDGE`.
+- **summary.json** is written to the output dir every run: run info, metrics (incl. byDifficulty/byCategory/byTag + CI), thresholds, and per-task condition results with per-trial failure evidence — the stable contract for CI gating, `--compare-results`, and external optimizers (`runEvaluation(opts): Promise<RunSummary>` from `src/index.ts`).
+- **Blind A/B Comparison** (`--blind-compare`, requires `--compare-skill` + `--judge`): anonymized judge evaluation of two skill versions to detect scoring bias.
 
 ## Concurrency and caching
 

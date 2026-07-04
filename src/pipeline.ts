@@ -2,26 +2,31 @@
  * Evaluation pipeline orchestrator.
  *
  * Coordinates the full evaluation flow:
- * load task packages → per-trial workspace → run agent → verifier → score → report → check thresholds
+ * load task packages → per-trial workspace → run agent → verifier → score → summary.json → report → thresholds
  *
- * In comparison mode (--compare), runs each task with AND without the skill,
- * then computes delta metrics showing the skill's impact.
+ * The paired baseline condition is the default when tasks have skills: each
+ * task runs with AND without the skill so Skill Lift can be measured. The LLM
+ * judge is opt-in diagnostics (--judge) and never affects pass/fail.
  */
 
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { formatDelta, pct } from './utils/format.js';
+import { resolutionRate } from './score/metrics.js';
 import { loadTaskPackages } from './task/load.js';
 import type { LoadedSuite, LoadedTask } from './task/load.js';
 import { createRunner } from './runner/runner-factory.js';
 import { scoreAll, type ScorerOptions } from './scorer/scorer.js';
 import { SessionLogger } from './session/session-logger.js';
-import { generateReport, generateJsonResults, computeSummary, type ReportOptions } from './report/report.js';
+import { generateReport, generateJsonResults, computeSummary, trialFlags, type ReportOptions } from './report/report.js';
 import { generateHtmlReport } from './report/html-report.js';
 import { generateGitHubSummary, writeGitHubSummary } from './report/github-summary.js';
 import { loadConfig, type EvalConfig } from './config.js';
 import { aggregateResults, aggregateScores } from './scorer/aggregator.js';
-import { loadPreviousReport, compareResults, formatComparisonConsole } from './report/comparison.js';
+import { loadPreviousRunSummary, compareRunSummaries, formatComparisonConsole } from './report/comparison.js';
+import { buildRunSummary, writeRunSummary } from './results/summary.js';
+import type { PhaseTrialData } from './results/summary.js';
+import type { RunSummary } from './results/types.js';
 import { createTrialWorkspace, applyCleanupPolicy } from './run/workspace.js';
 import type { TrialWorkspace, WorkspaceCleanupPolicy } from './run/workspace.js';
 import { buildNudgeForSkillsDir } from './run/nudge.js';
@@ -90,27 +95,28 @@ export interface PipelineOptions {
   skillsDir?: string;
   /** Comma-separated task IDs to run (empty = all) */
   taskFilter?: string;
-  /** Skip deterministic scoring */
-  noDeterministic?: boolean;
-  /** Skip LLM judge scoring */
-  noJudge?: boolean;
-  /** Number of times to run each task (default: 3) */
+  /** Enable LLM judge diagnostics (overrides config.judgeEnabled) */
+  judge?: boolean;
+  /** Number of trials per task per condition (default: 3) */
   numRuns?: number;
-  /** Path to previous JSON results for comparison */
+  /** Path to a previous run's summary.json for cross-iteration comparison */
   compareResultsPath?: string;
   /** Enable verbose logging */
   verbose?: boolean;
   /** Path to write feedback template JSON after run */
   generateFeedbackPath?: string;
-  /** Path to feedback JSON for judge prompt enrichment */
+  /** Path to feedback JSON for judge prompt enrichment (requires judge) */
   feedbackPath?: string;
-  /** Enable comparison mode: run with AND without skill */
-  compare?: boolean;
-  /** Path to alternative skill for comparison (instead of no-skill baseline) */
+  /**
+   * Paired baseline condition: run each task with AND without the skill.
+   * Defaults to ON when tasks have skills resolved, OFF when none.
+   */
+  baseline?: boolean;
+  /** Path to alternative skill for comparison (instead of no-skill baseline); implies baseline */
   compareSkillPath?: string;
   /** Custom label for the baseline in comparison reports */
   compareLabel?: string;
-  /** Run blind A/B comparison alongside --compare */
+  /** Run blind A/B comparison (requires --compare-skill and --judge) */
   blindCompare?: boolean;
   /** Skip reading from cache (still writes new results) */
   skipCache?: boolean;
@@ -129,6 +135,9 @@ export interface PipelineResult {
   results: TaskResult[];
   scores: CombinedScore[];
   report: EvaluationReport;
+  /** Machine-readable run summary — the stable programmatic contract. */
+  runSummary: RunSummary;
+  summaryJsonPath: string;
   reportPath?: string;
   jsonPath?: string;
   markdownSummary: string;
@@ -202,7 +211,7 @@ async function runPhase(
 
   for (let run = 0; run < numRuns; run++) {
     if (numRuns > 1) {
-      console.log(`\n--- ${phaseLabel}: Run ${run + 1}/${numRuns} (${config.runnerType}) ---\n`);
+      console.log(`\n--- ${phaseLabel}: Trial ${run + 1}/${numRuns} (${config.runnerType}) ---\n`);
     } else {
       console.log(`\n--- ${phaseLabel}: Running Tasks (${config.runnerType}) ---\n`);
     }
@@ -319,7 +328,7 @@ async function runPhase(
     allResults.push(results);
 
     if (numRuns > 1) {
-      console.log(`\n--- ${phaseLabel}: Scoring Run ${run + 1}/${numRuns} ---\n`);
+      console.log(`\n--- ${phaseLabel}: Scoring Trial ${run + 1}/${numRuns} ---\n`);
     } else {
       console.log(`\n--- ${phaseLabel}: Scoring ---\n`);
     }
@@ -330,8 +339,7 @@ async function runPhase(
     for (let t = 0; t < suiteTasks.length; t++) {
       const workspace = workspaces[t];
       if (!workspace) continue;
-      const trialFailed = results[t].isError
-        || (scores[t].deterministic ? !scores[t].deterministic!.passed : false);
+      const trialFailed = !scores[t].passed;
       await applyCleanupPolicy(workspace, env.keepWorkspaces, trialFailed);
     }
   }
@@ -382,10 +390,7 @@ function computeComparison(
       withoutSkill: b,
       delta: {
         taskId: w.result.taskId,
-        discoveryDelta: w.score.discovery - b.score.discovery,
-        adherenceDelta: w.score.adherence - b.score.adherence,
-        outputQualityDelta: w.score.outputQuality - b.score.outputQuality,
-        weightedScoreDelta: w.score.weightedScore - b.score.weightedScore,
+        lift: resolutionRate(trialFlags(w.score)) - resolutionRate(trialFlags(b.score)),
         durationDeltaMs: w.result.durationMs - b.result.durationMs,
         costDeltaUsd: w.result.costUsd - b.result.costUsd,
         totalTokensDelta:
@@ -400,10 +405,8 @@ function computeComparison(
     withSkill: withPhase.summary,
     withoutSkill: basePhase.summary,
     delta: {
-      discoveryAccuracyDelta: withPhase.summary.discoveryAccuracy - basePhase.summary.discoveryAccuracy,
-      avgAdherenceDelta: withPhase.summary.avgAdherence - basePhase.summary.avgAdherence,
-      avgOutputQualityDelta: withPhase.summary.avgOutputQuality - basePhase.summary.avgOutputQuality,
-      avgWeightedScoreDelta: withPhase.summary.avgWeightedScore - basePhase.summary.avgWeightedScore,
+      resolutionRateDelta: withPhase.summary.resolutionRate - basePhase.summary.resolutionRate,
+      passAtKDelta: withPhase.summary.passAtK - basePhase.summary.passAtK,
       totalDurationDeltaMs: withPhase.summary.totalDurationMs - basePhase.summary.totalDurationMs,
       totalCostDeltaUsd: withPhase.summary.totalCostUsd - basePhase.summary.totalCostUsd,
       totalTokensDelta:
@@ -426,15 +429,16 @@ function computeComparison(
  */
 export async function runPipeline(options: PipelineOptions): Promise<PipelineResult> {
   const config = await loadConfig(options.configPath, options.configOverrides);
-  const compareMode = options.compare || !!options.compareSkillPath;
   const keepWorkspaces = options.keepWorkspaces ?? 'failures';
+  const judgeEnabled = options.judge ?? config.judgeEnabled;
 
-  if (options.blindCompare && !compareMode) {
-    throw new Error('--blind-compare requires --compare mode');
-  }
-
-  if (options.compareLabel && !compareMode) {
-    console.warn('Warning: --compare-label has no effect without --compare or --compare-skill');
+  if (options.blindCompare) {
+    if (!options.compareSkillPath) {
+      throw new Error('--blind-compare requires --compare-skill: blind comparison evaluates two skill VERSIONS against each other (per the agentskills authoring methodology), not with/without-skill.');
+    }
+    if (!judgeEnabled) {
+      throw new Error('--blind-compare requires --judge (the blind comparison is an LLM-judge diagnostic).');
+    }
   }
 
   // 1. Load task packages
@@ -455,13 +459,33 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     throw new Error('No tasks to run');
   }
 
+  const anySkills = suiteTasks.some((lt) => lt.skillsDir);
+
+  // Paired baseline is the default whenever tasks have skills resolved.
+  const baselineMode = options.compareSkillPath
+    ? true
+    : options.baseline ?? anySkills;
+
+  if (baselineMode && !anySkills && !options.compareSkillPath) {
+    throw new Error('--baseline requires skills but none were found. Add skills under environment/skills/ (or a suite-level skills/ dir), or use --compare-skill to specify a baseline skill path.');
+  }
+
+  if (options.compareLabel && !baselineMode) {
+    console.warn('Warning: --compare-label has no effect without a baseline condition');
+  }
+
   const evaluation: SkillEvaluation = {
     skillName: suite.skillName,
     tasks: suiteTasks.map((lt) => lt.task),
   };
 
-  // Load human feedback if provided
-  const humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
+  // Load human feedback if provided (judge-scoped)
+  let humanFeedback: HumanFeedback | undefined;
+  if (options.feedbackPath && !judgeEnabled) {
+    console.log('Note: --feedback requires --judge (feedback enriches the judge prompt) — ignoring feedback file.');
+  } else {
+    humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
+  }
 
   // Generate feedback template early (only needs task IDs, available even if run fails)
   let feedbackTemplatePath: string | undefined;
@@ -474,10 +498,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   console.log(`Running ${evaluation.tasks.length} task(s) for skill: ${evaluation.skillName}`);
 
   // 1b. Validate comparison file early (before expensive pipeline run)
-  let previousReport: Awaited<ReturnType<typeof loadPreviousReport>> | undefined;
+  let previousSummary: RunSummary | undefined;
   if (options.compareResultsPath) {
     console.log(`Validating comparison file: ${options.compareResultsPath}`);
-    previousReport = await loadPreviousReport(options.compareResultsPath);
+    previousSummary = await loadPreviousRunSummary(options.compareResultsPath);
     console.log('Comparison file validated successfully');
   }
 
@@ -497,17 +521,11 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     }
   }
 
-  const anySkills = suiteTasks.some((lt) => lt.skillsDir);
-  if (compareMode && !anySkills) {
-    throw new Error('--compare requires skills but none were found. Add skills under environment/skills/ (or a suite-level skills/ dir), or use --compare-skill to specify a baseline skill path.');
-  }
-
   const numRuns = options.numRuns ?? 3;
   const nudgeLevel: NudgeLevel = options.nudge ?? config.nudge;
   const logDir = path.join(config.outputDir, 'logs');
   const scorerOptions: ScorerOptions = {
-    noDeterministic: options.noDeterministic,
-    noJudge: options.noJudge,
+    judgeEnabled,
     judgeOptions: { model: config.defaultJudgeModel },
     humanFeedback,
     cwd: options.cwd,
@@ -521,21 +539,23 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
   // 3. Run evaluation phase(s)
   let primaryPhase: PhaseResult;
+  let basePhase: PhaseResult | undefined;
+  let baselineLabel: string | undefined;
   let comparison: ComparisonData | undefined;
   let blindComparison: BlindComparisonData | undefined;
   let crossIterationComparison: ComparisonResult | undefined;
 
-  if (compareMode) {
-    // --- Comparison mode: two phases ---
+  if (baselineMode) {
+    // --- Paired conditions: with-skill + baseline ---
     const rawLabel = options.compareLabel?.trim();
-    const baselineLabel = (rawLabel && rawLabel.length > 0)
+    baselineLabel = (rawLabel && rawLabel.length > 0)
       ? rawLabel
       : (options.compareSkillPath
         ? smartLabel(options.compareSkillPath)
         : 'No Skill');
 
-    console.log(`\nComparison mode: running each task with skill AND "${baselineLabel}"`);
-    console.log(`Total runs per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)\n`);
+    console.log(`\nPaired baseline: running each task with skill AND "${baselineLabel}"`);
+    console.log(`Total trials per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)\n`);
 
     // Phase 1: With Skill
     console.log('=== Phase 1/2: With Skill ===');
@@ -549,16 +569,16 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     // Phase 2: Baseline
     console.log(`\n=== Phase 2/2: ${baselineLabel} ===`);
 
-    // Only skip deterministic for no-skill baseline; version comparison keeps it.
-    // isBaseline tells the judge to use a prompt that doesn't penalize for missing skill.
+    // isBaseline (no-skill only): deterministic runs in baseline mode (no
+    // activation gate) and the judge uses a prompt that doesn't penalize for
+    // missing skill. Skill-version comparison keeps full scoring.
     const isNoSkillBaseline = !options.compareSkillPath;
     const baselineScorerOptions: ScorerOptions = {
       ...scorerOptions,
-      noDeterministic: isNoSkillBaseline ? true : scorerOptions.noDeterministic,
       isBaseline: isNoSkillBaseline,
     };
 
-    const basePhase = await runPhase(
+    basePhase = await runPhase(
       baselineLabel, suiteTasks, config, numRuns, baselineScorerOptions,
       path.join(logDir, 'baseline'),
       {
@@ -582,7 +602,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
     primaryPhase = withPhase;
   } else {
-    // --- Normal mode: single phase ---
+    // --- Single condition ---
     primaryPhase = await runPhase(
       'Evaluation', suiteTasks, config, numRuns, scorerOptions, logDir,
       { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: 'task', nudgeLevel },
@@ -590,16 +610,38 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     );
   }
 
-  // Compare with previous results if requested (cross-iteration comparison)
-  if (previousReport) {
-    console.log('\n--- Comparing with Previous Results ---\n');
-    if (previousReport.skillName !== evaluation.skillName) {
-      console.warn(`Warning: Skill name mismatch — current: "${evaluation.skillName}", previous: "${previousReport.skillName}"`);
-    }
-    const currentSummary = computeSummary(primaryPhase.results, primaryPhase.scores, numRuns);
-    crossIterationComparison = compareResults(primaryPhase.scores, currentSummary, previousReport);
+  // 4. Build + write the machine-readable run summary (summary.json)
+  const withTrialData: PhaseTrialData = {
+    allResults: primaryPhase.allResults,
+    allScores: primaryPhase.allScores,
+  };
+  const baseTrialData: PhaseTrialData | undefined = basePhase
+    ? { allResults: basePhase.allResults, allScores: basePhase.allScores }
+    : undefined;
 
-    if (crossIterationComparison.taskDeltas.length === 0 && primaryPhase.scores.length > 0) {
+  const runSummary = buildRunSummary({
+    tasks: evaluation.tasks,
+    skillName: evaluation.skillName,
+    withSkill: withTrialData,
+    baseline: baseTrialData,
+    baselineLabel,
+    config,
+    nudge: nudgeLevel,
+    trials: numRuns,
+    judgeEnabled,
+  });
+  const summaryJsonPath = await writeRunSummary(runSummary, config.outputDir);
+  console.log(`\nRun summary saved to: ${summaryJsonPath}`);
+
+  // Compare with previous results if requested (cross-iteration comparison)
+  if (previousSummary) {
+    console.log('\n--- Comparing with Previous Results ---\n');
+    if (previousSummary.run.skillName !== evaluation.skillName) {
+      console.warn(`Warning: Skill name mismatch — current: "${evaluation.skillName}", previous: "${previousSummary.run.skillName}"`);
+    }
+    crossIterationComparison = compareRunSummaries(runSummary, previousSummary);
+
+    if (crossIterationComparison.taskDeltas.length === 0 && runSummary.tasks.length > 0) {
       console.warn('Warning: No tasks matched between current and previous results. Comparison may not be meaningful.');
     }
     if (crossIterationComparison.tasksOnlyInCurrent.length > 0) {
@@ -610,10 +652,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     }
   }
 
-  // 4. Generate reports
+  // 5. Generate reports
   console.log('\n--- Generating Reports ---\n');
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const suffix = comparison ? 'comparison' : '';
+  const suffix = comparison ? 'paired' : '';
   const reportBaseName = [evaluation.skillName, suffix, timestamp].filter(Boolean).join('-');
   const reportPath = path.join(config.outputDir, `${reportBaseName}.md`);
   const jsonPath = path.join(config.outputDir, `${reportBaseName}.json`);
@@ -632,6 +674,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     metadata,
     numRuns,
     runDetails: primaryPhase.runDetails,
+    humanFeedback,
     comparison,
     blindComparison,
     crossIterationComparison,
@@ -641,7 +684,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
 
-  const htmlPath = await maybeGenerateHtmlReport(config, reportBaseName, reportOptions);
+  await maybeGenerateHtmlReport(config, reportBaseName, reportOptions);
 
   if (config.githubSummary) {
     const wrote = await writeGitHubSummary(report, config);
@@ -651,7 +694,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   }
 
   const markdownSummary = generateGitHubSummary(report, config);
-  printSummary(report);
+  printSummary(report, runSummary);
 
   if (comparison) {
     printComparisonSummary(comparison);
@@ -670,6 +713,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     results: primaryPhase.results,
     scores: primaryPhase.scores,
     report,
+    runSummary,
+    summaryJsonPath,
     reportPath,
     jsonPath,
     markdownSummary,
@@ -688,13 +733,14 @@ export async function scorePipeline(
   options: {
     configPath?: string;
     configOverrides?: Partial<EvalConfig>;
-    noJudge?: boolean;
+    judge?: boolean;
     noDeterministic?: boolean;
     feedbackPath?: string;
     cwd?: string;
   } = {}
-): Promise<PipelineResult> {
+): Promise<Omit<PipelineResult, 'runSummary' | 'summaryJsonPath'>> {
   const config = await loadConfig(options.configPath, options.configOverrides);
+  const judgeEnabled = options.judge ?? config.judgeEnabled;
 
   const data = JSON.parse(await fs.readFile(resultsPath, 'utf-8'));
   const evaluation: SkillEvaluation = {
@@ -703,12 +749,17 @@ export async function scorePipeline(
   };
   const results: TaskResult[] = data.results;
 
-  // Load human feedback if provided
-  const humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
+  // Load human feedback if provided (judge-scoped)
+  let humanFeedback: HumanFeedback | undefined;
+  if (options.feedbackPath && !judgeEnabled) {
+    console.log('Note: --feedback requires --judge (feedback enriches the judge prompt) — ignoring feedback file.');
+  } else {
+    humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
+  }
 
   const scorerOptions: ScorerOptions = {
     noDeterministic: options.noDeterministic,
-    noJudge: options.noJudge,
+    judgeEnabled,
     judgeOptions: { model: config.defaultJudgeModel },
     humanFeedback,
     cwd: options.cwd,
@@ -735,7 +786,7 @@ export async function scorePipeline(
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
 
-  const htmlPath = await maybeGenerateHtmlReport(config, reportBaseName, reportOptions);
+  await maybeGenerateHtmlReport(config, reportBaseName, reportOptions);
 
   const markdownSummary = generateGitHubSummary(report, config);
   printSummary(report);
@@ -773,19 +824,26 @@ async function maybeGenerateHtmlReport(
   }
 }
 
-function printSummary(report: EvaluationReport): void {
+function printSummary(report: EvaluationReport, runSummary?: RunSummary): void {
   const s = report.summary;
   console.log('\n' + '='.repeat(50));
   console.log(`  Skill Evaluation: ${report.skillName}`);
   console.log('='.repeat(50));
   console.log(`  Result: ${report.passed ? 'PASS' : 'FAIL'}`);
   if (s.numRuns > 1) {
-    console.log(`  Runs: ${s.numRuns}`);
+    console.log(`  Trials per task: ${s.numRuns}`);
   }
-  console.log(`  Discovery: ${(s.discoveryAccuracy * 100).toFixed(0)}%${s.stddev ? ` (± ${(s.stddev.discovery * 100).toFixed(1)}%)` : ''}`);
-  console.log(`  Avg Adherence: ${s.avgAdherence.toFixed(2)}/5${s.stddev ? ` (± ${s.stddev.adherence.toFixed(2)})` : ''}`);
-  console.log(`  Avg Output Quality: ${s.avgOutputQuality.toFixed(2)}/5${s.stddev ? ` (± ${s.stddev.outputQuality.toFixed(2)})` : ''}`);
-  console.log(`  Weighted Score: ${s.avgWeightedScore.toFixed(2)}${s.stddev ? ` (± ${s.stddev.weightedScore.toFixed(2)})` : ''}`);
+  console.log(`  Resolution Rate: ${(s.resolutionRate * 100).toFixed(0)}% (CI ${(s.resolutionCI.low * 100).toFixed(0)}-${(s.resolutionCI.high * 100).toFixed(0)}%)`);
+  console.log(`  Pass@${s.numRuns}: ${(s.passAtK * 100).toFixed(0)}%`);
+  if (runSummary?.metrics.skillLift !== undefined) {
+    console.log(`  Skill Lift: ${formatDelta(runSummary.metrics.skillLift * 100, 1)}%`);
+  }
+  if (s.invocationRate !== undefined) {
+    console.log(`  Skill Invocation Rate: ${(s.invocationRate * 100).toFixed(0)}%`);
+  }
+  if (s.avgAdherence !== undefined && s.avgOutputQuality !== undefined) {
+    console.log(`  Judge diagnostics: adherence ${s.avgAdherence.toFixed(2)}/5, output ${s.avgOutputQuality.toFixed(2)}/5`);
+  }
   console.log(`  Duration: ${(s.totalDurationMs / 1000).toFixed(1)}s | Cost: $${s.totalCostUsd.toFixed(4)}`);
   if (!report.passed && report.failureReasons.length > 0) {
     console.log(`\n  Failures:`);
@@ -801,10 +859,8 @@ function printComparisonSummary(comparison: ComparisonData): void {
   console.log('\n' + '-'.repeat(50));
   console.log(`  Skill Impact (vs ${comparison.summary.baselineLabel})`);
   console.log('-'.repeat(50));
-  console.log(`  Discovery Delta: ${formatDelta(d.discoveryAccuracyDelta * 100, 0)}%`);
-  console.log(`  Adherence Delta: ${formatDelta(d.avgAdherenceDelta)}`);
-  console.log(`  Output Quality Delta: ${formatDelta(d.avgOutputQualityDelta)}`);
-  console.log(`  Weighted Score Delta: ${formatDelta(d.avgWeightedScoreDelta, 2)}`);
+  console.log(`  Skill Lift (resolution delta): ${formatDelta(d.resolutionRateDelta * 100, 1)}%`);
+  console.log(`  Pass@k Delta: ${formatDelta(d.passAtKDelta * 100, 1)}%`);
   console.log(`  Duration Delta: ${formatDelta(d.totalDurationDeltaMs / 1000, 1)}s`);
   console.log(`  Cost Delta: $${formatDelta(d.totalCostDeltaUsd, 4)}`);
   console.log('-'.repeat(50));

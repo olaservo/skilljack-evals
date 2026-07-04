@@ -31,6 +31,9 @@ export interface EvalConfig {
   defaultAgentModel: string;
   defaultJudgeModel: string;
 
+  // LLM judge diagnostics (opt-in; never affects pass/fail)
+  judgeEnabled: boolean;
+
   // Scoring weights
   defaultWeights: {
     discovery: number;
@@ -58,8 +61,8 @@ export interface EvalConfig {
   htmlReport: boolean;
 
   // Pass/fail thresholds
-  discoveryThreshold: number; // 0-1, default 0.8 (80%)
-  scoreThreshold: number; // 1-5, default 4.0
+  resolutionThreshold: number; // 0-1 min with-skill resolution rate, default 0.8
+  liftThreshold?: number; // min macro skill lift; unset = not gated
 
   // Security
   allowedWriteDirs: string[];
@@ -79,6 +82,7 @@ export const DEFAULT_CONFIG: EvalConfig = {
   runnerType: 'claude-sdk',
   defaultAgentModel: 'sonnet',
   defaultJudgeModel: 'haiku',
+  judgeEnabled: false,
   defaultWeights: {
     discovery: 0.3,
     adherence: 0.4,
@@ -93,8 +97,8 @@ export const DEFAULT_CONFIG: EvalConfig = {
   outputDir: './results',
   githubSummary: false,
   htmlReport: true,
-  discoveryThreshold: 0.8,
-  scoreThreshold: 4.0,
+  resolutionThreshold: 0.8,
+  liftThreshold: undefined,
   allowedWriteDirs: ['./results/', './fixtures/'],
   cache: {
     enabled: true,
@@ -119,8 +123,12 @@ interface RawConfigFile {
     };
   };
   thresholds?: {
-    discovery_rate?: number;
-    avg_score?: number;
+    resolution_rate?: number;
+    min_lift?: number;
+  };
+  judge?: {
+    enabled?: boolean;
+    model?: string;
   };
   runner?: {
     type?: string;
@@ -176,8 +184,11 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
       };
     }
 
-    if (raw.thresholds?.discovery_rate !== undefined) config.discoveryThreshold = raw.thresholds.discovery_rate;
-    if (raw.thresholds?.avg_score !== undefined) config.scoreThreshold = raw.thresholds.avg_score;
+    if (raw.thresholds?.resolution_rate !== undefined) config.resolutionThreshold = raw.thresholds.resolution_rate;
+    if (raw.thresholds?.min_lift !== undefined) config.liftThreshold = raw.thresholds.min_lift;
+
+    if (raw.judge?.enabled !== undefined) config.judgeEnabled = raw.judge.enabled === true;
+    if (raw.judge?.model) config.defaultJudgeModel = raw.judge.model;
 
     if (raw.runner?.timeout_ms !== undefined) config.taskTimeoutMs = raw.runner.timeout_ms;
     if (raw.runner?.concurrency !== undefined) {
@@ -235,8 +246,9 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
  * - EVAL_NUDGE: Skill nudge level off|name|description|full (default: 'off')
  * - EVAL_EXIT_ON_FAILURE: Exit with code 1 on failures (default: true)
  * - EVAL_OUTPUT_DIR: Directory for results (default: './results')
- * - EVAL_DISCOVERY_THRESHOLD: Min discovery rate 0-1 (default: 0.8)
- * - EVAL_SCORE_THRESHOLD: Min avg score 1-5 (default: 4.0)
+ * - EVAL_JUDGE: Enable LLM judge diagnostics (default: false)
+ * - EVAL_RESOLUTION_THRESHOLD: Min with-skill resolution rate 0-1 (default: 0.8)
+ * - EVAL_LIFT_THRESHOLD: Min macro skill lift (default: unset = not gated)
  * - EVAL_GITHUB_SUMMARY: Write GitHub Actions summary (default: false)
  * - EVAL_HTML_REPORT: Generate HTML report (default: true)
  * - EVAL_CACHE_ENABLED: Enable/disable response cache (default: true)
@@ -286,11 +298,15 @@ function loadEnvConfig(): Partial<EvalConfig> {
 
   if (process.env.EVAL_OUTPUT_DIR) config.outputDir = process.env.EVAL_OUTPUT_DIR;
 
-  const discoveryThreshold = parseFloat(process.env.EVAL_DISCOVERY_THRESHOLD || '');
-  if (!isNaN(discoveryThreshold)) config.discoveryThreshold = discoveryThreshold;
+  if (process.env.EVAL_JUDGE !== undefined) {
+    config.judgeEnabled = ['true', '1'].includes(process.env.EVAL_JUDGE.toLowerCase());
+  }
 
-  const scoreThreshold = parseFloat(process.env.EVAL_SCORE_THRESHOLD || '');
-  if (!isNaN(scoreThreshold)) config.scoreThreshold = scoreThreshold;
+  const resolutionThreshold = parseFloat(process.env.EVAL_RESOLUTION_THRESHOLD || '');
+  if (!isNaN(resolutionThreshold)) config.resolutionThreshold = resolutionThreshold;
+
+  const liftThreshold = parseFloat(process.env.EVAL_LIFT_THRESHOLD || '');
+  if (!isNaN(liftThreshold)) config.liftThreshold = liftThreshold;
 
   if (process.env.EVAL_GITHUB_SUMMARY !== undefined) {
     config.githubSummary = process.env.EVAL_GITHUB_SUMMARY === 'true';

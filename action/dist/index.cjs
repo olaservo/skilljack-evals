@@ -181,7 +181,7 @@ var require_file_command = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.prepareKeyValueMessage = exports2.issueFileCommand = void 0;
     var crypto2 = __importStar(require("crypto"));
-    var fs17 = __importStar(require("fs"));
+    var fs18 = __importStar(require("fs"));
     var os3 = __importStar(require("os"));
     var utils_1 = require_utils();
     function issueFileCommand(command, message) {
@@ -189,10 +189,10 @@ var require_file_command = __commonJS({
       if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
       }
-      if (!fs17.existsSync(filePath)) {
+      if (!fs18.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
       }
-      fs17.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os3.EOL}`, {
+      fs18.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os3.EOL}`, {
         encoding: "utf8"
       });
     }
@@ -995,14 +995,14 @@ var require_util = __commonJS({
         }
         const port = url.port != null ? url.port : url.protocol === "https:" ? 443 : 80;
         let origin = url.origin != null ? url.origin : `${url.protocol}//${url.hostname}:${port}`;
-        let path15 = url.path != null ? url.path : `${url.pathname || ""}${url.search || ""}`;
+        let path16 = url.path != null ? url.path : `${url.pathname || ""}${url.search || ""}`;
         if (origin.endsWith("/")) {
           origin = origin.substring(0, origin.length - 1);
         }
-        if (path15 && !path15.startsWith("/")) {
-          path15 = `/${path15}`;
+        if (path16 && !path16.startsWith("/")) {
+          path16 = `/${path16}`;
         }
-        url = new URL(origin + path15);
+        url = new URL(origin + path16);
       }
       return url;
     }
@@ -2616,20 +2616,20 @@ var require_parseParams = __commonJS({
 var require_basename = __commonJS({
   "node_modules/@fastify/busboy/lib/utils/basename.js"(exports2, module2) {
     "use strict";
-    module2.exports = function basename3(path15) {
-      if (typeof path15 !== "string") {
+    module2.exports = function basename3(path16) {
+      if (typeof path16 !== "string") {
         return "";
       }
-      for (var i = path15.length - 1; i >= 0; --i) {
-        switch (path15.charCodeAt(i)) {
+      for (var i = path16.length - 1; i >= 0; --i) {
+        switch (path16.charCodeAt(i)) {
           case 47:
           // '/'
           case 92:
-            path15 = path15.slice(i + 1);
-            return path15 === ".." || path15 === "." ? "" : path15;
+            path16 = path16.slice(i + 1);
+            return path16 === ".." || path16 === "." ? "" : path16;
         }
       }
-      return path15 === ".." || path15 === "." ? "" : path15;
+      return path16 === ".." || path16 === "." ? "" : path16;
     };
   }
 });
@@ -5659,7 +5659,7 @@ var require_request = __commonJS({
     }
     var Request = class _Request {
       constructor(origin, {
-        path: path15,
+        path: path16,
         method,
         body,
         headers,
@@ -5673,11 +5673,11 @@ var require_request = __commonJS({
         throwOnError,
         expectContinue
       }, handler) {
-        if (typeof path15 !== "string") {
+        if (typeof path16 !== "string") {
           throw new InvalidArgumentError("path must be a string");
-        } else if (path15[0] !== "/" && !(path15.startsWith("http://") || path15.startsWith("https://")) && method !== "CONNECT") {
+        } else if (path16[0] !== "/" && !(path16.startsWith("http://") || path16.startsWith("https://")) && method !== "CONNECT") {
           throw new InvalidArgumentError("path must be an absolute URL or start with a slash");
-        } else if (invalidPathRegex.exec(path15) !== null) {
+        } else if (invalidPathRegex.exec(path16) !== null) {
           throw new InvalidArgumentError("invalid request path");
         }
         if (typeof method !== "string") {
@@ -5740,7 +5740,7 @@ var require_request = __commonJS({
         this.completed = false;
         this.aborted = false;
         this.upgrade = upgrade || null;
-        this.path = query ? util.buildURL(path15, query) : path15;
+        this.path = query ? util.buildURL(path16, query) : path16;
         this.origin = origin;
         this.idempotent = idempotent == null ? method === "HEAD" || method === "GET" : idempotent;
         this.blocking = blocking == null ? false : blocking;
@@ -6748,9 +6748,9 @@ var require_RedirectHandler = __commonJS({
           return this.handler.onHeaders(statusCode, headers, resume, statusText);
         }
         const { origin, pathname, search } = util.parseURL(new URL(this.location, this.opts.origin && new URL(this.opts.path, this.opts.origin)));
-        const path15 = search ? `${pathname}${search}` : pathname;
+        const path16 = search ? `${pathname}${search}` : pathname;
         this.opts.headers = cleanRequestHeaders(this.opts.headers, statusCode === 303, this.opts.origin !== origin);
-        this.opts.path = path15;
+        this.opts.path = path16;
         this.opts.origin = origin;
         this.opts.maxRedirections = 0;
         this.opts.query = null;
@@ -7990,7 +7990,7 @@ var require_client = __commonJS({
         writeH2(client, client[kHTTP2Session], request);
         return;
       }
-      const { body, method, path: path15, host, upgrade, headers, blocking, reset } = request;
+      const { body, method, path: path16, host, upgrade, headers, blocking, reset } = request;
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body && typeof body.read === "function") {
         body.read(0);
@@ -8040,7 +8040,7 @@ var require_client = __commonJS({
       if (blocking) {
         socket[kBlocking] = true;
       }
-      let header = `${method} ${path15} HTTP/1.1\r
+      let header = `${method} ${path16} HTTP/1.1\r
 `;
       if (typeof host === "string") {
         header += `host: ${host}\r
@@ -8103,7 +8103,7 @@ upgrade: ${upgrade}\r
       return true;
     }
     function writeH2(client, session, request) {
-      const { body, method, path: path15, host, upgrade, expectContinue, signal, headers: reqHeaders } = request;
+      const { body, method, path: path16, host, upgrade, expectContinue, signal, headers: reqHeaders } = request;
       let headers;
       if (typeof reqHeaders === "string") headers = Request[kHTTP2CopyHeaders](reqHeaders.trim());
       else headers = reqHeaders;
@@ -8146,7 +8146,7 @@ upgrade: ${upgrade}\r
         });
         return true;
       }
-      headers[HTTP2_HEADER_PATH] = path15;
+      headers[HTTP2_HEADER_PATH] = path16;
       headers[HTTP2_HEADER_SCHEME] = "https";
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body && typeof body.read === "function") {
@@ -10386,20 +10386,20 @@ var require_mock_utils = __commonJS({
       }
       return true;
     }
-    function safeUrl(path15) {
-      if (typeof path15 !== "string") {
-        return path15;
+    function safeUrl(path16) {
+      if (typeof path16 !== "string") {
+        return path16;
       }
-      const pathSegments = path15.split("?");
+      const pathSegments = path16.split("?");
       if (pathSegments.length !== 2) {
-        return path15;
+        return path16;
       }
       const qp2 = new URLSearchParams(pathSegments.pop());
       qp2.sort();
       return [...pathSegments, qp2.toString()].join("?");
     }
-    function matchKey(mockDispatch2, { path: path15, method, body, headers }) {
-      const pathMatch = matchValue(mockDispatch2.path, path15);
+    function matchKey(mockDispatch2, { path: path16, method, body, headers }) {
+      const pathMatch = matchValue(mockDispatch2.path, path16);
       const methodMatch = matchValue(mockDispatch2.method, method);
       const bodyMatch = typeof mockDispatch2.body !== "undefined" ? matchValue(mockDispatch2.body, body) : true;
       const headersMatch = matchHeaders(mockDispatch2, headers);
@@ -10417,7 +10417,7 @@ var require_mock_utils = __commonJS({
     function getMockDispatch(mockDispatches, key) {
       const basePath = key.query ? buildURL(key.path, key.query) : key.path;
       const resolvedPath = typeof basePath === "string" ? safeUrl(basePath) : basePath;
-      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path15 }) => matchValue(safeUrl(path15), resolvedPath));
+      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path16 }) => matchValue(safeUrl(path16), resolvedPath));
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for path '${resolvedPath}'`);
       }
@@ -10454,9 +10454,9 @@ var require_mock_utils = __commonJS({
       }
     }
     function buildKey(opts) {
-      const { path: path15, method, body, headers, query } = opts;
+      const { path: path16, method, body, headers, query } = opts;
       return {
-        path: path15,
+        path: path16,
         method,
         body,
         headers,
@@ -10905,10 +10905,10 @@ var require_pending_interceptors_formatter = __commonJS({
       }
       format(pendingInterceptors) {
         const withPrettyHeaders = pendingInterceptors.map(
-          ({ method, path: path15, data: { statusCode }, persist, times, timesInvoked, origin }) => ({
+          ({ method, path: path16, data: { statusCode }, persist, times, timesInvoked, origin }) => ({
             Method: method,
             Origin: origin,
-            Path: path15,
+            Path: path16,
             "Status code": statusCode,
             Persistent: persist ? "\u2705" : "\u274C",
             Invocations: timesInvoked,
@@ -15528,8 +15528,8 @@ var require_util6 = __commonJS({
         }
       }
     }
-    function validateCookiePath(path15) {
-      for (const char of path15) {
+    function validateCookiePath(path16) {
+      for (const char of path16) {
         const code = char.charCodeAt(0);
         if (code < 33 || char === ";") {
           throw new Error("Invalid cookie path");
@@ -17209,11 +17209,11 @@ var require_undici = __commonJS({
           if (typeof opts.path !== "string") {
             throw new InvalidArgumentError("invalid opts.path");
           }
-          let path15 = opts.path;
+          let path16 = opts.path;
           if (!opts.path.startsWith("/")) {
-            path15 = `/${path15}`;
+            path16 = `/${path16}`;
           }
-          url = new URL(util.parseOrigin(url).origin + path15);
+          url = new URL(util.parseOrigin(url).origin + path16);
         } else {
           if (!opts) {
             opts = typeof url === "object" ? url : {};
@@ -18144,7 +18144,7 @@ var require_summary = __commonJS({
     exports2.summary = exports2.markdownSummary = exports2.SUMMARY_DOCS_URL = exports2.SUMMARY_ENV_VAR = void 0;
     var os_1 = require("os");
     var fs_1 = require("fs");
-    var { access, appendFile: appendFile2, writeFile: writeFile7 } = fs_1.promises;
+    var { access, appendFile: appendFile2, writeFile: writeFile8 } = fs_1.promises;
     exports2.SUMMARY_ENV_VAR = "GITHUB_STEP_SUMMARY";
     exports2.SUMMARY_DOCS_URL = "https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary";
     var Summary = class {
@@ -18202,7 +18202,7 @@ var require_summary = __commonJS({
         return __awaiter(this, void 0, void 0, function* () {
           const overwrite = !!(options === null || options === void 0 ? void 0 : options.overwrite);
           const filePath = yield this.filePath();
-          const writeFunc = overwrite ? writeFile7 : appendFile2;
+          const writeFunc = overwrite ? writeFile8 : appendFile2;
           yield writeFunc(filePath, this._buffer, { encoding: "utf8" });
           return this.emptyBuffer();
         });
@@ -18436,7 +18436,7 @@ var require_path_utils = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.toPlatformPath = exports2.toWin32Path = exports2.toPosixPath = void 0;
-    var path15 = __importStar(require("path"));
+    var path16 = __importStar(require("path"));
     function toPosixPath(pth) {
       return pth.replace(/[\\]/g, "/");
     }
@@ -18446,7 +18446,7 @@ var require_path_utils = __commonJS({
     }
     exports2.toWin32Path = toWin32Path;
     function toPlatformPath(pth) {
-      return pth.replace(/[/\\]/g, path15.sep);
+      return pth.replace(/[/\\]/g, path16.sep);
     }
     exports2.toPlatformPath = toPlatformPath;
   }
@@ -18509,12 +18509,12 @@ var require_io_util = __commonJS({
     var _a2;
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getCmdPath = exports2.tryGetExecutablePath = exports2.isRooted = exports2.isDirectory = exports2.exists = exports2.READONLY = exports2.UV_FS_O_EXLOCK = exports2.IS_WINDOWS = exports2.unlink = exports2.symlink = exports2.stat = exports2.rmdir = exports2.rm = exports2.rename = exports2.readlink = exports2.readdir = exports2.open = exports2.mkdir = exports2.lstat = exports2.copyFile = exports2.chmod = void 0;
-    var fs17 = __importStar(require("fs"));
-    var path15 = __importStar(require("path"));
-    _a2 = fs17.promises, exports2.chmod = _a2.chmod, exports2.copyFile = _a2.copyFile, exports2.lstat = _a2.lstat, exports2.mkdir = _a2.mkdir, exports2.open = _a2.open, exports2.readdir = _a2.readdir, exports2.readlink = _a2.readlink, exports2.rename = _a2.rename, exports2.rm = _a2.rm, exports2.rmdir = _a2.rmdir, exports2.stat = _a2.stat, exports2.symlink = _a2.symlink, exports2.unlink = _a2.unlink;
+    var fs18 = __importStar(require("fs"));
+    var path16 = __importStar(require("path"));
+    _a2 = fs18.promises, exports2.chmod = _a2.chmod, exports2.copyFile = _a2.copyFile, exports2.lstat = _a2.lstat, exports2.mkdir = _a2.mkdir, exports2.open = _a2.open, exports2.readdir = _a2.readdir, exports2.readlink = _a2.readlink, exports2.rename = _a2.rename, exports2.rm = _a2.rm, exports2.rmdir = _a2.rmdir, exports2.stat = _a2.stat, exports2.symlink = _a2.symlink, exports2.unlink = _a2.unlink;
     exports2.IS_WINDOWS = process.platform === "win32";
     exports2.UV_FS_O_EXLOCK = 268435456;
-    exports2.READONLY = fs17.constants.O_RDONLY;
+    exports2.READONLY = fs18.constants.O_RDONLY;
     function exists(fsPath) {
       return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -18559,7 +18559,7 @@ var require_io_util = __commonJS({
         }
         if (stats && stats.isFile()) {
           if (exports2.IS_WINDOWS) {
-            const upperExt = path15.extname(filePath).toUpperCase();
+            const upperExt = path16.extname(filePath).toUpperCase();
             if (extensions.some((validExt) => validExt.toUpperCase() === upperExt)) {
               return filePath;
             }
@@ -18583,11 +18583,11 @@ var require_io_util = __commonJS({
           if (stats && stats.isFile()) {
             if (exports2.IS_WINDOWS) {
               try {
-                const directory = path15.dirname(filePath);
-                const upperName = path15.basename(filePath).toUpperCase();
+                const directory = path16.dirname(filePath);
+                const upperName = path16.basename(filePath).toUpperCase();
                 for (const actualName of yield exports2.readdir(directory)) {
                   if (upperName === actualName.toUpperCase()) {
-                    filePath = path15.join(directory, actualName);
+                    filePath = path16.join(directory, actualName);
                     break;
                   }
                 }
@@ -18682,7 +18682,7 @@ var require_io = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.findInPath = exports2.which = exports2.mkdirP = exports2.rmRF = exports2.mv = exports2.cp = void 0;
     var assert_1 = require("assert");
-    var path15 = __importStar(require("path"));
+    var path16 = __importStar(require("path"));
     var ioUtil = __importStar(require_io_util());
     function cp(source, dest, options = {}) {
       return __awaiter(this, void 0, void 0, function* () {
@@ -18691,7 +18691,7 @@ var require_io = __commonJS({
         if (destStat && destStat.isFile() && !force) {
           return;
         }
-        const newDest = destStat && destStat.isDirectory() && copySourceDirectory ? path15.join(dest, path15.basename(source)) : dest;
+        const newDest = destStat && destStat.isDirectory() && copySourceDirectory ? path16.join(dest, path16.basename(source)) : dest;
         if (!(yield ioUtil.exists(source))) {
           throw new Error(`no such file or directory: ${source}`);
         }
@@ -18703,7 +18703,7 @@ var require_io = __commonJS({
             yield cpDirRecursive(source, newDest, 0, force);
           }
         } else {
-          if (path15.relative(source, newDest) === "") {
+          if (path16.relative(source, newDest) === "") {
             throw new Error(`'${newDest}' and '${source}' are the same file`);
           }
           yield copyFile2(source, newDest, force);
@@ -18716,7 +18716,7 @@ var require_io = __commonJS({
         if (yield ioUtil.exists(dest)) {
           let destExists = true;
           if (yield ioUtil.isDirectory(dest)) {
-            dest = path15.join(dest, path15.basename(source));
+            dest = path16.join(dest, path16.basename(source));
             destExists = yield ioUtil.exists(dest);
           }
           if (destExists) {
@@ -18727,7 +18727,7 @@ var require_io = __commonJS({
             }
           }
         }
-        yield mkdirP(path15.dirname(dest));
+        yield mkdirP(path16.dirname(dest));
         yield ioUtil.rename(source, dest);
       });
     }
@@ -18790,7 +18790,7 @@ var require_io = __commonJS({
         }
         const extensions = [];
         if (ioUtil.IS_WINDOWS && process.env["PATHEXT"]) {
-          for (const extension of process.env["PATHEXT"].split(path15.delimiter)) {
+          for (const extension of process.env["PATHEXT"].split(path16.delimiter)) {
             if (extension) {
               extensions.push(extension);
             }
@@ -18803,12 +18803,12 @@ var require_io = __commonJS({
           }
           return [];
         }
-        if (tool.includes(path15.sep)) {
+        if (tool.includes(path16.sep)) {
           return [];
         }
         const directories = [];
         if (process.env.PATH) {
-          for (const p of process.env.PATH.split(path15.delimiter)) {
+          for (const p of process.env.PATH.split(path16.delimiter)) {
             if (p) {
               directories.push(p);
             }
@@ -18816,7 +18816,7 @@ var require_io = __commonJS({
         }
         const matches = [];
         for (const directory of directories) {
-          const filePath = yield ioUtil.tryGetExecutablePath(path15.join(directory, tool), extensions);
+          const filePath = yield ioUtil.tryGetExecutablePath(path16.join(directory, tool), extensions);
           if (filePath) {
             matches.push(filePath);
           }
@@ -18932,7 +18932,7 @@ var require_toolrunner = __commonJS({
     var os3 = __importStar(require("os"));
     var events = __importStar(require("events"));
     var child = __importStar(require("child_process"));
-    var path15 = __importStar(require("path"));
+    var path16 = __importStar(require("path"));
     var io = __importStar(require_io());
     var ioUtil = __importStar(require_io_util());
     var timers_1 = require("timers");
@@ -19147,7 +19147,7 @@ var require_toolrunner = __commonJS({
       exec() {
         return __awaiter(this, void 0, void 0, function* () {
           if (!ioUtil.isRooted(this.toolPath) && (this.toolPath.includes("/") || IS_WINDOWS && this.toolPath.includes("\\"))) {
-            this.toolPath = path15.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
+            this.toolPath = path16.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
           }
           this.toolPath = yield io.which(this.toolPath, true);
           return new Promise((resolve6, reject) => __awaiter(this, void 0, void 0, function* () {
@@ -19647,7 +19647,7 @@ var require_core = __commonJS({
     var file_command_1 = require_file_command();
     var utils_1 = require_utils();
     var os3 = __importStar(require("os"));
-    var path15 = __importStar(require("path"));
+    var path16 = __importStar(require("path"));
     var oidc_utils_1 = require_oidc_utils();
     var ExitCode;
     (function(ExitCode2) {
@@ -19675,7 +19675,7 @@ var require_core = __commonJS({
       } else {
         (0, command_1.issueCommand)("add-path", {}, inputPath);
       }
-      process.env["PATH"] = `${inputPath}${path15.delimiter}${process.env["PATH"]}`;
+      process.env["PATH"] = `${inputPath}${path16.delimiter}${process.env["PATH"]}`;
     }
     exports2.addPath = addPath;
     function getInput2(name, options) {
@@ -19816,8 +19816,8 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 var core = __toESM(require_core(), 1);
 
 // dist/src/pipeline.js
-var path14 = __toESM(require("path"), 1);
-var fs16 = __toESM(require("fs/promises"), 1);
+var path15 = __toESM(require("path"), 1);
+var fs17 = __toESM(require("fs/promises"), 1);
 
 // dist/src/utils/format.js
 var ARROW_DIRECTION_EPSILON = 1e-3;
@@ -19841,6 +19841,60 @@ function formatCategory(cat) {
   if (cat === "none")
     return "No Failure";
   return cat.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+// dist/src/score/metrics.js
+function resolutionRate(passedFlags) {
+  if (passedFlags.length === 0)
+    return 0;
+  return passedFlags.filter(Boolean).length / passedFlags.length;
+}
+function passAtK(passedFlags) {
+  return passedFlags.some(Boolean);
+}
+function binomialCI(p, n) {
+  if (n <= 0)
+    return { low: 0, high: 1 };
+  const halfWidth = 1.96 * Math.sqrt(p * (1 - p) / n);
+  return {
+    low: Math.max(0, p - halfWidth),
+    high: Math.min(1, p + halfWidth)
+  };
+}
+function skillLift(withSkillRate, baselineRate) {
+  return withSkillRate - baselineRate;
+}
+function macroSkillLift(perTaskLifts) {
+  if (perTaskLifts.length === 0)
+    return 0;
+  return perTaskLifts.reduce((sum, v3) => sum + v3, 0) / perTaskLifts.length;
+}
+function skillInvocationRate(invokedFlags) {
+  if (invokedFlags.length === 0)
+    return void 0;
+  return invokedFlags.filter(Boolean).length / invokedFlags.length;
+}
+function groupMetrics(tasks) {
+  const buckets = /* @__PURE__ */ new Map();
+  for (const task of tasks) {
+    const keys = [...new Set(task.keys.filter((k3) => !!k3))];
+    for (const key of keys) {
+      const bucket = buckets.get(key) ?? { rates: [], anyPass: 0 };
+      bucket.rates.push(resolutionRate(task.passed));
+      if (passAtK(task.passed))
+        bucket.anyPass++;
+      buckets.set(key, bucket);
+    }
+  }
+  const out = {};
+  for (const [key, bucket] of buckets) {
+    out[key] = {
+      tasks: bucket.rates.length,
+      resolutionRate: bucket.rates.reduce((s, v3) => s + v3, 0) / bucket.rates.length,
+      passAtK: bucket.anyPass / bucket.rates.length
+    };
+  }
+  return out;
 }
 
 // node_modules/js-yaml/dist/js-yaml.mjs
@@ -22223,6 +22277,7 @@ var DEFAULT_CONFIG = {
   runnerType: "claude-sdk",
   defaultAgentModel: "sonnet",
   defaultJudgeModel: "haiku",
+  judgeEnabled: false,
   defaultWeights: {
     discovery: 0.3,
     adherence: 0.4,
@@ -22239,8 +22294,8 @@ var DEFAULT_CONFIG = {
   outputDir: "./results",
   githubSummary: false,
   htmlReport: true,
-  discoveryThreshold: 0.8,
-  scoreThreshold: 4,
+  resolutionThreshold: 0.8,
+  liftThreshold: void 0,
   allowedWriteDirs: ["./results/", "./fixtures/"],
   cache: {
     enabled: true,
@@ -22273,10 +22328,14 @@ async function loadConfigFile(configPath) {
         output: raw.scoring.weights.output ?? DEFAULT_CONFIG.defaultWeights.output
       };
     }
-    if (raw.thresholds?.discovery_rate !== void 0)
-      config.discoveryThreshold = raw.thresholds.discovery_rate;
-    if (raw.thresholds?.avg_score !== void 0)
-      config.scoreThreshold = raw.thresholds.avg_score;
+    if (raw.thresholds?.resolution_rate !== void 0)
+      config.resolutionThreshold = raw.thresholds.resolution_rate;
+    if (raw.thresholds?.min_lift !== void 0)
+      config.liftThreshold = raw.thresholds.min_lift;
+    if (raw.judge?.enabled !== void 0)
+      config.judgeEnabled = raw.judge.enabled === true;
+    if (raw.judge?.model)
+      config.defaultJudgeModel = raw.judge.model;
     if (raw.runner?.timeout_ms !== void 0)
       config.taskTimeoutMs = raw.runner.timeout_ms;
     if (raw.runner?.concurrency !== void 0) {
@@ -22360,12 +22419,15 @@ function loadEnvConfig() {
   }
   if (process.env.EVAL_OUTPUT_DIR)
     config.outputDir = process.env.EVAL_OUTPUT_DIR;
-  const discoveryThreshold = parseFloat(process.env.EVAL_DISCOVERY_THRESHOLD || "");
-  if (!isNaN(discoveryThreshold))
-    config.discoveryThreshold = discoveryThreshold;
-  const scoreThreshold = parseFloat(process.env.EVAL_SCORE_THRESHOLD || "");
-  if (!isNaN(scoreThreshold))
-    config.scoreThreshold = scoreThreshold;
+  if (process.env.EVAL_JUDGE !== void 0) {
+    config.judgeEnabled = ["true", "1"].includes(process.env.EVAL_JUDGE.toLowerCase());
+  }
+  const resolutionThreshold = parseFloat(process.env.EVAL_RESOLUTION_THRESHOLD || "");
+  if (!isNaN(resolutionThreshold))
+    config.resolutionThreshold = resolutionThreshold;
+  const liftThreshold = parseFloat(process.env.EVAL_LIFT_THRESHOLD || "");
+  if (!isNaN(liftThreshold))
+    config.liftThreshold = liftThreshold;
   if (process.env.EVAL_GITHUB_SUMMARY !== void 0) {
     config.githubSummary = process.env.EVAL_GITHUB_SUMMARY === "true";
   }
@@ -43132,6 +43194,7 @@ function scoreDeterministic(task, result, options) {
   const check = task.deterministic;
   if (!check)
     return null;
+  const ignoreActivation = options?.ignoreActivation ?? false;
   const details = [];
   let skillActivated = false;
   let activatedSkillName;
@@ -43153,7 +43216,9 @@ function scoreDeterministic(task, result, options) {
       activatedSkillName = result.skillLoads[0];
     }
   }
-  if (check.expectSkillActivation) {
+  if (ignoreActivation) {
+    details.push("Baseline: skill activation not evaluated");
+  } else if (check.expectSkillActivation) {
     if (skillActivated) {
       if (task.expectedSkillLoad && task.expectedSkillLoad !== "none") {
         if (activatedSkillName === task.expectedSkillLoad) {
@@ -43209,7 +43274,7 @@ function scoreDeterministic(task, result, options) {
   let regexCheckPassed = null;
   let javascriptCheckPassed = null;
   let fileExistsCheckPassed = null;
-  if (check.expectSkillActivation !== false && (skillActivated || !check.expectSkillActivation)) {
+  if (ignoreActivation || check.expectSkillActivation !== false && (skillActivated || !check.expectSkillActivation)) {
     if (Array.isArray(check.expectContains) && check.expectContains.length > 0) {
       const missing = check.expectContains.filter((s) => !result.output.includes(s));
       containsCheckPassed = missing.length === 0;
@@ -43322,7 +43387,27 @@ function scoreDeterministic(task, result, options) {
     }
   }
   let passed;
-  if (check.expectSkillActivation) {
+  if (ignoreActivation) {
+    passed = !result.isError;
+    if (markerFound !== null)
+      passed = passed && markerFound;
+    if (expectedToolsCalled !== null)
+      passed = passed && expectedToolsCalled;
+    if (unexpectedToolsCalled !== null)
+      passed = passed && !unexpectedToolsCalled;
+    if (containsCheckPassed !== null)
+      passed = passed && containsCheckPassed;
+    if (notContainsCheckPassed !== null)
+      passed = passed && notContainsCheckPassed;
+    if (regexCheckPassed !== null)
+      passed = passed && regexCheckPassed;
+    if (javascriptCheckPassed !== null)
+      passed = passed && javascriptCheckPassed;
+    if (fileExistsCheckPassed !== null)
+      passed = passed && fileExistsCheckPassed;
+    if (verifierPassed !== null)
+      passed = passed && verifierPassed;
+  } else if (check.expectSkillActivation) {
     passed = skillActivated;
     if (markerFound !== null)
       passed = passed && markerFound;
@@ -43603,7 +43688,7 @@ function extractJsonObject(text) {
   }
   return null;
 }
-function parseJudgeResponseJson(response, taskId, weights) {
+function parseJudgeResponseJson(response, taskId) {
   const jsonStr = extractJsonObject(response);
   if (!jsonStr) {
     return createErrorScore(taskId, "Failed to parse judge response");
@@ -43613,9 +43698,6 @@ function parseJudgeResponseJson(response, taskId, weights) {
     const discovery = Number(data.discovery) || 0;
     const adherence = Number(data.adherence) || 1;
     const outputQuality = Number(data.output_quality) || 1;
-    const adherenceNorm = (adherence - 1) / 4;
-    const outputNorm = (outputQuality - 1) / 4;
-    const weightedScore = (weights.get("discovery") ?? 0.3) * discovery + (weights.get("adherence") ?? 0.4) * adherenceNorm + (weights.get("output") ?? 0.3) * outputNorm;
     const checklistResults = Array.isArray(data.checklist_results) ? data.checklist_results.filter((cr) => typeof cr === "object" && cr !== null && "item" in cr && "passed" in cr).map((cr) => ({
       item: String(cr.item),
       passed: Boolean(cr.passed),
@@ -43626,7 +43708,6 @@ function parseJudgeResponseJson(response, taskId, weights) {
       discovery,
       adherence,
       outputQuality,
-      weightedScore,
       failureCategory: isValidFailureCategory(data.failure_category) ? data.failure_category : "agent_error",
       reasoning: data.reasoning || "",
       checklistResults,
@@ -43663,7 +43744,6 @@ function createErrorScore(taskId, reason) {
     discovery: 0,
     adherence: 1,
     outputQuality: 1,
-    weightedScore: 0,
     failureCategory: "agent_error",
     reasoning: reason,
     checklistResults: []
@@ -43725,15 +43805,10 @@ var SkillJudge = class {
         discovery: 0,
         adherence: 1,
         outputQuality: 1,
-        weightedScore: 0,
         failureCategory: "agent_error",
         reasoning: `Task failed with error: ${result.errorMessage}`,
         checklistResults: []
       };
-    }
-    const weights = /* @__PURE__ */ new Map();
-    for (const c of task.criteria) {
-      weights.set(c.dimension, c.weight);
     }
     const prompt = this.buildJudgePrompt(task, result, feedback);
     try {
@@ -43760,7 +43835,7 @@ var SkillJudge = class {
           }
         }
       }
-      return parseJudgeResponseJson(responseText, task.id, weights);
+      return parseJudgeResponseJson(responseText, task.id);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "unknown";
       if (this.options.isBaseline) {
@@ -43769,7 +43844,6 @@ var SkillJudge = class {
           discovery: 0,
           adherence: 3,
           outputQuality: 3,
-          weightedScore: 0.5,
           failureCategory: "none",
           reasoning: `Heuristic baseline scoring (judge error: ${errorMsg})`,
           checklistResults: []
@@ -43781,7 +43855,6 @@ var SkillJudge = class {
         discovery,
         adherence: 3,
         outputQuality: 3,
-        weightedScore: 0.5,
         failureCategory: discovery === 0 ? "discovery_failure" : "none",
         reasoning: `Heuristic scoring (judge error: ${errorMsg})`,
         checklistResults: []
@@ -43915,7 +43988,7 @@ async function blindCompareAll(tasks, judge, options) {
       };
     }
     const preferredCondition = mapPreferredToCondition(result.preferred, withSkillIsA);
-    const standardDelta = task.delta.weightedScoreDelta;
+    const standardDelta = task.delta.lift;
     const standardPrefersWithSkill = standardDelta > threshold;
     const standardPrefersWithout = standardDelta < -threshold;
     const biasSignal = preferredCondition !== "tie" && (standardPrefersWithSkill && preferredCondition === "without-skill" || standardPrefersWithout && preferredCondition === "with-skill");
@@ -43950,25 +44023,21 @@ function capitalize(s) {
 
 // dist/src/scorer/scorer.js
 async function scoreTask(task, result, options = {}) {
-  const config = loadConfigSync();
-  const weights = /* @__PURE__ */ new Map([
-    ["discovery", config.defaultWeights.discovery],
-    ["adherence", config.defaultWeights.adherence],
-    ["output", config.defaultWeights.output]
-  ]);
   let deterministicResult = null;
   if (!options.noDeterministic && task.deterministic) {
-    deterministicResult = scoreDeterministic(task, result, { cwd: task.workspaceDir ?? options.cwd });
+    deterministicResult = scoreDeterministic(task, result, {
+      cwd: task.workspaceDir ?? options.cwd,
+      ignoreActivation: options.isBaseline
+    });
   }
   let judgeResult = null;
-  if (!options.noJudge && task.criteria.length > 0) {
+  if (options.judgeEnabled && task.criteria.length > 0) {
     const judgeOpts = { ...options.judgeOptions, isBaseline: options.isBaseline };
     const judge = new SkillJudge(judgeOpts);
     const taskFeedback = getFeedbackForTask(options.humanFeedback, task.id);
     judgeResult = await judge.judgeResult(task, result, taskFeedback);
   }
-  const isNegativeTest = task.expectedSkillLoad === "none";
-  return mergeScores(task.id, deterministicResult, judgeResult, weights, isNegativeTest);
+  return mergeScores(task, result, deterministicResult, judgeResult, options.isBaseline ?? false);
 }
 async function scoreAll(tasks, results, options = {}) {
   const scores = [];
@@ -43981,93 +44050,52 @@ async function scoreAll(tasks, results, options = {}) {
   }
   return scores;
 }
-function computeWeightedScore(discovery, adherence, outputQuality, weights) {
-  const adherenceNorm = (adherence - 1) / 4;
-  const outputNorm = (outputQuality - 1) / 4;
-  return (weights.get("discovery") ?? 0.3) * discovery + (weights.get("adherence") ?? 0.4) * adherenceNorm + (weights.get("output") ?? 0.3) * outputNorm;
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
 }
-function mergeScores(taskId, det, judge, weights, isNegativeTest = false) {
+function mergeScores(task, result, det, judge, isBaseline) {
+  const taskId = task.id;
+  const isNegativeTest = task.expectedSkillLoad === "none";
   const computeDiscovery = (activated) => isNegativeTest ? activated ? 0 : 1 : activated ? 1 : 0;
-  if (det && judge) {
-    const discovery = computeDiscovery(det.skillActivated);
-    const adherence = judge.adherence;
-    const outputQuality = judge.outputQuality;
-    const weightedScore = computeWeightedScore(discovery, adherence, outputQuality, weights);
-    let failureCategory = judge.failureCategory;
-    if (!det.passed && det.skillActivated === false) {
+  const passed = !result.isError && (det ? det.passed : true);
+  const reward = result.isError ? 0 : passed ? 1 : clamp01(result.verifier?.reward ?? 0);
+  const discovery = det ? computeDiscovery(det.skillActivated) : 0;
+  const invocation = !isBaseline && !isNegativeTest && det ? det.skillActivated ? 1 : 0 : void 0;
+  let failureCategory = judge?.failureCategory ?? "none";
+  if (result.isError) {
+    failureCategory = "agent_error";
+  } else if (det) {
+    if (!det.passed && !det.skillActivated && det.details.some((d) => d.includes("Expected skill activation"))) {
       failureCategory = "discovery_failure";
-    }
-    if (det.skillActivated && det.details.some((d) => d.includes("false positive"))) {
+    } else if (det.details.some((d) => d.includes("false positive"))) {
       failureCategory = "false_positive";
+    } else if (!det.passed && !judge) {
+      failureCategory = "agent_error";
     }
-    const reasons = [];
-    if (det.details.length > 0)
-      reasons.push(`Deterministic: ${det.details.join("; ")}`);
-    if (judge.reasoning)
-      reasons.push(`Judge: ${judge.reasoning}`);
-    return {
-      taskId,
-      deterministic: det,
-      judge,
-      discovery,
-      adherence,
-      outputQuality,
-      weightedScore,
-      failureCategory,
-      reasoning: reasons.join(" | "),
-      checklistResults: judge.checklistResults
-    };
   }
-  if (det) {
-    const discovery = computeDiscovery(det.skillActivated);
-    const adherence = det.passed ? 5 : 1;
-    const outputQuality = det.passed ? 5 : 1;
-    const weightedScore = computeWeightedScore(discovery, adherence, outputQuality, weights);
-    let failureCategory = "none";
-    if (!det.skillActivated && det.details.some((d) => d.includes("Expected skill activation"))) {
-      failureCategory = "discovery_failure";
-    }
-    if (det.details.some((d) => d.includes("false positive"))) {
-      failureCategory = "false_positive";
-    }
-    return {
-      taskId,
-      deterministic: det,
-      judge: null,
-      discovery,
-      adherence,
-      outputQuality,
-      weightedScore,
-      failureCategory,
-      reasoning: `Deterministic only: ${det.details.join("; ")}`,
-      checklistResults: []
-    };
+  if (passed && !judge) {
+    failureCategory = "none";
   }
-  if (judge) {
-    return {
-      taskId,
-      deterministic: null,
-      judge,
-      discovery: judge.discovery,
-      adherence: judge.adherence,
-      outputQuality: judge.outputQuality,
-      weightedScore: judge.weightedScore,
-      failureCategory: judge.failureCategory,
-      reasoning: judge.reasoning,
-      checklistResults: judge.checklistResults
-    };
-  }
+  const reasons = [];
+  if (result.isError && result.errorMessage)
+    reasons.push(`Agent error: ${result.errorMessage}`);
+  if (det && det.details.length > 0)
+    reasons.push(`Deterministic: ${det.details.join("; ")}`);
+  if (judge?.reasoning)
+    reasons.push(`Judge: ${judge.reasoning}`);
   return {
     taskId,
-    deterministic: null,
-    judge: null,
-    discovery: 0,
-    adherence: 1,
-    outputQuality: 1,
-    weightedScore: 0,
-    failureCategory: "agent_error",
-    reasoning: "No scoring method available (no deterministic check or LLM judge criteria defined)",
-    checklistResults: []
+    deterministic: det,
+    judge,
+    passed,
+    reward,
+    discovery,
+    invocation,
+    adherence: judge?.adherence,
+    outputQuality: judge?.outputQuality,
+    failureCategory,
+    reasoning: reasons.join(" | ") || "No scoring detail available",
+    checklistResults: judge?.checklistResults ?? []
   };
 }
 
@@ -44229,7 +44257,11 @@ var path9 = __toESM(require("path"), 1);
 // dist/src/scorer/aggregator.js
 var FLAKY_STDDEV_THRESHOLD = 1;
 function isFlaky(stddev) {
-  return !!(stddev && (stddev.adherence > FLAKY_STDDEV_THRESHOLD || stddev.outputQuality > FLAKY_STDDEV_THRESHOLD));
+  if (!stddev)
+    return false;
+  if (stddev.reward > 0)
+    return true;
+  return (stddev.adherence ?? 0) > FLAKY_STDDEV_THRESHOLD || (stddev.outputQuality ?? 0) > FLAKY_STDDEV_THRESHOLD;
 }
 function computeStddev(values, mean) {
   if (values.length < 2)
@@ -44239,17 +44271,23 @@ function computeStddev(values, mean) {
   return Math.sqrt(variance);
 }
 function findRepresentativeIndex(scores) {
-  const mean = scores.reduce((sum, s) => sum + s.weightedScore, 0) / scores.length;
+  const mean = scores.reduce((sum, s) => sum + s.reward, 0) / scores.length;
   let repIdx = 0;
   let minDist = Infinity;
   for (let r = 0; r < scores.length; r++) {
-    const dist = Math.abs(scores[r].weightedScore - mean);
+    const dist = Math.abs(scores[r].reward - mean);
     if (dist < minDist) {
       minDist = dist;
       repIdx = r;
     }
   }
   return repIdx;
+}
+function meanOfDefined(values) {
+  const defined = values.filter((v3) => v3 !== void 0);
+  if (defined.length === 0)
+    return void 0;
+  return defined.reduce((sum, v3) => sum + v3, 0) / defined.length;
 }
 function aggregateResults(allResults, allScores) {
   const numRuns = allResults.length;
@@ -44289,7 +44327,8 @@ function aggregateResults(allResults, allScores) {
       toolCalls: rep.toolCalls,
       isError: runs.some((r) => r.isError),
       errorMessage: runs.filter((r) => r.isError).map((r) => r.errorMessage).join("; "),
-      tokens
+      tokens,
+      verifier: rep.verifier
     });
   }
   return aggregated;
@@ -44304,16 +44343,24 @@ function aggregateScores(allScores) {
   const aggregated = [];
   for (let t = 0; t < numTasks; t++) {
     const scores = allScores.map((s) => s[t]);
+    const trialPassed = scores.map((s) => s.passed);
+    const trialRewards = scores.map((s) => s.reward);
+    const passCount = trialPassed.filter(Boolean).length;
+    const avgReward = trialRewards.reduce((sum, v3) => sum + v3, 0) / numRuns;
     const avgDiscovery = scores.reduce((sum, s) => sum + s.discovery, 0) / numRuns;
-    const avgAdherence = scores.reduce((sum, s) => sum + s.adherence, 0) / numRuns;
-    const avgOutput = scores.reduce((sum, s) => sum + s.outputQuality, 0) / numRuns;
-    const avgWeighted = scores.reduce((sum, s) => sum + s.weightedScore, 0) / numRuns;
+    const avgInvocation = meanOfDefined(scores.map((s) => s.invocation));
+    const avgAdherence = meanOfDefined(scores.map((s) => s.adherence));
+    const avgOutput = meanOfDefined(scores.map((s) => s.outputQuality));
     const stddev = {
-      discovery: computeStddev(scores.map((s) => s.discovery), avgDiscovery),
-      adherence: computeStddev(scores.map((s) => s.adherence), avgAdherence),
-      outputQuality: computeStddev(scores.map((s) => s.outputQuality), avgOutput),
-      weightedScore: computeStddev(scores.map((s) => s.weightedScore), avgWeighted)
+      reward: computeStddev(trialRewards, avgReward),
+      discovery: computeStddev(scores.map((s) => s.discovery), avgDiscovery)
     };
+    if (avgAdherence !== void 0) {
+      stddev.adherence = computeStddev(scores.map((s) => s.adherence).filter((v3) => v3 !== void 0), avgAdherence);
+    }
+    if (avgOutput !== void 0) {
+      stddev.outputQuality = computeStddev(scores.map((s) => s.outputQuality).filter((v3) => v3 !== void 0), avgOutput);
+    }
     const catCounts = /* @__PURE__ */ new Map();
     for (const s of scores) {
       catCounts.set(s.failureCategory, (catCounts.get(s.failureCategory) || 0) + 1);
@@ -44326,19 +44373,21 @@ function aggregateScores(allScores) {
         modeCategory = cat;
       }
     }
-    const discoveryCount = scores.filter((s) => s.discovery >= 1).length;
     const repIdx = findRepresentativeIndex(scores);
     aggregated.push({
       taskId: scores[0].taskId,
-      deterministic: null,
-      judge: null,
+      deterministic: scores[repIdx].deterministic,
+      judge: scores[repIdx].judge,
+      passed: passCount === numRuns,
+      reward: avgReward,
       discovery: avgDiscovery,
+      invocation: avgInvocation,
       adherence: avgAdherence,
       outputQuality: avgOutput,
-      weightedScore: avgWeighted,
       failureCategory: modeCategory,
-      reasoning: `Aggregated over ${numRuns} runs: discovery ${discoveryCount}/${numRuns}, mean adherence ${avgAdherence.toFixed(1)}, mean output ${avgOutput.toFixed(1)}`,
+      reasoning: `Aggregated over ${numRuns} trials: passed ${passCount}/${numRuns}, mean reward ${avgReward.toFixed(2)}`,
       checklistResults: scores[repIdx].checklistResults ?? [],
+      trials: { passed: trialPassed, rewards: trialRewards },
       stddev
     });
   }
@@ -44347,9 +44396,8 @@ function aggregateScores(allScores) {
 
 // dist/src/report/comparison.js
 var fs9 = __toESM(require("fs/promises"), 1);
-var SIGNIFICANCE_THRESHOLD_ADHERENCE = 1;
-var SIGNIFICANCE_THRESHOLD_WEIGHTED = 0.15;
-async function loadPreviousReport(filePath) {
+var SIGNIFICANCE_THRESHOLD_RESOLUTION = 0.2;
+async function loadPreviousRunSummary(filePath) {
   let raw;
   try {
     raw = await fs9.readFile(filePath, "utf-8");
@@ -44365,112 +44413,91 @@ async function loadPreviousReport(filePath) {
   } catch (err) {
     throw new Error(`Failed to parse comparison file as JSON: ${err.message}`);
   }
-  const report = data;
-  if (typeof report.skillName !== "string") {
-    throw new Error('Comparison file is not a valid EvaluationReport: missing "skillName"');
+  const summary2 = data;
+  const oldSummary = summary2.summary;
+  if (typeof summary2.skillName === "string" && oldSummary && typeof oldSummary.avgWeightedScore === "number") {
+    throw new Error(`Comparison file looks like a pre-2.0 results.json (weighted-score format): ${filePath}. --compare-results now reads the summary.json written by a 2.x run \u2014 re-run the previous iteration to produce one.`);
   }
-  if (!report.summary || typeof report.summary !== "object") {
-    throw new Error('Comparison file is not a valid EvaluationReport: missing "summary"');
+  const metrics = summary2.metrics;
+  if (!metrics || typeof metrics.resolutionRate !== "number" || typeof metrics.passAtK !== "number") {
+    throw new Error('Comparison file is not a valid run summary: missing numeric "metrics.resolutionRate"/"metrics.passAtK"');
   }
-  const summary2 = report.summary;
-  if (typeof summary2.discoveryAccuracy !== "number" || typeof summary2.avgAdherence !== "number" || typeof summary2.avgOutputQuality !== "number" || typeof summary2.avgWeightedScore !== "number") {
-    throw new Error("Comparison file summary is missing required numeric fields");
+  if (!Array.isArray(summary2.tasks)) {
+    throw new Error('Comparison file is not a valid run summary: missing "tasks" array');
   }
-  if (!Array.isArray(report.tasks)) {
-    throw new Error('Comparison file is not a valid EvaluationReport: missing "tasks" array');
-  }
-  for (const task of report.tasks) {
-    if (!task.score || typeof task.score.taskId !== "string") {
-      throw new Error("Comparison file has task entries without score.taskId");
+  for (const task of summary2.tasks) {
+    if (typeof task?.id !== "string" || typeof task?.withSkill?.resolutionRate !== "number") {
+      throw new Error('Comparison file has task entries without "id" and numeric "withSkill.resolutionRate"');
     }
-    if (typeof task.score.weightedScore !== "number" || typeof task.score.discovery !== "number" || typeof task.score.adherence !== "number" || typeof task.score.outputQuality !== "number") {
-      throw new Error(`Comparison file task "${task.score.taskId}" is missing numeric score fields`);
-    }
+  }
+  if (!summary2.run || typeof summary2.run.timestamp !== "string") {
+    throw new Error('Comparison file is not a valid run summary: missing "run.timestamp"');
   }
   return data;
 }
-function compareResults(currentScores, currentSummary, previous) {
+function compareRunSummaries(current, previous) {
   const previousMap = /* @__PURE__ */ new Map();
-  for (const entry of previous.tasks) {
-    const s = entry.score;
-    previousMap.set(s.taskId, {
-      discovery: s.discovery,
-      adherence: s.adherence,
-      outputQuality: s.outputQuality,
-      weightedScore: s.weightedScore
+  for (const task of previous.tasks) {
+    previousMap.set(task.id, {
+      resolutionRate: task.withSkill.resolutionRate,
+      lift: task.lift
     });
   }
-  const currentIds = new Set(currentScores.map((s) => s.taskId));
+  const currentIds = new Set(current.tasks.map((t) => t.id));
   const taskDeltas = [];
   const tasksOnlyInCurrent = [];
-  for (const score of currentScores) {
-    const prev = previousMap.get(score.taskId);
+  const round3 = (v3) => Math.round(v3 * 1e3) / 1e3;
+  for (const task of current.tasks) {
+    const prev = previousMap.get(task.id);
     if (!prev) {
-      tasksOnlyInCurrent.push(score.taskId);
+      tasksOnlyInCurrent.push(task.id);
       continue;
     }
-    const current = {
-      discovery: score.discovery,
-      adherence: score.adherence,
-      outputQuality: score.outputQuality,
-      weightedScore: score.weightedScore
+    const currentSnapshot = {
+      resolutionRate: task.withSkill.resolutionRate,
+      lift: task.lift
     };
-    const round3 = (v3) => Math.round(v3 * 1e3) / 1e3;
-    const delta = {
-      discovery: round3(current.discovery - prev.discovery),
-      adherence: round3(current.adherence - prev.adherence),
-      outputQuality: round3(current.outputQuality - prev.outputQuality),
-      weightedScore: round3(current.weightedScore - prev.weightedScore)
-    };
-    const roundedWeighted = Math.round(delta.weightedScore * 1e3) / 1e3;
-    const isSignificant = Math.abs(delta.adherence) >= SIGNIFICANCE_THRESHOLD_ADHERENCE || Math.abs(roundedWeighted) >= SIGNIFICANCE_THRESHOLD_WEIGHTED;
+    const delta = round3(currentSnapshot.resolutionRate - prev.resolutionRate);
     let significantChange = "unchanged";
-    if (isSignificant) {
-      if (delta.weightedScore > 0 || delta.weightedScore === 0 && delta.adherence > 0) {
-        significantChange = "improved";
-      } else if (delta.weightedScore < 0 || delta.weightedScore === 0 && delta.adherence < 0) {
-        significantChange = "regressed";
-      }
+    if (Math.abs(delta) >= SIGNIFICANCE_THRESHOLD_RESOLUTION) {
+      significantChange = delta > 0 ? "improved" : "regressed";
     }
     taskDeltas.push({
-      taskId: score.taskId,
+      taskId: task.id,
       previous: prev,
-      current,
+      current: currentSnapshot,
       delta,
       significantChange
     });
   }
   const tasksOnlyInPrevious = [];
-  for (const entry of previous.tasks) {
-    if (!currentIds.has(entry.score.taskId)) {
-      tasksOnlyInPrevious.push(entry.score.taskId);
+  for (const task of previous.tasks) {
+    if (!currentIds.has(task.id)) {
+      tasksOnlyInPrevious.push(task.id);
     }
   }
   const prevSummary = {
-    discoveryAccuracy: previous.summary.discoveryAccuracy,
-    avgAdherence: previous.summary.avgAdherence,
-    avgOutputQuality: previous.summary.avgOutputQuality,
-    avgWeightedScore: previous.summary.avgWeightedScore
+    resolutionRate: previous.metrics.resolutionRate,
+    passAtK: previous.metrics.passAtK,
+    skillLift: previous.metrics.skillLift
   };
   const currSummary = {
-    discoveryAccuracy: currentSummary.discoveryAccuracy,
-    avgAdherence: currentSummary.avgAdherence,
-    avgOutputQuality: currentSummary.avgOutputQuality,
-    avgWeightedScore: currentSummary.avgWeightedScore
+    resolutionRate: current.metrics.resolutionRate,
+    passAtK: current.metrics.passAtK,
+    skillLift: current.metrics.skillLift
   };
   const summaryDelta = {
     previous: prevSummary,
     current: currSummary,
     delta: {
-      discoveryAccuracy: Math.round((currSummary.discoveryAccuracy - prevSummary.discoveryAccuracy) * 1e3) / 1e3,
-      avgAdherence: Math.round((currSummary.avgAdherence - prevSummary.avgAdherence) * 1e3) / 1e3,
-      avgOutputQuality: Math.round((currSummary.avgOutputQuality - prevSummary.avgOutputQuality) * 1e3) / 1e3,
-      avgWeightedScore: Math.round((currSummary.avgWeightedScore - prevSummary.avgWeightedScore) * 1e3) / 1e3
+      resolutionRate: round3(currSummary.resolutionRate - prevSummary.resolutionRate),
+      passAtK: round3(currSummary.passAtK - prevSummary.passAtK),
+      skillLift: currSummary.skillLift !== void 0 && prevSummary.skillLift !== void 0 ? round3(currSummary.skillLift - prevSummary.skillLift) : void 0
     }
   };
   return {
-    previousTimestamp: previous.timestamp,
-    previousSkillName: previous.skillName,
+    previousTimestamp: previous.run.timestamp,
+    previousSkillName: previous.run.skillName,
     summaryDelta,
     taskDeltas,
     tasksOnlyInCurrent,
@@ -44488,19 +44515,20 @@ function formatComparisonMarkdown(comparison) {
   lines.push("");
   lines.push("| Metric | Previous | Current | Delta | |");
   lines.push("|--------|----------|---------|-------|-|");
-  lines.push(summaryRow("Discovery Accuracy", `${(d.previous.discoveryAccuracy * 100).toFixed(1)}%`, `${(d.current.discoveryAccuracy * 100).toFixed(1)}%`, formatDelta(d.delta.discoveryAccuracy * 100) + "%", d.delta.discoveryAccuracy));
-  lines.push(summaryRow("Avg Adherence", `${d.previous.avgAdherence.toFixed(2)}/5`, `${d.current.avgAdherence.toFixed(2)}/5`, formatDelta(d.delta.avgAdherence), d.delta.avgAdherence));
-  lines.push(summaryRow("Avg Output Quality", `${d.previous.avgOutputQuality.toFixed(2)}/5`, `${d.current.avgOutputQuality.toFixed(2)}/5`, formatDelta(d.delta.avgOutputQuality), d.delta.avgOutputQuality));
-  lines.push(summaryRow("Weighted Score", d.previous.avgWeightedScore.toFixed(2), d.current.avgWeightedScore.toFixed(2), formatDelta(d.delta.avgWeightedScore), d.delta.avgWeightedScore));
+  lines.push(summaryRow("Resolution Rate", `${(d.previous.resolutionRate * 100).toFixed(1)}%`, `${(d.current.resolutionRate * 100).toFixed(1)}%`, formatDelta(d.delta.resolutionRate * 100) + "%", d.delta.resolutionRate));
+  lines.push(summaryRow("Pass@k", `${(d.previous.passAtK * 100).toFixed(1)}%`, `${(d.current.passAtK * 100).toFixed(1)}%`, formatDelta(d.delta.passAtK * 100) + "%", d.delta.passAtK));
+  if (d.delta.skillLift !== void 0 && d.previous.skillLift !== void 0 && d.current.skillLift !== void 0) {
+    lines.push(summaryRow("Skill Lift", formatDelta(d.previous.skillLift * 100, 1) + "%", formatDelta(d.current.skillLift * 100, 1) + "%", formatDelta(d.delta.skillLift * 100) + "%", d.delta.skillLift));
+  }
   lines.push("");
   if (comparison.taskDeltas.length > 0) {
     lines.push("### Per-Task Changes");
     lines.push("");
-    lines.push("| Task | Discovery | Adherence | Output | Weighted | Status |");
-    lines.push("|------|-----------|-----------|--------|----------|--------|");
+    lines.push("| Task | Resolution Rate | Delta | Status |");
+    lines.push("|------|-----------------|-------|--------|");
     for (const t of comparison.taskDeltas) {
       const status = t.significantChange === "improved" ? ":arrow_up: Improved" : t.significantChange === "regressed" ? ":arrow_down: Regressed" : "Unchanged";
-      lines.push(`| ${t.taskId} | ${formatTransition(t.previous.discovery, t.current.discovery)} | ${formatTransition(t.previous.adherence, t.current.adherence)} | ${formatTransition(t.previous.outputQuality, t.current.outputQuality)} | ${formatTransitionDecimal(t.previous.weightedScore, t.current.weightedScore)} | ${status} |`);
+      lines.push(`| ${t.taskId} | ${formatTransitionPct(t.previous.resolutionRate, t.current.resolutionRate)} | ${formatDelta(t.delta * 100)}% | ${status} |`);
     }
     lines.push("");
   }
@@ -44524,10 +44552,11 @@ function formatComparisonConsole(comparison) {
   lines.push("-".repeat(50));
   lines.push("  Comparison vs. Previous");
   lines.push("-".repeat(50));
-  lines.push(`  Discovery:    ${formatDelta(d.discoveryAccuracy * 100)}%`);
-  lines.push(`  Adherence:    ${formatDelta(d.avgAdherence)}`);
-  lines.push(`  Output:       ${formatDelta(d.avgOutputQuality)}`);
-  lines.push(`  Weighted:     ${formatDelta(d.avgWeightedScore)}`);
+  lines.push(`  Resolution:   ${formatDelta(d.resolutionRate * 100)}%`);
+  lines.push(`  Pass@k:       ${formatDelta(d.passAtK * 100)}%`);
+  if (d.skillLift !== void 0) {
+    lines.push(`  Skill Lift:   ${formatDelta(d.skillLift * 100)}%`);
+  }
   const improved = comparison.taskDeltas.filter((t) => t.significantChange === "improved");
   const regressed = comparison.taskDeltas.filter((t) => t.significantChange === "regressed");
   if (improved.length > 0) {
@@ -44550,19 +44579,22 @@ function summaryRow(label, prev, curr, delta, value) {
   const arrow = value > ARROW_DIRECTION_EPSILON ? ":arrow_up:" : value < -ARROW_DIRECTION_EPSILON ? ":arrow_down:" : "";
   return `| **${label}** | ${prev} | ${curr} | ${delta} | ${arrow} |`;
 }
-function formatTransition(prev, curr) {
-  const delta = curr - prev;
-  const sign = delta > 0 ? "+" : "";
-  const fmt = (v3) => v3.toFixed(1);
-  return `${fmt(prev)} \u2192 ${fmt(curr)} (${sign}${fmt(delta)})`;
-}
-function formatTransitionDecimal(prev, curr) {
-  const delta = curr - prev;
-  const sign = delta > 0 ? "+" : "";
-  return `${prev.toFixed(2)} \u2192 ${curr.toFixed(2)} (${sign}${delta.toFixed(2)})`;
+function formatTransitionPct(prev, curr) {
+  return `${(prev * 100).toFixed(0)}% \u2192 ${(curr * 100).toFixed(0)}%`;
 }
 
 // dist/src/report/report.js
+function trialFlags(score) {
+  return score.trials?.passed ?? [score.passed];
+}
+function formatCI(summary2) {
+  const { low, high } = summary2.resolutionCI;
+  return `${(low * 100).toFixed(0)}\u2013${(high * 100).toFixed(0)}%`;
+}
+function passedRatio(score) {
+  const flags = trialFlags(score);
+  return `${flags.filter(Boolean).length}/${flags.length}`;
+}
 async function generateReport(options) {
   const { evaluation, results, scores, outputPath, metadata, runDetails, humanFeedback, comparison, blindComparison, crossIterationComparison } = options;
   const numRuns = options.numRuns ?? 1;
@@ -44570,7 +44602,9 @@ async function generateReport(options) {
   const totalTasks = evaluation.tasks.length;
   const summary2 = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-  const { discoveryPassed, adherencePassed, outputQualityPassed, passed } = evaluatePassFail(summary2, config);
+  const skillLift2 = comparison?.summary.delta.resolutionRateDelta;
+  const { resolutionPassed, liftPassed, passed } = evaluatePassFail(summary2, config, skillLift2);
+  const judgeRan = scores.some((s) => s.judge);
   let metaSection = "";
   if (metadata) {
     const metaLines = [`**Skill Path:** \`${metadata.skillPath}\``];
@@ -44580,12 +44614,17 @@ async function generateReport(options) {
     if (metadata.version)
       metaLines.push(`**Version:** ${metadata.version}`);
     metaLines.push(`**Agent Model:** ${metadata.agentModel}`);
-    metaLines.push(`**Judge Model:** ${metadata.judgeModel}`);
+    if (judgeRan)
+      metaLines.push(`**Judge Model:** ${metadata.judgeModel}`);
     metaSection = metaLines.join("\n") + "\n";
   }
-  const runsLine = numRuns > 1 ? `**Runs per Task:** ${numRuns}
+  const runsLine = numRuns > 1 ? `**Trials per Task:** ${numRuns}
 ` : "";
-  const compareLine = comparison ? `**Mode:** Comparison (vs ${comparison.summary.baselineLabel})
+  const compareLine = comparison ? `**Mode:** Paired baseline (vs ${comparison.summary.baselineLabel})
+` : "";
+  const liftRow = skillLift2 !== void 0 ? `| **Skill Lift** | ${formatDelta(skillLift2 * 100, 1)}% | ${config.liftThreshold !== void 0 ? formatDelta(config.liftThreshold * 100, 1) + "%" : ""} | ${liftPassed === void 0 ? "" : liftPassed ? "PASS" : "FAIL"} |
+` : "";
+  const invocationRow = summary2.invocationRate !== void 0 ? `| **Skill Invocation Rate** | ${(summary2.invocationRate * 100).toFixed(1)}% | | |
 ` : "";
   let report = `# Skill Evaluation Report: ${evaluation.skillName}
 
@@ -44599,11 +44638,9 @@ ${metaSection}
 
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
-| **Discovery Accuracy** | ${(summary2.discoveryAccuracy * 100).toFixed(1)}%${summary2.stddev ? ` \xB1 ${(summary2.stddev.discovery * 100).toFixed(1)}%` : ""} | ${(config.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? "PASS" : "FAIL"} |
-| **Avg Adherence Score** | ${summary2.avgAdherence.toFixed(2)}/5.0${summary2.stddev ? ` \xB1 ${summary2.stddev.adherence.toFixed(2)}` : ""} | ${config.scoreThreshold.toFixed(1)} | ${adherencePassed ? "PASS" : "FAIL"} |
-| **Avg Output Quality** | ${summary2.avgOutputQuality.toFixed(2)}/5.0${summary2.stddev ? ` \xB1 ${summary2.stddev.outputQuality.toFixed(2)}` : ""} | ${config.scoreThreshold.toFixed(1)} | ${outputQualityPassed ? "PASS" : "FAIL"} |
-| **Avg Weighted Score** | ${summary2.avgWeightedScore.toFixed(2)}${summary2.stddev ? ` \xB1 ${summary2.stddev.weightedScore.toFixed(2)}` : ""} | | |
-| **Total Duration** | ${(summary2.totalDurationMs / 1e3).toFixed(1)}s | | |
+| **Resolution Rate** | ${(summary2.resolutionRate * 100).toFixed(1)}% (CI ${formatCI(summary2)}) | ${(config.resolutionThreshold * 100).toFixed(0)}% | ${resolutionPassed ? "PASS" : "FAIL"} |
+| **Pass@${numRuns}** | ${(summary2.passAtK * 100).toFixed(1)}% | | |
+${liftRow}${invocationRow}| **Total Duration** | ${(summary2.totalDurationMs / 1e3).toFixed(1)}s | | |
 | **Total Cost** | $${summary2.totalCostUsd.toFixed(4)} | | |
 | **Total Tokens** | ${formatTokens(summary2.totalTokens)} | | |
 
@@ -44664,19 +44701,10 @@ ${metaSection}
 **Expected Skill:** \`${task.expectedSkillLoad}\`
 **Loaded Skills:** ${loadedSkills}
 
-#### Scores
-
-| Dimension | Score | Status |
-|-----------|-------|--------|
-| Discovery | ${score.stddev ? `${(score.discovery * 100).toFixed(0)}% \xB1 ${(score.stddev.discovery * 100).toFixed(0)}%` : `${Math.round(score.discovery)}`} | ${score.discovery >= 1 ? "PASS" : "FAIL"} |
-| Adherence | ${score.adherence.toFixed(1)}/5${score.stddev ? ` \xB1 ${score.stddev.adherence.toFixed(1)}` : ""} | ${score.adherence >= 4 ? "PASS" : "FAIL"} |
-| Output Quality | ${score.outputQuality.toFixed(1)}/5${score.stddev ? ` \xB1 ${score.stddev.outputQuality.toFixed(1)}` : ""} | ${score.outputQuality >= 4 ? "PASS" : "FAIL"} |
-| **Weighted** | **${score.weightedScore.toFixed(2)}${score.stddev ? ` \xB1 ${score.stddev.weightedScore.toFixed(2)}` : ""}** | |
-${isFlaky(score.stddev) ? `
-> **Warning: Potentially Flaky** \u2014 High variance across runs (adherence \u03C3=${score.stddev.adherence.toFixed(2)}, output \u03C3=${score.stddev.outputQuality.toFixed(2)})
-> _Only adherence and output quality are checked: discovery (0/1) and weighted score (0-1) cannot exceed the threshold._
-` : ""}
-**Failure Category:** ${formatCategory(score.failureCategory)}
+**Passed:** ${passedRatio(score)} trial(s)${score.stddev && isFlaky(score.stddev) ? " \u2014 **potentially flaky** (trials disagree)" : ""}
+**Reward:** ${score.reward.toFixed(2)}
+${score.invocation !== void 0 ? `**Skill Invoked:** ${(score.invocation * 100).toFixed(0)}% of trials
+` : ""}**Failure Category:** ${formatCategory(score.failureCategory)}
 `;
     if (score.deterministic) {
       report += `
@@ -44687,20 +44715,35 @@ ${isFlaky(score.stddev) ? `
 `;
       }
     }
-    if ((score.checklistResults ?? []).length > 0) {
-      const checklistPassed = (score.checklistResults ?? []).filter((cr) => cr.passed).length;
+    if (score.judge) {
       report += `
-**Checklist:** ${checklistPassed}/${(score.checklistResults ?? []).length} passed
+#### Diagnostics (LLM judge \u2014 does not affect pass/fail)
 
 `;
-      for (const cr of score.checklistResults ?? []) {
-        const safeItem = cr.item.replace(/[|_*`]/g, "\\$&");
-        report += `- ${cr.passed ? "PASS" : "FAIL"}: **${safeItem}**
+      if (score.adherence !== void 0 && score.outputQuality !== void 0) {
+        report += `| Dimension | Rating |
+|-----------|--------|
 `;
-        if (cr.evidence?.trim()) {
-          const safeEvidence = cr.evidence.trim().replace(/[|_*`]/g, "\\$&");
-          report += `  - _${safeEvidence}_
+        report += `| Adherence | ${score.adherence.toFixed(1)}/5${score.stddev?.adherence !== void 0 ? ` \xB1 ${score.stddev.adherence.toFixed(1)}` : ""} |
 `;
+        report += `| Output Quality | ${score.outputQuality.toFixed(1)}/5${score.stddev?.outputQuality !== void 0 ? ` \xB1 ${score.stddev.outputQuality.toFixed(1)}` : ""} |
+`;
+      }
+      if ((score.checklistResults ?? []).length > 0) {
+        const checklistPassed = (score.checklistResults ?? []).filter((cr) => cr.passed).length;
+        report += `
+**Assertions:** ${checklistPassed}/${(score.checklistResults ?? []).length} passed
+
+`;
+        for (const cr of score.checklistResults ?? []) {
+          const safeItem = cr.item.replace(/[|_*`]/g, "\\$&");
+          report += `- ${cr.passed ? "PASS" : "FAIL"}: **${safeItem}**
+`;
+          if (cr.evidence?.trim()) {
+            const safeEvidence = cr.evidence.trim().replace(/[|_*`]/g, "\\$&");
+            report += `  - _${safeEvidence}_
+`;
+          }
         }
       }
     }
@@ -44731,15 +44774,15 @@ ${result.output.slice(0, config.reportOutputTruncation) || "(no output)"}
     if (runDetails && runDetails[i] && runDetails[i].length > 1) {
       report += `
 <details>
-<summary>Per-run breakdown (${runDetails[i].length} runs)</summary>
+<summary>Per-trial breakdown (${runDetails[i].length} trials)</summary>
 
-| Run | Discovery | Adherence | Output | Weighted | Tokens | Skills Loaded |
-|-----|-----------|-----------|--------|----------|--------|---------------|
+| Trial | Passed | Reward | Tokens | Skills Loaded |
+|-------|--------|--------|--------|---------------|
 `;
       for (let r = 0; r < runDetails[i].length; r++) {
         const rd2 = runDetails[i][r];
         const skills = rd2.result.skillLoads.length > 0 ? rd2.result.skillLoads.join(", ") : "none";
-        report += `| ${r + 1} | ${rd2.score.discovery} | ${rd2.score.adherence}/5 | ${rd2.score.outputQuality}/5 | ${rd2.score.weightedScore.toFixed(2)} | ${formatTokens(rd2.result.tokens?.total)} | ${skills} |
+        report += `| ${r + 1} | ${rd2.score.passed ? "PASS" : "FAIL"} | ${rd2.score.reward.toFixed(2)} | ${formatTokens(rd2.result.tokens?.total)} | ${skills} |
 `;
       }
       report += `
@@ -44764,8 +44807,9 @@ async function generateJsonResults(options) {
   const config = options.config ?? loadConfigSync();
   const summary2 = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-  const { passed } = evaluatePassFail(summary2, config);
-  const failureReasons = computeFailureReasons(summary2, config);
+  const skillLift2 = comparison?.summary.delta.resolutionRateDelta;
+  const { passed } = evaluatePassFail(summary2, config, skillLift2);
+  const failureReasons = computeFailureReasons(summary2, config, skillLift2);
   const report = {
     skillName: evaluation.skillName,
     timestamp: (/* @__PURE__ */ new Date()).toISOString(),
@@ -44800,36 +44844,36 @@ async function generateJsonResults(options) {
   }
   return report;
 }
-function evaluatePassFail(summary2, config) {
-  const discoveryPassed = summary2.discoveryAccuracy >= config.discoveryThreshold;
-  const adherencePassed = summary2.avgAdherence >= config.scoreThreshold;
-  const outputQualityPassed = summary2.avgOutputQuality >= config.scoreThreshold;
+function evaluatePassFail(summary2, config, skillLift2) {
+  const resolutionPassed = summary2.resolutionRate >= config.resolutionThreshold;
+  const liftPassed = config.liftThreshold !== void 0 && skillLift2 !== void 0 ? skillLift2 >= config.liftThreshold : void 0;
   return {
-    discoveryPassed,
-    adherencePassed,
-    outputQualityPassed,
-    passed: discoveryPassed && adherencePassed && outputQualityPassed
+    resolutionPassed,
+    liftPassed,
+    passed: resolutionPassed && liftPassed !== false
   };
 }
-function computeFailureReasons(summary2, config) {
+function computeFailureReasons(summary2, config, skillLift2) {
   const reasons = [];
-  if (summary2.discoveryAccuracy < config.discoveryThreshold) {
-    reasons.push(`Discovery rate ${(summary2.discoveryAccuracy * 100).toFixed(1)}% below threshold ${(config.discoveryThreshold * 100).toFixed(0)}%`);
+  if (summary2.resolutionRate < config.resolutionThreshold) {
+    reasons.push(`Resolution rate ${(summary2.resolutionRate * 100).toFixed(1)}% below threshold ${(config.resolutionThreshold * 100).toFixed(0)}%`);
   }
-  if (summary2.avgAdherence < config.scoreThreshold) {
-    reasons.push(`Avg adherence ${summary2.avgAdherence.toFixed(2)} below threshold ${config.scoreThreshold}`);
-  }
-  if (summary2.avgOutputQuality < config.scoreThreshold) {
-    reasons.push(`Avg output quality ${summary2.avgOutputQuality.toFixed(2)} below threshold ${config.scoreThreshold}`);
+  if (config.liftThreshold !== void 0 && skillLift2 !== void 0 && skillLift2 < config.liftThreshold) {
+    reasons.push(`Skill lift ${formatDelta(skillLift2 * 100, 1)}% below threshold ${formatDelta(config.liftThreshold * 100, 1)}%`);
   }
   return reasons;
 }
 function computeSummary(results, scores, numRuns = 1) {
   const totalTasks = scores.length;
-  const avgDiscovery = totalTasks > 0 ? scores.reduce((sum, s) => sum + s.discovery, 0) / totalTasks : 0;
-  const avgAdherence = totalTasks > 0 ? scores.reduce((sum, s) => sum + s.adherence, 0) / totalTasks : 0;
-  const avgOutputQuality = totalTasks > 0 ? scores.reduce((sum, s) => sum + s.outputQuality, 0) / totalTasks : 0;
-  const avgWeightedScore = totalTasks > 0 ? scores.reduce((sum, s) => sum + s.weightedScore, 0) / totalTasks : 0;
+  const perTaskFlags = scores.map(trialFlags);
+  const perTaskRates = perTaskFlags.map(resolutionRate);
+  const avgResolution = totalTasks > 0 ? perTaskRates.reduce((sum, v3) => sum + v3, 0) / totalTasks : 0;
+  const totalTrials = perTaskFlags.reduce((sum, flags) => sum + flags.length, 0);
+  const passAtKRate = totalTasks > 0 ? perTaskFlags.filter(passAtK).length / totalTasks : 0;
+  const invocations = scores.map((s) => s.invocation).filter((v3) => v3 !== void 0);
+  const invocationRate = invocations.length > 0 ? invocations.reduce((sum, v3) => sum + v3, 0) / invocations.length : void 0;
+  const adherences = scores.map((s) => s.adherence).filter((v3) => v3 !== void 0);
+  const outputs = scores.map((s) => s.outputQuality).filter((v3) => v3 !== void 0);
   let totalDurationMs = 0;
   let totalCostUsd = 0;
   let tokenSum = 0;
@@ -44845,10 +44889,12 @@ function computeSummary(results, scores, numRuns = 1) {
   const summary2 = {
     totalTasks,
     numRuns,
-    discoveryAccuracy: avgDiscovery,
-    avgAdherence,
-    avgOutputQuality,
-    avgWeightedScore,
+    resolutionRate: avgResolution,
+    resolutionCI: binomialCI(avgResolution, totalTrials),
+    passAtK: passAtKRate,
+    invocationRate,
+    avgAdherence: adherences.length > 0 ? adherences.reduce((sum, v3) => sum + v3, 0) / adherences.length : void 0,
+    avgOutputQuality: outputs.length > 0 ? outputs.reduce((sum, v3) => sum + v3, 0) / outputs.length : void 0,
     totalDurationMs,
     totalCostUsd,
     totalTokens: hasAllTokens ? tokenSum : void 0
@@ -44856,11 +44902,15 @@ function computeSummary(results, scores, numRuns = 1) {
   if (numRuns >= 2) {
     const tasksWithStddev = scores.filter((s) => s.stddev);
     if (tasksWithStddev.length > 0) {
+      const meanOf = (values) => {
+        const defined = values.filter((v3) => v3 !== void 0);
+        return defined.length > 0 ? defined.reduce((sum, v3) => sum + v3, 0) / defined.length : void 0;
+      };
       summary2.stddev = {
+        reward: tasksWithStddev.reduce((sum, s) => sum + s.stddev.reward, 0) / tasksWithStddev.length,
         discovery: tasksWithStddev.reduce((sum, s) => sum + s.stddev.discovery, 0) / tasksWithStddev.length,
-        adherence: tasksWithStddev.reduce((sum, s) => sum + s.stddev.adherence, 0) / tasksWithStddev.length,
-        outputQuality: tasksWithStddev.reduce((sum, s) => sum + s.stddev.outputQuality, 0) / tasksWithStddev.length,
-        weightedScore: tasksWithStddev.reduce((sum, s) => sum + s.stddev.weightedScore, 0) / tasksWithStddev.length
+        adherence: meanOf(tasksWithStddev.map((s) => s.stddev.adherence)),
+        outputQuality: meanOf(tasksWithStddev.map((s) => s.stddev.outputQuality))
       };
     }
   }
@@ -44893,31 +44943,26 @@ function generateComparisonSection(comparison) {
 
 | Metric | With Skill | Baseline | Delta | Impact |
 |--------|-----------|----------|-------|--------|
-| Discovery | ${(ws2.discoveryAccuracy * 100).toFixed(0)}% | ${(bs2.discoveryAccuracy * 100).toFixed(0)}% | ${formatDelta(d.discoveryAccuracyDelta * 100, 0)}% | ${qualityImpact(d.discoveryAccuracyDelta, DISCOVERY_IMPACT_THRESHOLD)} |
-| Avg Adherence | ${ws2.avgAdherence.toFixed(2)}/5 | ${bs2.avgAdherence.toFixed(2)}/5 | ${formatDelta(d.avgAdherenceDelta)} | ${qualityImpact(d.avgAdherenceDelta, ADHERENCE_IMPACT_THRESHOLD)} |
-| Avg Output Quality | ${ws2.avgOutputQuality.toFixed(2)}/5 | ${bs2.avgOutputQuality.toFixed(2)}/5 | ${formatDelta(d.avgOutputQualityDelta)} | ${qualityImpact(d.avgOutputQualityDelta, OUTPUT_QUALITY_IMPACT_THRESHOLD)} |
-| Weighted Score | ${ws2.avgWeightedScore.toFixed(2)} | ${bs2.avgWeightedScore.toFixed(2)} | ${formatDelta(d.avgWeightedScoreDelta)} | ${qualityImpact(d.avgWeightedScoreDelta, WEIGHTED_SCORE_IMPACT_THRESHOLD)} |
+| Resolution Rate | ${(ws2.resolutionRate * 100).toFixed(0)}% | ${(bs2.resolutionRate * 100).toFixed(0)}% | ${formatDelta(d.resolutionRateDelta * 100, 0)}% | ${qualityImpact(d.resolutionRateDelta, RESOLUTION_IMPACT_THRESHOLD)} |
+| Pass@k | ${(ws2.passAtK * 100).toFixed(0)}% | ${(bs2.passAtK * 100).toFixed(0)}% | ${formatDelta(d.passAtKDelta * 100, 0)}% | ${qualityImpact(d.passAtKDelta, RESOLUTION_IMPACT_THRESHOLD)} |
 | Duration | ${(ws2.totalDurationMs / 1e3).toFixed(1)}s | ${(bs2.totalDurationMs / 1e3).toFixed(1)}s | ${formatDelta(d.totalDurationDeltaMs / 1e3, 1)}s | ${durationImpact(d.totalDurationDeltaMs)} |
 | Cost | $${ws2.totalCostUsd.toFixed(4)} | $${bs2.totalCostUsd.toFixed(4)} | $${formatDelta(d.totalCostDeltaUsd, 4)} | ${costImpact(d.totalCostDeltaUsd)} |
 | Tokens | ${formatTokens(ws2.totalTokens)} | ${formatTokens(bs2.totalTokens)} | ${d.totalTokensDelta !== void 0 ? formatDelta(d.totalTokensDelta, 0) : "n/a"} | ${d.totalTokensDelta !== void 0 ? tokenImpact(d.totalTokensDelta) : ""} |
 
 ### Per-Task Comparison
 
-| Task | Adherence (W / B / Delta) | Output (W / B / Delta) | Weighted (W / B / Delta) |
-|------|--------------------------|----------------------|------------------------|
+| Task | With Skill Passed | Baseline Passed | Lift |
+|------|-------------------|-----------------|------|
 `;
   for (const t of tasks) {
     const w = t.withSkill.score;
     const b = t.withoutSkill.score;
-    section += `| ${t.taskId} | ${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / ${formatDelta(t.delta.adherenceDelta, 1)} | ${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / ${formatDelta(t.delta.outputQualityDelta, 1)} | ${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / ${formatDelta(t.delta.weightedScoreDelta)} |
+    section += `| ${t.taskId} | ${passedRatio(w)} | ${passedRatio(b)} | ${formatDelta(t.delta.lift * 100, 0)}% |
 `;
   }
   return section;
 }
-var DISCOVERY_IMPACT_THRESHOLD = 0.05;
-var ADHERENCE_IMPACT_THRESHOLD = 0.2;
-var OUTPUT_QUALITY_IMPACT_THRESHOLD = 0.2;
-var WEIGHTED_SCORE_IMPACT_THRESHOLD = 0.05;
+var RESOLUTION_IMPACT_THRESHOLD = 0.05;
 var DURATION_IMPACT_THRESHOLD_MS = 1e3;
 var COST_IMPACT_THRESHOLD_USD = 1e-4;
 function qualityImpact(delta, threshold) {
@@ -45009,7 +45054,8 @@ async function generateHtmlReport(options) {
   }
   const summary2 = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-  const { passed } = evaluatePassFail(summary2, config);
+  const skillLift2 = comparison?.summary.delta.resolutionRateDelta;
+  const { passed } = evaluatePassFail(summary2, config, skillLift2);
   const tasks = evaluation.tasks.map((task, i) => ({
     index: i,
     task,
@@ -45020,10 +45066,8 @@ async function generateHtmlReport(options) {
   const clientData = tasks.map((t) => ({
     taskId: t.task.id,
     prompt: t.task.prompt,
-    discovery: t.score.discovery,
-    adherence: t.score.adherence,
-    outputQuality: t.score.outputQuality,
-    weightedScore: t.score.weightedScore,
+    passed: t.score.passed,
+    reward: t.score.reward,
     failureCategory: t.score.failureCategory,
     isFlaky: isFlaky(t.score.stddev),
     tokens: t.result.tokens?.total ?? null
@@ -45044,7 +45088,7 @@ ${renderStyles()}
 <body>
 <div class="container">
 ${renderHeader(evaluation.skillName, passed, metadata, numRuns, comparison)}
-${renderDashboard(summary2, config)}
+${renderDashboard(summary2, config, skillLift2)}
 ${renderFailureAnalysis(failureBreakdown)}
 ${renderControls(!!crossIterationComparison)}
 ${renderTaskTable(tasks, config, humanFeedback)}
@@ -45096,39 +45140,52 @@ function renderHeader(skillName, passed, metadata, numRuns, comparison) {
 }
 function renderGauge(label, value, max, threshold, format) {
   const pctValue = max > 0 ? Math.min(value / max, 1) : 0;
-  const pctThreshold = max > 0 ? Math.min(threshold / max, 1) : 0;
-  const passed = value >= threshold;
+  const pctThreshold = threshold !== void 0 && max > 0 ? Math.min(threshold / max, 1) : 0;
+  const passed = threshold === void 0 || value >= threshold;
   const radius = 60;
   const circumference = Math.PI * radius;
   const offset = circumference * (1 - pctValue);
   const thresholdAngle = 180 * pctThreshold;
+  const thresholdLine = threshold !== void 0 ? `<line x1="70" y1="75" x2="${70 + radius * Math.cos(Math.PI - thresholdAngle * Math.PI / 180)}" y2="${75 - radius * Math.sin(Math.PI - thresholdAngle * Math.PI / 180)}"
+      stroke="var(--color-text-muted)" stroke-width="1.5" stroke-dasharray="3,2"/>` : "";
   return `
 <div class="gauge">
   <svg viewBox="0 0 140 80" class="gauge-svg">
     <path d="M 10 75 A 60 60 0 0 1 130 75" fill="none" stroke="var(--color-border)" stroke-width="10" stroke-linecap="round"/>
     <path d="M 10 75 A 60 60 0 0 1 130 75" fill="none" stroke="${passed ? "var(--color-pass)" : "var(--color-fail)"}" stroke-width="10" stroke-linecap="round"
       stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" class="gauge-fill"/>
-    <line x1="70" y1="75" x2="${70 + radius * Math.cos(Math.PI - thresholdAngle * Math.PI / 180)}" y2="${75 - radius * Math.sin(Math.PI - thresholdAngle * Math.PI / 180)}"
-      stroke="var(--color-text-muted)" stroke-width="1.5" stroke-dasharray="3,2"/>
+    ${thresholdLine}
   </svg>
   <div class="gauge-value">${format(value)}</div>
   <div class="gauge-label">${label}</div>
-  <div class="gauge-threshold">Threshold: ${format(threshold)}</div>
+  <div class="gauge-threshold">${threshold !== void 0 ? `Threshold: ${format(threshold)}` : "&nbsp;"}</div>
 </div>`;
 }
-function renderDashboard(summary2, config) {
+function renderDashboard(summary2, config, skillLift2) {
+  const pctFmt = (v3) => v3.toFixed(1) + "%";
+  const gauges = [
+    renderGauge("Resolution Rate", summary2.resolutionRate * 100, 100, config.resolutionThreshold * 100, pctFmt),
+    renderGauge(`Pass@${summary2.numRuns}`, summary2.passAtK * 100, 100, void 0, pctFmt)
+  ];
+  if (summary2.invocationRate !== void 0) {
+    gauges.push(renderGauge("Invocation Rate", summary2.invocationRate * 100, 100, void 0, pctFmt));
+  }
+  const ci = summary2.resolutionCI;
+  const liftStat = skillLift2 !== void 0 ? `
+    <div class="stat">
+      <div class="stat-value">${formatDelta(skillLift2 * 100, 1)}%</div>
+      <div class="stat-label">Skill Lift</div>
+    </div>` : "";
   return `
 <section id="dashboard">
   <div class="gauges">
-    ${renderGauge("Discovery", summary2.discoveryAccuracy * 100, 100, config.discoveryThreshold * 100, (v3) => v3.toFixed(1) + "%")}
-    ${renderGauge("Adherence", summary2.avgAdherence, 5, config.scoreThreshold, (v3) => v3.toFixed(2) + "/5")}
-    ${renderGauge("Output Quality", summary2.avgOutputQuality, 5, config.scoreThreshold, (v3) => v3.toFixed(2) + "/5")}
+    ${gauges.join("\n    ")}
   </div>
   <div class="stats-row">
     <div class="stat">
-      <div class="stat-value">${summary2.avgWeightedScore.toFixed(2)}${summary2.stddev ? ` <span class="stddev">&plusmn; ${summary2.stddev.weightedScore.toFixed(2)}</span>` : ""}</div>
-      <div class="stat-label">Weighted Score</div>
-    </div>
+      <div class="stat-value">${(ci.low * 100).toFixed(0)}&ndash;${(ci.high * 100).toFixed(0)}%</div>
+      <div class="stat-label">95% CI</div>
+    </div>${liftStat}
     <div class="stat">
       <div class="stat-value">${summary2.totalTasks}</div>
       <div class="stat-label">Tasks</div>
@@ -45187,25 +45244,27 @@ function renderControls(hasRegression) {
 function renderTaskTable(tasks, config, humanFeedback) {
   let rows = "";
   for (const t of tasks) {
-    const isFailed = t.score.failureCategory !== "none";
+    const isFailed = !t.score.passed;
     const flaky = isFlaky(t.score.stddev);
     const statusClass = isFailed ? "status-fail" : flaky ? "status-flaky" : "status-pass";
     const statusLabel = isFailed ? "FAIL" : flaky ? "FLAKY" : "PASS";
+    const flags = trialFlags(t.score);
+    const passedCell = `${flags.filter(Boolean).length}/${flags.length}`;
+    const invokedCell = t.score.invocation !== void 0 ? `${(t.score.invocation * 100).toFixed(0)}%` : "n/a";
     const tokensCell = formatTokens(t.result.tokens?.total);
     rows += `
     <tr class="task-row" data-task-id="${escapeHtml(t.task.id)}" data-index="${t.index}">
       <td>${t.index + 1}</td>
       <td class="task-id-cell">${escapeHtml(t.task.id)}</td>
-      <td>${t.score.discovery >= 1 ? "1" : t.score.discovery.toFixed(2)}</td>
-      <td>${t.score.adherence.toFixed(1)}</td>
-      <td>${t.score.outputQuality.toFixed(1)}</td>
-      <td>${t.score.weightedScore.toFixed(2)}</td>
+      <td>${passedCell}</td>
+      <td>${t.score.reward.toFixed(2)}</td>
+      <td>${invokedCell}</td>
       <td>${tokensCell}</td>
       <td>${escapeHtml(formatCategory(t.score.failureCategory))}</td>
       <td><span class="status ${statusClass}">${statusLabel}</span></td>
     </tr>
     <tr class="detail-row" data-task-id="${escapeHtml(t.task.id)}">
-      <td colspan="9">
+      <td colspan="8">
         ${renderTaskDetail(t, config, humanFeedback)}
       </td>
     </tr>`;
@@ -45219,10 +45278,9 @@ function renderTaskTable(tasks, config, humanFeedback) {
         <tr>
           <th class="sortable" data-col="index">#</th>
           <th class="sortable" data-col="taskId">Task ID</th>
-          <th class="sortable" data-col="discovery">Discovery</th>
-          <th class="sortable" data-col="adherence">Adherence</th>
-          <th class="sortable" data-col="outputQuality">Output Quality</th>
-          <th class="sortable" data-col="weightedScore">Weighted</th>
+          <th>Passed</th>
+          <th class="sortable" data-col="reward">Reward</th>
+          <th>Invoked</th>
           <th class="sortable" data-col="tokens">Tokens</th>
           <th class="sortable" data-col="failureCategory">Failure</th>
           <th>Status</th>
@@ -45250,26 +45308,13 @@ function renderTaskDetail(t, config, humanFeedback) {
     </div>
   </div>`;
   if (t.score.stddev) {
+    const judgeVariance = t.score.stddev.adherence !== void 0 && t.score.adherence !== void 0 && t.score.stddev.outputQuality !== void 0 && t.score.outputQuality !== void 0 ? ` |
+       Adherence: ${t.score.adherence.toFixed(1)} &plusmn; ${t.score.stddev.adherence.toFixed(1)} |
+       Output: ${t.score.outputQuality.toFixed(1)} &plusmn; ${t.score.stddev.outputQuality.toFixed(1)}` : "";
     detail += `
   <div class="detail-section">
     <h4>Score Variance</h4>
-    <p>Discovery: ${(t.score.discovery * 100).toFixed(0)}% &plusmn; ${(t.score.stddev.discovery * 100).toFixed(0)}% |
-       Adherence: ${t.score.adherence.toFixed(1)} &plusmn; ${t.score.stddev.adherence.toFixed(1)} |
-       Output: ${t.score.outputQuality.toFixed(1)} &plusmn; ${t.score.stddev.outputQuality.toFixed(1)} |
-       Weighted: ${t.score.weightedScore.toFixed(2)} &plusmn; ${t.score.stddev.weightedScore.toFixed(2)}</p>
-  </div>`;
-  }
-  if (t.score.checklistResults && t.score.checklistResults.length > 0) {
-    const passed = t.score.checklistResults.filter((c) => c.passed).length;
-    const items = t.score.checklistResults.map((c) => {
-      const icon = c.passed ? '<span class="check-pass">&#10003;</span>' : '<span class="check-fail">&#10007;</span>';
-      const evidence = c.evidence?.trim() ? `<div class="check-evidence">${escapeHtml(c.evidence.trim())}</div>` : "";
-      return `<li>${icon} ${escapeHtml(c.item)}${evidence}</li>`;
-    }).join("");
-    detail += `
-  <div class="detail-section">
-    <h4>Checklist (${passed}/${t.score.checklistResults.length})</h4>
-    <ul class="checklist">${items}</ul>
+    <p>Reward: ${t.score.reward.toFixed(2)} &plusmn; ${t.score.stddev.reward.toFixed(2)}${judgeVariance}</p>
   </div>`;
   }
   if (t.score.deterministic) {
@@ -45277,6 +45322,26 @@ function renderTaskDetail(t, config, humanFeedback) {
   <div class="detail-section">
     <h4>Deterministic Check: ${t.score.deterministic.passed ? '<span class="check-pass">PASS</span>' : '<span class="check-fail">FAIL</span>'}</h4>
     <ul>${t.score.deterministic.details.map((d) => `<li>${escapeHtml(d)}</li>`).join("")}</ul>
+  </div>`;
+  }
+  if (t.score.judge) {
+    const ratings = t.score.adherence !== void 0 && t.score.outputQuality !== void 0 ? `<p>Adherence: ${t.score.adherence.toFixed(1)}/5 | Output Quality: ${t.score.outputQuality.toFixed(1)}/5</p>` : "";
+    let assertionsHtml = "";
+    if (t.score.checklistResults && t.score.checklistResults.length > 0) {
+      const passed = t.score.checklistResults.filter((c) => c.passed).length;
+      const items = t.score.checklistResults.map((c) => {
+        const icon = c.passed ? '<span class="check-pass">&#10003;</span>' : '<span class="check-fail">&#10007;</span>';
+        const evidence = c.evidence?.trim() ? `<div class="check-evidence">${escapeHtml(c.evidence.trim())}</div>` : "";
+        return `<li>${icon} ${escapeHtml(c.item)}${evidence}</li>`;
+      }).join("");
+      assertionsHtml = `
+    <p><strong>Assertions (${passed}/${t.score.checklistResults.length})</strong></p>
+    <ul class="checklist">${items}</ul>`;
+    }
+    detail += `
+  <div class="detail-section">
+    <h4>Diagnostics (LLM judge &mdash; does not affect pass/fail)</h4>
+    ${ratings}${assertionsHtml}
   </div>`;
   }
   if (humanFeedback && humanFeedback[t.task.id]) {
@@ -45306,10 +45371,8 @@ function renderTaskDetail(t, config, humanFeedback) {
       const skills = rd2.result.skillLoads.length > 0 ? rd2.result.skillLoads.join(", ") : "none";
       runRows += `<tr>
         <td>${r + 1}</td>
-        <td>${rd2.score.discovery}</td>
-        <td>${rd2.score.adherence}/5</td>
-        <td>${rd2.score.outputQuality}/5</td>
-        <td>${rd2.score.weightedScore.toFixed(2)}</td>
+        <td>${rd2.score.passed ? '<span class="check-pass">PASS</span>' : '<span class="check-fail">FAIL</span>'}</td>
+        <td>${rd2.score.reward.toFixed(2)}</td>
         <td>${formatTokens(rd2.result.tokens?.total)}</td>
         <td>${escapeHtml(skills)}</td>
       </tr>`;
@@ -45318,7 +45381,7 @@ function renderTaskDetail(t, config, humanFeedback) {
   <div class="detail-section">
     <h4>Per-Run Breakdown (${t.runDetails.length} runs)</h4>
     <table class="run-table">
-      <thead><tr><th>Run</th><th>Discovery</th><th>Adherence</th><th>Output</th><th>Weighted</th><th>Tokens</th><th>Skills</th></tr></thead>
+      <thead><tr><th>Trial</th><th>Passed</th><th>Reward</th><th>Tokens</th><th>Skills</th></tr></thead>
       <tbody>${runRows}</tbody>
     </table>
   </div>`;
@@ -45331,18 +45394,20 @@ function renderComparisonSection(comparison) {
   const ws2 = summary2.withSkill;
   const bs2 = summary2.withoutSkill;
   const d = summary2.delta;
+  const passedCell = (score) => {
+    const flags = trialFlags(score);
+    return `${flags.filter(Boolean).length}/${flags.length}`;
+  };
   let taskRows = "";
   for (const t of tasks) {
-    const w = t.withSkill.score;
-    const b = t.withoutSkill.score;
     const wTokens = t.withSkill.result.tokens;
     const bTokens = t.withoutSkill.result.tokens;
     const tokenCell = wTokens && bTokens && t.delta.totalTokensDelta !== void 0 ? `${wTokens.total.toLocaleString()} / ${bTokens.total.toLocaleString()} / <span class="delta">${escapeHtml(formatDelta(t.delta.totalTokensDelta, 0))}</span>` : "n/a";
     taskRows += `<tr>
       <td>${escapeHtml(t.taskId)}</td>
-      <td>${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.adherenceDelta, 1))}</span></td>
-      <td>${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.outputQualityDelta, 1))}</span></td>
-      <td>${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / <span class="delta">${escapeHtml(formatDelta(t.delta.weightedScoreDelta))}</span></td>
+      <td>${passedCell(t.withSkill.score)}</td>
+      <td>${passedCell(t.withoutSkill.score)}</td>
+      <td class="delta">${escapeHtml(formatDelta(t.delta.lift * 100, 0))}%</td>
       <td>${tokenCell}</td>
     </tr>`;
   }
@@ -45353,10 +45418,8 @@ function renderComparisonSection(comparison) {
   <table>
     <thead><tr><th>Metric</th><th>With Skill</th><th>Baseline</th><th>Delta</th></tr></thead>
     <tbody>
-      <tr><td>Discovery</td><td>${(ws2.discoveryAccuracy * 100).toFixed(0)}%</td><td>${(bs2.discoveryAccuracy * 100).toFixed(0)}%</td><td class="delta">${escapeHtml(formatDelta(d.discoveryAccuracyDelta * 100, 0))}%</td></tr>
-      <tr><td>Adherence</td><td>${ws2.avgAdherence.toFixed(2)}/5</td><td>${bs2.avgAdherence.toFixed(2)}/5</td><td class="delta">${escapeHtml(formatDelta(d.avgAdherenceDelta))}</td></tr>
-      <tr><td>Output Quality</td><td>${ws2.avgOutputQuality.toFixed(2)}/5</td><td>${bs2.avgOutputQuality.toFixed(2)}/5</td><td class="delta">${escapeHtml(formatDelta(d.avgOutputQualityDelta))}</td></tr>
-      <tr><td>Weighted Score</td><td>${ws2.avgWeightedScore.toFixed(2)}</td><td>${bs2.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(d.avgWeightedScoreDelta))}</td></tr>
+      <tr><td>Resolution Rate</td><td>${(ws2.resolutionRate * 100).toFixed(0)}%</td><td>${(bs2.resolutionRate * 100).toFixed(0)}%</td><td class="delta">${escapeHtml(formatDelta(d.resolutionRateDelta * 100, 0))}%</td></tr>
+      <tr><td>Pass@k</td><td>${(ws2.passAtK * 100).toFixed(0)}%</td><td>${(bs2.passAtK * 100).toFixed(0)}%</td><td class="delta">${escapeHtml(formatDelta(d.passAtKDelta * 100, 0))}%</td></tr>
       <tr><td>Duration</td><td>${(ws2.totalDurationMs / 1e3).toFixed(1)}s</td><td>${(bs2.totalDurationMs / 1e3).toFixed(1)}s</td><td class="delta">${escapeHtml(formatDelta(d.totalDurationDeltaMs / 1e3, 1))}s</td></tr>
       <tr><td>Cost</td><td>$${ws2.totalCostUsd.toFixed(4)}</td><td>$${bs2.totalCostUsd.toFixed(4)}</td><td class="delta">$${escapeHtml(formatDelta(d.totalCostDeltaUsd, 4))}</td></tr>
       <tr><td>Tokens</td><td>${formatTokens(ws2.totalTokens)}</td><td>${formatTokens(bs2.totalTokens)}</td><td class="delta">${d.totalTokensDelta !== void 0 ? escapeHtml(formatDelta(d.totalTokensDelta, 0)) : "n/a"}</td></tr>
@@ -45365,7 +45428,7 @@ function renderComparisonSection(comparison) {
   <h3>Per-Task Comparison</h3>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Task</th><th>Adherence (W / B / Delta)</th><th>Output (W / B / Delta)</th><th>Weighted (W / B / Delta)</th><th>Tokens (W / B / Delta)</th></tr></thead>
+      <thead><tr><th>Task</th><th>With Skill Passed</th><th>Baseline Passed</th><th>Lift</th><th>Tokens (W / B / Delta)</th></tr></thead>
       <tbody>${taskRows}</tbody>
     </table>
   </div>
@@ -45427,9 +45490,7 @@ function renderCrossIterationSection(comparison) {
     const changeClass = td2.significantChange === "improved" ? "delta-positive" : td2.significantChange === "regressed" ? "delta-negative" : "";
     taskRows += `<tr class="${changeClass}">
       <td>${escapeHtml(td2.taskId)}</td>
-      <td>${td2.previous.adherence.toFixed(1)} &rarr; ${td2.current.adherence.toFixed(1)} (${escapeHtml(formatDelta(td2.delta.adherence, 1))})</td>
-      <td>${td2.previous.outputQuality.toFixed(1)} &rarr; ${td2.current.outputQuality.toFixed(1)} (${escapeHtml(formatDelta(td2.delta.outputQuality, 1))})</td>
-      <td>${td2.previous.weightedScore.toFixed(2)} &rarr; ${td2.current.weightedScore.toFixed(2)} (${escapeHtml(formatDelta(td2.delta.weightedScore))})</td>
+      <td>${(td2.previous.resolutionRate * 100).toFixed(0)}% &rarr; ${(td2.current.resolutionRate * 100).toFixed(0)}% (${escapeHtml(formatDelta(td2.delta * 100, 0))}%)</td>
       <td><span class="status ${td2.significantChange === "improved" ? "status-pass" : td2.significantChange === "regressed" ? "status-fail" : "status-neutral"}">${td2.significantChange}</span></td>
     </tr>`;
   }
@@ -45440,6 +45501,8 @@ function renderCrossIterationSection(comparison) {
   if (comparison.tasksOnlyInPrevious.length > 0) {
     extras += `<p><strong>Removed tasks:</strong> ${comparison.tasksOnlyInPrevious.map(escapeHtml).join(", ")}</p>`;
   }
+  const liftRow = sd2.delta.skillLift !== void 0 && sd2.previous.skillLift !== void 0 && sd2.current.skillLift !== void 0 ? `
+      <tr><td>Skill Lift</td><td>${escapeHtml(formatDelta(sd2.previous.skillLift * 100, 1))}%</td><td>${escapeHtml(formatDelta(sd2.current.skillLift * 100, 1))}%</td><td class="delta">${escapeHtml(formatDelta(sd2.delta.skillLift * 100, 1))}%</td></tr>` : "";
   return `
 <section id="cross-iteration">
   <h2>Cross-Iteration Comparison</h2>
@@ -45447,16 +45510,14 @@ function renderCrossIterationSection(comparison) {
   <table>
     <thead><tr><th>Metric</th><th>Previous</th><th>Current</th><th>Delta</th></tr></thead>
     <tbody>
-      <tr><td>Discovery</td><td>${(sd2.previous.discoveryAccuracy * 100).toFixed(1)}%</td><td>${(sd2.current.discoveryAccuracy * 100).toFixed(1)}%</td><td class="delta">${escapeHtml(formatDelta(sd2.delta.discoveryAccuracy * 100, 1))}%</td></tr>
-      <tr><td>Adherence</td><td>${sd2.previous.avgAdherence.toFixed(2)}</td><td>${sd2.current.avgAdherence.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd2.delta.avgAdherence))}</td></tr>
-      <tr><td>Output Quality</td><td>${sd2.previous.avgOutputQuality.toFixed(2)}</td><td>${sd2.current.avgOutputQuality.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd2.delta.avgOutputQuality))}</td></tr>
-      <tr><td>Weighted Score</td><td>${sd2.previous.avgWeightedScore.toFixed(2)}</td><td>${sd2.current.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd2.delta.avgWeightedScore))}</td></tr>
+      <tr><td>Resolution Rate</td><td>${(sd2.previous.resolutionRate * 100).toFixed(1)}%</td><td>${(sd2.current.resolutionRate * 100).toFixed(1)}%</td><td class="delta">${escapeHtml(formatDelta(sd2.delta.resolutionRate * 100, 1))}%</td></tr>
+      <tr><td>Pass@k</td><td>${(sd2.previous.passAtK * 100).toFixed(1)}%</td><td>${(sd2.current.passAtK * 100).toFixed(1)}%</td><td class="delta">${escapeHtml(formatDelta(sd2.delta.passAtK * 100, 1))}%</td></tr>${liftRow}
     </tbody>
   </table>
   <h3>Per-Task Changes</h3>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Task</th><th>Adherence</th><th>Output Quality</th><th>Weighted Score</th><th>Change</th></tr></thead>
+      <thead><tr><th>Task</th><th>Resolution Rate</th><th>Change</th></tr></thead>
       <tbody>${taskRows}</tbody>
     </table>
   </div>
@@ -45759,7 +45820,7 @@ function renderScript() {
       }
 
       // Category filter
-      if (show && currentFilter === 'failed' && d.failureCategory === 'none') show = false;
+      if (show && currentFilter === 'failed' && d.passed) show = false;
       if (show && currentFilter === 'flaky' && !d.isFlaky) show = false;
       if (show && currentFilter === 'regressed' && !d.isRegressed) show = false;
 
@@ -45801,24 +45862,32 @@ function renderScript() {
 var fs12 = __toESM(require("fs/promises"), 1);
 function generateGitHubSummary(report, config) {
   const resolvedConfig = config ?? loadConfigSync();
-  const { summary: summary2, failureBreakdown, tasks } = report;
-  const { discoveryPassed, adherencePassed, outputQualityPassed } = evaluatePassFail(summary2, resolvedConfig);
+  const { summary: summary2, tasks } = report;
+  const skillLift2 = report.comparison?.summary.delta.resolutionRateDelta;
+  const { resolutionPassed, liftPassed } = evaluatePassFail(summary2, resolvedConfig, skillLift2);
   const lines = [];
   const icon = report.passed ? ":white_check_mark:" : ":x:";
-  const runsLabel = summary2.numRuns > 1 ? ` (${summary2.numRuns} runs)` : "";
+  const runsLabel = summary2.numRuns > 1 ? ` (${summary2.numRuns} trials)` : "";
   lines.push(`## ${icon} Skill Evaluation: ${report.skillName}${runsLabel}`);
   lines.push("");
+  const ci = summary2.resolutionCI;
   lines.push("| Metric | Value | Threshold | Status |");
   lines.push("|--------|-------|-----------|--------|");
-  lines.push(`| Discovery Rate | ${(summary2.discoveryAccuracy * 100).toFixed(0)}%${summary2.stddev ? ` \xB1 ${(summary2.stddev.discovery * 100).toFixed(0)}%` : ""} (${Math.round(summary2.discoveryAccuracy * summary2.totalTasks)}/${summary2.totalTasks}) | ${(resolvedConfig.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? "PASS" : "FAIL"} |`);
-  lines.push(`| Avg Adherence | ${summary2.avgAdherence.toFixed(1)}/5${summary2.stddev ? ` \xB1 ${summary2.stddev.adherence.toFixed(1)}` : ""} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${adherencePassed ? "PASS" : "FAIL"} |`);
-  lines.push(`| Avg Output Quality | ${summary2.avgOutputQuality.toFixed(1)}/5${summary2.stddev ? ` \xB1 ${summary2.stddev.outputQuality.toFixed(1)}` : ""} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${outputQualityPassed ? "PASS" : "FAIL"} |`);
-  lines.push(`| Weighted Score | ${summary2.avgWeightedScore.toFixed(2)}${summary2.stddev ? ` \xB1 ${summary2.stddev.weightedScore.toFixed(2)}` : ""} | | |`);
+  lines.push(`| Resolution Rate | ${(summary2.resolutionRate * 100).toFixed(0)}% (CI ${(ci.low * 100).toFixed(0)}\u2013${(ci.high * 100).toFixed(0)}%) | ${(resolvedConfig.resolutionThreshold * 100).toFixed(0)}% | ${resolutionPassed ? "PASS" : "FAIL"} |`);
+  lines.push(`| Pass@${summary2.numRuns} | ${(summary2.passAtK * 100).toFixed(0)}% | | |`);
+  if (skillLift2 !== void 0) {
+    const liftThresholdCell = resolvedConfig.liftThreshold !== void 0 ? `${formatDelta(resolvedConfig.liftThreshold * 100, 0)}%` : "";
+    const liftStatus = liftPassed === void 0 ? "" : liftPassed ? "PASS" : "FAIL";
+    lines.push(`| Skill Lift | ${formatDelta(skillLift2 * 100, 0)}% | ${liftThresholdCell} | ${liftStatus} |`);
+  }
+  if (summary2.invocationRate !== void 0) {
+    lines.push(`| Invocation Rate | ${(summary2.invocationRate * 100).toFixed(0)}% | | |`);
+  }
   lines.push(`| Duration | ${(summary2.totalDurationMs / 1e3).toFixed(1)}s | | |`);
   lines.push(`| Cost | $${summary2.totalCostUsd.toFixed(4)} | | |`);
   lines.push(`| Tokens | ${formatTokens(summary2.totalTokens)} | | |`);
   lines.push("");
-  const failures = tasks.filter((t) => t.score.failureCategory !== "none");
+  const failures = tasks.filter((t) => !t.score.passed);
   if (failures.length > 0) {
     lines.push(`### Failures (${failures.length})`);
     lines.push("");
@@ -45845,10 +45914,11 @@ function generateGitHubSummary(report, config) {
     lines.push("");
     lines.push("| Metric | Delta | |");
     lines.push("|--------|-------|-|");
-    lines.push(`| Discovery | ${formatDelta(sd2.discoveryAccuracy * 100)}% | ${arrow(sd2.discoveryAccuracy)} |`);
-    lines.push(`| Adherence | ${formatDelta(sd2.avgAdherence)} | ${arrow(sd2.avgAdherence)} |`);
-    lines.push(`| Output Quality | ${formatDelta(sd2.avgOutputQuality)} | ${arrow(sd2.avgOutputQuality)} |`);
-    lines.push(`| Weighted Score | ${formatDelta(sd2.avgWeightedScore)} | ${arrow(sd2.avgWeightedScore)} |`);
+    lines.push(`| Resolution Rate | ${formatDelta(sd2.resolutionRate * 100)}% | ${arrow(sd2.resolutionRate)} |`);
+    lines.push(`| Pass@k | ${formatDelta(sd2.passAtK * 100)}% | ${arrow(sd2.passAtK)} |`);
+    if (sd2.skillLift !== void 0) {
+      lines.push(`| Skill Lift | ${formatDelta(sd2.skillLift * 100)}% | ${arrow(sd2.skillLift)} |`);
+    }
     lines.push("");
     const regressions = c.taskDeltas.filter((t) => t.significantChange === "regressed");
     const improvements = c.taskDeltas.filter((t) => t.significantChange === "improved");
@@ -45864,30 +45934,47 @@ function generateGitHubSummary(report, config) {
   lines.push("<details><summary>All task results</summary>");
   lines.push("");
   if (isMultiRun) {
-    lines.push("| Task | Discovery | Adherence | Output | Weighted | Variance | Status |");
-    lines.push("|------|-----------|-----------|--------|----------|----------|--------|");
+    lines.push("| Task | Passed | Reward | Invoked | Variance | Status |");
+    lines.push("|------|--------|--------|---------|----------|--------|");
   } else {
-    lines.push("| Task | Discovery | Adherence | Output | Weighted | Status |");
-    lines.push("|------|-----------|-----------|--------|----------|--------|");
+    lines.push("| Task | Passed | Reward | Invoked | Status |");
+    lines.push("|------|--------|--------|---------|--------|");
   }
   for (const t of tasks) {
     const s = t.score;
-    const status = s.failureCategory === "none" ? "PASS" : "FAIL";
+    const flags = trialFlags(s);
+    const passedCell = `${flags.filter(Boolean).length}/${flags.length}`;
+    const status = s.passed ? "PASS" : "FAIL";
+    const invoked = s.invocation !== void 0 ? `${(s.invocation * 100).toFixed(0)}%` : "n/a";
     const taskId = t.task.id.replace(/\|/g, "\\|");
     if (isMultiRun) {
       const varianceLabel = s.stddev ? isFlaky(s.stddev) ? ":warning: High" : "Low" : "N/A";
-      lines.push(`| ${taskId} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
+      lines.push(`| ${taskId} | ${passedCell} | ${s.reward.toFixed(2)} | ${invoked} | ${varianceLabel} | ${status} |`);
     } else {
-      lines.push(`| ${taskId} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
+      lines.push(`| ${taskId} | ${passedCell} | ${s.reward.toFixed(2)} | ${invoked} | ${status} |`);
     }
   }
-  const tasksWithChecklist = tasks.filter((t) => (t.score.checklistResults ?? []).length > 0);
-  if (tasksWithChecklist.length > 0) {
+  lines.push("");
+  lines.push("</details>");
+  lines.push("");
+  const judgedTasks = tasks.filter((t) => t.score.judge);
+  if (judgedTasks.length > 0) {
+    lines.push("### Diagnostics (LLM judge)");
     lines.push("");
+    lines.push("| Task | Adherence | Output Quality |");
+    lines.push("|------|-----------|----------------|");
+    for (const t of judgedTasks) {
+      const taskId = t.task.id.replace(/\|/g, "\\|");
+      const adh = t.score.adherence !== void 0 ? `${t.score.adherence.toFixed(1)}/5` : "n/a";
+      const out = t.score.outputQuality !== void 0 ? `${t.score.outputQuality.toFixed(1)}/5` : "n/a";
+      lines.push(`| ${taskId} | ${adh} | ${out} |`);
+    }
+    lines.push("");
+    const tasksWithChecklist = judgedTasks.filter((t) => (t.score.checklistResults ?? []).length > 0);
     for (const t of tasksWithChecklist) {
       const results = t.score.checklistResults ?? [];
-      const passed = results.filter((cr) => cr.passed).length;
-      lines.push(`**${t.task.id} checklist:** ${passed}/${results.length}`);
+      const passedCount = results.filter((cr) => cr.passed).length;
+      lines.push(`**${t.task.id} assertions:** ${passedCount}/${results.length}`);
       for (const cr of results) {
         const safeItem = cr.item.replace(/\|/g, "\\|");
         const line = `- ${cr.passed ? "PASS" : "FAIL"}: ${safeItem}`;
@@ -45897,9 +45984,6 @@ function generateGitHubSummary(report, config) {
       lines.push("");
     }
   }
-  lines.push("");
-  lines.push("</details>");
-  lines.push("");
   if (report.comparison) {
     const d = report.comparison.summary.delta;
     const ws2 = report.comparison.summary.withSkill;
@@ -45908,10 +45992,8 @@ function generateGitHubSummary(report, config) {
     lines.push("");
     lines.push("| Metric | With Skill | Baseline | Delta |");
     lines.push("|--------|-----------|----------|-------|");
-    lines.push(`| Discovery | ${(ws2.discoveryAccuracy * 100).toFixed(0)}% | ${(bs2.discoveryAccuracy * 100).toFixed(0)}% | **${formatDelta(d.discoveryAccuracyDelta * 100, 0)}%** |`);
-    lines.push(`| Adherence | ${ws2.avgAdherence.toFixed(1)}/5 | ${bs2.avgAdherence.toFixed(1)}/5 | **${formatDelta(d.avgAdherenceDelta)}** |`);
-    lines.push(`| Output Quality | ${ws2.avgOutputQuality.toFixed(1)}/5 | ${bs2.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
-    lines.push(`| Weighted Score | ${ws2.avgWeightedScore.toFixed(2)} | ${bs2.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
+    lines.push(`| Resolution Rate | ${(ws2.resolutionRate * 100).toFixed(0)}% | ${(bs2.resolutionRate * 100).toFixed(0)}% | **${formatDelta(d.resolutionRateDelta * 100, 0)}%** |`);
+    lines.push(`| Pass@k | ${(ws2.passAtK * 100).toFixed(0)}% | ${(bs2.passAtK * 100).toFixed(0)}% | **${formatDelta(d.passAtKDelta * 100, 0)}%** |`);
     if (d.totalTokensDelta !== void 0) {
       lines.push(`| Tokens | ${formatTokens(ws2.totalTokens)} | ${formatTokens(bs2.totalTokens)} | **${formatDelta(d.totalTokensDelta, 0)}** |`);
     }
@@ -45951,57 +46033,245 @@ async function writeGitHubSummary(report, config) {
   return true;
 }
 
-// dist/src/run/workspace.js
+// dist/src/results/summary.js
 var fs13 = __toESM(require("fs/promises"), 1);
 var path11 = __toESM(require("path"), 1);
-var DEFAULT_SKILLS_MOUNT_PATH = path11.join(".claude", "skills");
+var VERIFIER_STDERR_EXCERPT = 400;
+var FAILURE_DETAIL_PREFIXES = [
+  "Expected skill activation",
+  "Wrong skill activated",
+  "Unexpected skill activation",
+  "Marker not found",
+  "Missing expected tool calls",
+  "Forbidden tools were called",
+  "Expected substrings not found",
+  "Forbidden substrings found",
+  "Regex patterns not matched",
+  "JavaScript assertion returned",
+  "JavaScript assertion error",
+  "Expected files not found",
+  "Working directory does not exist",
+  "Verifier failed",
+  "Task errored"
+];
+function collectFailedChecks(det) {
+  if (!det)
+    return [];
+  return det.details.filter((d) => FAILURE_DETAIL_PREFIXES.some((p) => d.startsWith(p)));
+}
+function taskTrials(phase, taskIndex) {
+  return phase.allResults.map((runResults, run2) => ({
+    result: runResults[taskIndex],
+    score: phase.allScores[run2][taskIndex]
+  }));
+}
+function conditionStats(trials) {
+  const passed = trials.map((t) => t.score.passed);
+  return {
+    passed,
+    rewards: trials.map((t) => t.score.reward),
+    resolutionRate: resolutionRate(passed),
+    passAtK: passAtK(passed)
+  };
+}
+function trialFailures(trials, condition) {
+  const failures = [];
+  for (let i = 0; i < trials.length; i++) {
+    const { result, score } = trials[i];
+    if (score.passed)
+      continue;
+    const failure = {
+      trial: i + 1,
+      condition,
+      failedChecks: collectFailedChecks(score.deterministic)
+    };
+    if (result.verifier && !result.verifier.passed) {
+      failure.verifierStatus = result.verifier.status;
+      if (result.verifier.stderr) {
+        failure.verifierStderr = result.verifier.stderr.slice(0, VERIFIER_STDERR_EXCERPT);
+      }
+    }
+    if (result.isError && result.errorMessage) {
+      failure.errorMessage = result.errorMessage;
+    }
+    if (score.failureCategory && score.failureCategory !== "none") {
+      failure.failureCategory = score.failureCategory;
+    }
+    if (score.judge?.reasoning) {
+      failure.judgeNotes = score.judge.reasoning;
+    }
+    failures.push(failure);
+  }
+  return failures;
+}
+function evaluateThresholds(resolution, config, lift) {
+  const resolutionPassed = resolution >= config.resolutionThreshold;
+  const liftPassed = config.liftThreshold !== void 0 && lift !== void 0 ? lift >= config.liftThreshold : void 0;
+  return {
+    resolution: config.resolutionThreshold,
+    lift: config.liftThreshold,
+    resolutionPassed,
+    liftPassed,
+    passed: resolutionPassed && liftPassed !== false
+  };
+}
+function buildRunSummary(options) {
+  const { tasks, config } = options;
+  const taskSummaries = [];
+  const perTaskLifts = [];
+  const invokedFlags = [];
+  let totalDurationMs = 0;
+  let totalCostUsd = 0;
+  let tokenSum = 0;
+  let hasAllTokens = true;
+  let totalWithSkillTrials = 0;
+  const phases = [
+    { data: options.withSkill, condition: "with-skill" },
+    ...options.baseline ? [{ data: options.baseline, condition: "baseline" }] : []
+  ];
+  for (const phase of phases) {
+    for (const runResults of phase.data.allResults) {
+      for (const result of runResults) {
+        totalDurationMs += result.durationMs;
+        totalCostUsd += result.costUsd;
+        if (result.tokens)
+          tokenSum += result.tokens.total;
+        else
+          hasAllTokens = false;
+      }
+    }
+  }
+  for (let t = 0; t < tasks.length; t++) {
+    const task = tasks[t];
+    const withTrials = taskTrials(options.withSkill, t);
+    const withStats = conditionStats(withTrials);
+    totalWithSkillTrials += withTrials.length;
+    const summary2 = {
+      id: task.id,
+      difficulty: task.difficulty,
+      category: task.category,
+      tags: task.tags,
+      expectedSkill: task.expectedSkillLoad,
+      withSkill: withStats,
+      failures: trialFailures(withTrials, "with-skill")
+    };
+    if (options.baseline) {
+      const baseTrials = taskTrials(options.baseline, t);
+      summary2.baseline = conditionStats(baseTrials);
+      summary2.lift = skillLift(withStats.resolutionRate, summary2.baseline.resolutionRate);
+      perTaskLifts.push(summary2.lift);
+      summary2.failures.push(...trialFailures(baseTrials, "baseline"));
+    }
+    if (task.expectedSkillLoad !== "none") {
+      const taskInvoked = withTrials.map(({ score }) => (score.invocation ?? 0) >= 1);
+      invokedFlags.push(...taskInvoked);
+      summary2.invocationRate = taskInvoked.filter(Boolean).length / Math.max(1, taskInvoked.length);
+    }
+    if (options.judgeEnabled) {
+      const withAssertions = withTrials.find(({ score }) => (score.checklistResults ?? []).length > 0);
+      if (withAssertions) {
+        summary2.assertions = withAssertions.score.checklistResults;
+      }
+    }
+    taskSummaries.push(summary2);
+  }
+  const perTaskRates = taskSummaries.map((s) => s.withSkill.resolutionRate);
+  const overallResolution = perTaskRates.length > 0 ? perTaskRates.reduce((sum, v3) => sum + v3, 0) / perTaskRates.length : 0;
+  const overallPassAtK = taskSummaries.length > 0 ? taskSummaries.filter((s) => s.withSkill.passAtK).length / taskSummaries.length : 0;
+  const lift = options.baseline ? macroSkillLift(perTaskLifts) : void 0;
+  const grouped = (keyOf) => groupMetrics(tasks.map((task, i) => ({
+    keys: keyOf(task),
+    passed: taskSummaries[i].withSkill.passed
+  })));
+  const thresholds = evaluateThresholds(overallResolution, config, lift);
+  return {
+    version: 2,
+    run: {
+      timestamp: options.timestamp ?? (/* @__PURE__ */ new Date()).toISOString(),
+      skillName: options.skillName,
+      runner: config.runnerType,
+      model: config.defaultAgentModel,
+      nudge: options.nudge,
+      trials: options.trials,
+      baseline: !!options.baseline,
+      baselineLabel: options.baselineLabel,
+      judge: options.judgeEnabled
+    },
+    metrics: {
+      resolutionRate: overallResolution,
+      ci: binomialCI(overallResolution, totalWithSkillTrials),
+      passAtK: overallPassAtK,
+      skillLift: lift,
+      skillInvocationRate: skillInvocationRate(invokedFlags),
+      byDifficulty: grouped((task) => [task.difficulty]),
+      byCategory: grouped((task) => [task.category]),
+      byTag: grouped((task) => task.tags ?? []),
+      totalDurationMs,
+      totalCostUsd,
+      totalTokens: hasAllTokens ? tokenSum : void 0
+    },
+    thresholds,
+    tasks: taskSummaries
+  };
+}
+async function writeRunSummary(summary2, outputDir) {
+  const summaryPath = path11.join(outputDir, "summary.json");
+  await fs13.mkdir(outputDir, { recursive: true });
+  await fs13.writeFile(summaryPath, JSON.stringify(summary2, null, 2));
+  return summaryPath;
+}
+
+// dist/src/run/workspace.js
+var fs14 = __toESM(require("fs/promises"), 1);
+var path12 = __toESM(require("path"), 1);
+var DEFAULT_SKILLS_MOUNT_PATH = path12.join(".claude", "skills");
 async function copyDir(src, dest) {
-  await fs13.mkdir(dest, { recursive: true });
-  const entries = await fs13.readdir(src, { withFileTypes: true });
+  await fs14.mkdir(dest, { recursive: true });
+  const entries = await fs14.readdir(src, { withFileTypes: true });
   for (const entry of entries) {
-    const srcPath = path11.join(src, entry.name);
-    const destPath = path11.join(dest, entry.name);
+    const srcPath = path12.join(src, entry.name);
+    const destPath = path12.join(dest, entry.name);
     if (entry.isDirectory()) {
       await copyDir(srcPath, destPath);
     } else {
-      await fs13.copyFile(srcPath, destPath);
+      await fs14.copyFile(srcPath, destPath);
     }
   }
 }
 async function mountSkills(skillsSourceDir, targetDir) {
-  await fs13.mkdir(targetDir, { recursive: true });
+  await fs14.mkdir(targetDir, { recursive: true });
   const skillNames = [];
-  const entries = await fs13.readdir(skillsSourceDir, { withFileTypes: true });
+  const entries = await fs14.readdir(skillsSourceDir, { withFileTypes: true });
   for (const entry of entries) {
     if (entry.isDirectory()) {
-      await copyDir(path11.join(skillsSourceDir, entry.name), path11.join(targetDir, entry.name));
+      await copyDir(path12.join(skillsSourceDir, entry.name), path12.join(targetDir, entry.name));
       skillNames.push(entry.name);
     } else if (entry.name === "SKILL.md") {
-      const skillName = path11.basename(skillsSourceDir);
-      await fs13.mkdir(path11.join(targetDir, skillName), { recursive: true });
-      await fs13.copyFile(path11.join(skillsSourceDir, entry.name), path11.join(targetDir, skillName, "SKILL.md"));
+      const skillName = path12.basename(skillsSourceDir);
+      await fs14.mkdir(path12.join(targetDir, skillName), { recursive: true });
+      await fs14.copyFile(path12.join(skillsSourceDir, entry.name), path12.join(targetDir, skillName, "SKILL.md"));
       skillNames.push(skillName);
     }
   }
   return skillNames;
 }
 async function createTrialWorkspace(options) {
-  const dir = path11.resolve(options.baseDir, "workspaces", options.taskId, `run-${options.runIndex + 1}`);
-  await fs13.rm(dir, { recursive: true, force: true });
-  await fs13.mkdir(dir, { recursive: true });
+  const dir = path12.resolve(options.baseDir, "workspaces", options.taskId, `run-${options.runIndex + 1}`);
+  await fs14.rm(dir, { recursive: true, force: true });
+  await fs14.mkdir(dir, { recursive: true });
   if (options.seedDir) {
     await copyDir(options.seedDir, dir);
   }
   let skillNames = [];
   if (options.skillsDir) {
-    const mountPath = path11.join(dir, options.skillsMountPath ?? DEFAULT_SKILLS_MOUNT_PATH);
+    const mountPath = path12.join(dir, options.skillsMountPath ?? DEFAULT_SKILLS_MOUNT_PATH);
     skillNames = await mountSkills(options.skillsDir, mountPath);
   }
   return {
     dir,
     skillNames,
     cleanup: async () => {
-      await fs13.rm(dir, { recursive: true, force: true }).catch(() => {
+      await fs14.rm(dir, { recursive: true, force: true }).catch(() => {
       });
     }
   };
@@ -46016,12 +46286,12 @@ async function applyCleanupPolicy(workspace, policy, trialFailed) {
 
 // dist/src/score/verifier.js
 var import_child_process5 = require("child_process");
-var fs14 = __toESM(require("fs/promises"), 1);
+var fs15 = __toESM(require("fs/promises"), 1);
 var os2 = __toESM(require("os"), 1);
-var path12 = __toESM(require("path"), 1);
+var path13 = __toESM(require("path"), 1);
 var DEFAULT_VERIFIER_TIMEOUT_MS = 6e4;
 function resolveInterpreter(scriptPath, platform = process.platform) {
-  const ext = path12.extname(scriptPath).toLowerCase();
+  const ext = path13.extname(scriptPath).toLowerCase();
   switch (ext) {
     case ".mjs":
     case ".js":
@@ -46078,7 +46348,7 @@ function execAttempt(invocation, cwd, env, timeoutMs) {
 async function readReward(rewardFile) {
   let raw;
   try {
-    raw = await fs14.readFile(rewardFile, "utf-8");
+    raw = await fs15.readFile(rewardFile, "utf-8");
   } catch {
     return null;
   }
@@ -46157,7 +46427,7 @@ async function executeVerifier(options) {
 async function runVerifier(options) {
   let contractDir;
   try {
-    contractDir = await fs14.mkdtemp(path12.join(os2.tmpdir(), "skilljack-verifier-"));
+    contractDir = await fs15.mkdtemp(path13.join(os2.tmpdir(), "skilljack-verifier-"));
   } catch (err) {
     return {
       reward: 0,
@@ -46169,12 +46439,12 @@ async function runVerifier(options) {
       durationMs: 0
     };
   }
-  const outputFile = path12.join(contractDir, "output.txt");
-  const trajectoryFile = path12.join(contractDir, "trajectory.json");
-  const rewardFile = path12.join(contractDir, "reward.txt");
+  const outputFile = path13.join(contractDir, "output.txt");
+  const trajectoryFile = path13.join(contractDir, "trajectory.json");
+  const rewardFile = path13.join(contractDir, "reward.txt");
   try {
-    await fs14.writeFile(outputFile, options.output, "utf-8");
-    await fs14.writeFile(trajectoryFile, JSON.stringify(options.toolCalls, null, 2), "utf-8");
+    await fs15.writeFile(outputFile, options.output, "utf-8");
+    await fs15.writeFile(trajectoryFile, JSON.stringify(options.toolCalls, null, 2), "utf-8");
     return await executeVerifier({
       scriptPath: options.scriptPath,
       command: options.command,
@@ -46186,15 +46456,15 @@ async function runVerifier(options) {
       timeoutMs: options.timeoutMs
     });
   } finally {
-    await fs14.rm(contractDir, { recursive: true, force: true }).catch(() => {
+    await fs15.rm(contractDir, { recursive: true, force: true }).catch(() => {
     });
   }
 }
 
 // dist/src/cache/response-cache.js
 var crypto = __toESM(require("crypto"), 1);
-var fs15 = __toESM(require("fs/promises"), 1);
-var path13 = __toESM(require("path"), 1);
+var fs16 = __toESM(require("fs/promises"), 1);
+var path14 = __toESM(require("path"), 1);
 function isTaskCacheable(task, context = {}) {
   if (context.hasVerifier)
     return false;
@@ -46223,8 +46493,8 @@ var ResponseCache = class _ResponseCache {
       return null;
     }
     try {
-      const filePath = path13.join(this.config.dir, `${key}.json`);
-      const content = await fs15.readFile(filePath, "utf-8");
+      const filePath = path14.join(this.config.dir, `${key}.json`);
+      const content = await fs16.readFile(filePath, "utf-8");
       const entry = JSON.parse(content);
       if (!entry?.taskResult?.taskId || !entry?.cachedAt) {
         return null;
@@ -46248,16 +46518,16 @@ var ResponseCache = class _ResponseCache {
       return;
     }
     try {
-      await fs15.mkdir(this.config.dir, { recursive: true });
+      await fs16.mkdir(this.config.dir, { recursive: true });
       const entry = {
         taskResult: result,
         cachedAt: (/* @__PURE__ */ new Date()).toISOString(),
         cacheKeyInputs: keyInputs
       };
-      const filePath = path13.join(this.config.dir, `${key}.json`);
+      const filePath = path14.join(this.config.dir, `${key}.json`);
       const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-      await fs15.writeFile(tmpPath, JSON.stringify(entry, null, 2));
-      await fs15.rename(tmpPath, filePath);
+      await fs16.writeFile(tmpPath, JSON.stringify(entry, null, 2));
+      await fs16.rename(tmpPath, filePath);
     } catch (err) {
       console.warn(`Cache write failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -46267,9 +46537,9 @@ var ResponseCache = class _ResponseCache {
    */
   async clear() {
     try {
-      const entries = await fs15.readdir(this.config.dir);
+      const entries = await fs16.readdir(this.config.dir);
       const cacheFiles = entries.filter((e) => /^[a-f0-9]{64}\.json$/.test(e));
-      await Promise.all(cacheFiles.map((f) => fs15.unlink(path13.join(this.config.dir, f))));
+      await Promise.all(cacheFiles.map((f) => fs16.unlink(path14.join(this.config.dir, f))));
       return { deletedCount: cacheFiles.length };
     } catch (err) {
       if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
@@ -46321,11 +46591,11 @@ var ResponseCache = class _ResponseCache {
       const files = await collectFiles(skillsDir);
       if (files.length === 0)
         return "no-skills";
-      const relativePaths = files.map((f) => path13.relative(skillsDir, f).split(path13.sep).join("/"));
+      const relativePaths = files.map((f) => path14.relative(skillsDir, f).split(path14.sep).join("/"));
       relativePaths.sort();
       const hash = crypto.createHash("sha256");
       for (const relPath of relativePaths) {
-        const content = await fs15.readFile(path13.join(skillsDir, relPath));
+        const content = await fs16.readFile(path14.join(skillsDir, relPath));
         hash.update(relPath);
         hash.update("\0");
         hash.update(content);
@@ -46341,9 +46611,9 @@ var ResponseCache = class _ResponseCache {
 };
 async function collectFiles(dir) {
   const results = [];
-  const entries = await fs15.readdir(dir, { withFileTypes: true });
+  const entries = await fs16.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
-    const fullPath = path13.join(dir, entry.name);
+    const fullPath = path14.join(dir, entry.name);
     if (entry.isDirectory()) {
       results.push(...await collectFiles(fullPath));
     } else {
@@ -46368,7 +46638,7 @@ async function loadHumanFeedback(feedbackPath, tasks) {
   return feedback;
 }
 function smartLabel(skillPath) {
-  const parts = path14.normalize(skillPath).split(path14.sep).filter(Boolean);
+  const parts = path15.normalize(skillPath).split(path15.sep).filter(Boolean);
   return parts.length >= 2 ? parts.slice(-2).join("/") : parts[parts.length - 1] || skillPath;
 }
 function phaseSkillsDirFor(lt2, phaseSkills) {
@@ -46389,14 +46659,14 @@ async function runPhase(phaseLabel, suiteTasks, config, numRuns, scorerOptions, 
   for (let run2 = 0; run2 < numRuns; run2++) {
     if (numRuns > 1) {
       console.log(`
---- ${phaseLabel}: Run ${run2 + 1}/${numRuns} (${config.runnerType}) ---
+--- ${phaseLabel}: Trial ${run2 + 1}/${numRuns} (${config.runnerType}) ---
 `);
     } else {
       console.log(`
 --- ${phaseLabel}: Running Tasks (${config.runnerType}) ---
 `);
     }
-    const runLogDir = numRuns > 1 ? path14.join(logBaseDir, `run-${run2 + 1}`) : logBaseDir;
+    const runLogDir = numRuns > 1 ? path15.join(logBaseDir, `run-${run2 + 1}`) : logBaseDir;
     let cacheHits = 0;
     const cacheConcurrent = config.concurrency ?? 1;
     const effectiveTasks = suiteTasks.map((lt2) => lt2.task);
@@ -46484,7 +46754,7 @@ ${cacheHits} of ${suiteTasks.length} task(s) served from cache`);
     allResults.push(results2);
     if (numRuns > 1) {
       console.log(`
---- ${phaseLabel}: Scoring Run ${run2 + 1}/${numRuns} ---
+--- ${phaseLabel}: Scoring Trial ${run2 + 1}/${numRuns} ---
 `);
     } else {
       console.log(`
@@ -46497,7 +46767,7 @@ ${cacheHits} of ${suiteTasks.length} task(s) served from cache`);
       const workspace = workspaces[t];
       if (!workspace)
         continue;
-      const trialFailed = results2[t].isError || (scores2[t].deterministic ? !scores2[t].deterministic.passed : false);
+      const trialFailed = !scores2[t].passed;
       await applyCleanupPolicy(workspace, env.keepWorkspaces, trialFailed);
     }
   }
@@ -46528,10 +46798,7 @@ function computeComparison(withPhase, basePhase, baselineLabel, evalTasks, compa
       withoutSkill: b,
       delta: {
         taskId: w.result.taskId,
-        discoveryDelta: w.score.discovery - b.score.discovery,
-        adherenceDelta: w.score.adherence - b.score.adherence,
-        outputQualityDelta: w.score.outputQuality - b.score.outputQuality,
-        weightedScoreDelta: w.score.weightedScore - b.score.weightedScore,
+        lift: resolutionRate(trialFlags(w.score)) - resolutionRate(trialFlags(b.score)),
         durationDeltaMs: w.result.durationMs - b.result.durationMs,
         costDeltaUsd: w.result.costUsd - b.result.costUsd,
         totalTokensDelta: w.result.tokens && b.result.tokens ? w.result.tokens.total - b.result.tokens.total : void 0
@@ -46542,10 +46809,8 @@ function computeComparison(withPhase, basePhase, baselineLabel, evalTasks, compa
     withSkill: withPhase.summary,
     withoutSkill: basePhase.summary,
     delta: {
-      discoveryAccuracyDelta: withPhase.summary.discoveryAccuracy - basePhase.summary.discoveryAccuracy,
-      avgAdherenceDelta: withPhase.summary.avgAdherence - basePhase.summary.avgAdherence,
-      avgOutputQualityDelta: withPhase.summary.avgOutputQuality - basePhase.summary.avgOutputQuality,
-      avgWeightedScoreDelta: withPhase.summary.avgWeightedScore - basePhase.summary.avgWeightedScore,
+      resolutionRateDelta: withPhase.summary.resolutionRate - basePhase.summary.resolutionRate,
+      passAtKDelta: withPhase.summary.passAtK - basePhase.summary.passAtK,
       totalDurationDeltaMs: withPhase.summary.totalDurationMs - basePhase.summary.totalDurationMs,
       totalCostDeltaUsd: withPhase.summary.totalCostUsd - basePhase.summary.totalCostUsd,
       totalTokensDelta: withPhase.summary.totalTokens !== void 0 && basePhase.summary.totalTokens !== void 0 ? withPhase.summary.totalTokens - basePhase.summary.totalTokens : void 0
@@ -46560,13 +46825,15 @@ function computeComparison(withPhase, basePhase, baselineLabel, evalTasks, compa
 }
 async function runPipeline(options) {
   const config = await loadConfig(options.configPath, options.configOverrides);
-  const compareMode = options.compare || !!options.compareSkillPath;
   const keepWorkspaces = options.keepWorkspaces ?? "failures";
-  if (options.blindCompare && !compareMode) {
-    throw new Error("--blind-compare requires --compare mode");
-  }
-  if (options.compareLabel && !compareMode) {
-    console.warn("Warning: --compare-label has no effect without --compare or --compare-skill");
+  const judgeEnabled = options.judge ?? config.judgeEnabled;
+  if (options.blindCompare) {
+    if (!options.compareSkillPath) {
+      throw new Error("--blind-compare requires --compare-skill: blind comparison evaluates two skill VERSIONS against each other (per the agentskills authoring methodology), not with/without-skill.");
+    }
+    if (!judgeEnabled) {
+      throw new Error("--blind-compare requires --judge (the blind comparison is an LLM-judge diagnostic).");
+    }
   }
   console.log(`Loading task packages from: ${options.tasksPath}`);
   const suite = await loadTaskPackages(options.tasksPath, {
@@ -46582,11 +46849,24 @@ async function runPipeline(options) {
   if (suiteTasks.length === 0) {
     throw new Error("No tasks to run");
   }
+  const anySkills = suiteTasks.some((lt2) => lt2.skillsDir);
+  const baselineMode = options.compareSkillPath ? true : options.baseline ?? anySkills;
+  if (baselineMode && !anySkills && !options.compareSkillPath) {
+    throw new Error("--baseline requires skills but none were found. Add skills under environment/skills/ (or a suite-level skills/ dir), or use --compare-skill to specify a baseline skill path.");
+  }
+  if (options.compareLabel && !baselineMode) {
+    console.warn("Warning: --compare-label has no effect without a baseline condition");
+  }
   const evaluation = {
     skillName: suite.skillName,
     tasks: suiteTasks.map((lt2) => lt2.task)
   };
-  const humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
+  let humanFeedback;
+  if (options.feedbackPath && !judgeEnabled) {
+    console.log("Note: --feedback requires --judge (feedback enriches the judge prompt) \u2014 ignoring feedback file.");
+  } else {
+    humanFeedback = await loadHumanFeedback(options.feedbackPath, evaluation.tasks);
+  }
   let feedbackTemplatePath;
   if (options.generateFeedbackPath) {
     await writeFeedbackTemplate(evaluation.tasks, options.generateFeedbackPath);
@@ -46594,16 +46874,16 @@ async function runPipeline(options) {
     console.log(`Feedback template written to: ${feedbackTemplatePath}`);
   }
   console.log(`Running ${evaluation.tasks.length} task(s) for skill: ${evaluation.skillName}`);
-  let previousReport;
+  let previousSummary;
   if (options.compareResultsPath) {
     console.log(`Validating comparison file: ${options.compareResultsPath}`);
-    previousReport = await loadPreviousReport(options.compareResultsPath);
+    previousSummary = await loadPreviousRunSummary(options.compareResultsPath);
     console.log("Comparison file validated successfully");
   }
   if (options.compareSkillPath) {
     let stat3;
     try {
-      stat3 = await fs16.stat(options.compareSkillPath);
+      stat3 = await fs17.stat(options.compareSkillPath);
     } catch (err) {
       if (err.code === "ENOENT") {
         throw new Error(`--compare-skill path not found: ${options.compareSkillPath}`);
@@ -46614,16 +46894,11 @@ async function runPipeline(options) {
       throw new Error(`--compare-skill path is not a directory: ${options.compareSkillPath}`);
     }
   }
-  const anySkills = suiteTasks.some((lt2) => lt2.skillsDir);
-  if (compareMode && !anySkills) {
-    throw new Error("--compare requires skills but none were found. Add skills under environment/skills/ (or a suite-level skills/ dir), or use --compare-skill to specify a baseline skill path.");
-  }
   const numRuns = options.numRuns ?? 3;
   const nudgeLevel = options.nudge ?? config.nudge;
-  const logDir = path14.join(config.outputDir, "logs");
+  const logDir = path15.join(config.outputDir, "logs");
   const scorerOptions = {
-    noDeterministic: options.noDeterministic,
-    noJudge: options.noJudge,
+    judgeEnabled,
     judgeOptions: { model: config.defaultJudgeModel },
     humanFeedback,
     cwd: options.cwd
@@ -46631,28 +46906,29 @@ async function runPipeline(options) {
   const cacheEnabled = config.cache.enabled && !options.bustCache;
   const cacheOpts = cacheEnabled ? { cache: new ResponseCache(config.cache), skipCache: options.skipCache } : void 0;
   let primaryPhase;
+  let basePhase;
+  let baselineLabel;
   let comparison;
   let blindComparison;
   let crossIterationComparison;
-  if (compareMode) {
+  if (baselineMode) {
     const rawLabel = options.compareLabel?.trim();
-    const baselineLabel = rawLabel && rawLabel.length > 0 ? rawLabel : options.compareSkillPath ? smartLabel(options.compareSkillPath) : "No Skill";
+    baselineLabel = rawLabel && rawLabel.length > 0 ? rawLabel : options.compareSkillPath ? smartLabel(options.compareSkillPath) : "No Skill";
     console.log(`
-Comparison mode: running each task with skill AND "${baselineLabel}"`);
-    console.log(`Total runs per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)
+Paired baseline: running each task with skill AND "${baselineLabel}"`);
+    console.log(`Total trials per task: ${numRuns * 2} (${numRuns} with skill + ${numRuns} baseline)
 `);
     console.log("=== Phase 1/2: With Skill ===");
-    const withPhase = await runPhase("With Skill", suiteTasks, config, numRuns, scorerOptions, path14.join(logDir, "with-skill"), { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: "task", nudgeLevel }, cacheOpts);
+    const withPhase = await runPhase("With Skill", suiteTasks, config, numRuns, scorerOptions, path15.join(logDir, "with-skill"), { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: "task", nudgeLevel }, cacheOpts);
     console.log(`
 === Phase 2/2: ${baselineLabel} ===`);
     const isNoSkillBaseline = !options.compareSkillPath;
     const baselineScorerOptions = {
       ...scorerOptions,
-      noDeterministic: isNoSkillBaseline ? true : scorerOptions.noDeterministic,
       isBaseline: isNoSkillBaseline
     };
-    const basePhase = await runPhase(baselineLabel, suiteTasks, config, numRuns, baselineScorerOptions, path14.join(logDir, "baseline"), {
-      workspaceBaseDir: path14.join(config.outputDir, "baseline"),
+    basePhase = await runPhase(baselineLabel, suiteTasks, config, numRuns, baselineScorerOptions, path15.join(logDir, "baseline"), {
+      workspaceBaseDir: path15.join(config.outputDir, "baseline"),
       keepWorkspaces,
       phaseSkills: options.compareSkillPath ? { dir: options.compareSkillPath } : "none",
       // Baseline always gets the bare prompt — no nudge.
@@ -46669,14 +46945,32 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
   } else {
     primaryPhase = await runPhase("Evaluation", suiteTasks, config, numRuns, scorerOptions, logDir, { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: "task", nudgeLevel }, cacheOpts);
   }
-  if (previousReport) {
+  const withTrialData = {
+    allResults: primaryPhase.allResults,
+    allScores: primaryPhase.allScores
+  };
+  const baseTrialData = basePhase ? { allResults: basePhase.allResults, allScores: basePhase.allScores } : void 0;
+  const runSummary = buildRunSummary({
+    tasks: evaluation.tasks,
+    skillName: evaluation.skillName,
+    withSkill: withTrialData,
+    baseline: baseTrialData,
+    baselineLabel,
+    config,
+    nudge: nudgeLevel,
+    trials: numRuns,
+    judgeEnabled
+  });
+  const summaryJsonPath = await writeRunSummary(runSummary, config.outputDir);
+  console.log(`
+Run summary saved to: ${summaryJsonPath}`);
+  if (previousSummary) {
     console.log("\n--- Comparing with Previous Results ---\n");
-    if (previousReport.skillName !== evaluation.skillName) {
-      console.warn(`Warning: Skill name mismatch \u2014 current: "${evaluation.skillName}", previous: "${previousReport.skillName}"`);
+    if (previousSummary.run.skillName !== evaluation.skillName) {
+      console.warn(`Warning: Skill name mismatch \u2014 current: "${evaluation.skillName}", previous: "${previousSummary.run.skillName}"`);
     }
-    const currentSummary = computeSummary(primaryPhase.results, primaryPhase.scores, numRuns);
-    crossIterationComparison = compareResults(primaryPhase.scores, currentSummary, previousReport);
-    if (crossIterationComparison.taskDeltas.length === 0 && primaryPhase.scores.length > 0) {
+    crossIterationComparison = compareRunSummaries(runSummary, previousSummary);
+    if (crossIterationComparison.taskDeltas.length === 0 && runSummary.tasks.length > 0) {
       console.warn("Warning: No tasks matched between current and previous results. Comparison may not be meaningful.");
     }
     if (crossIterationComparison.tasksOnlyInCurrent.length > 0) {
@@ -46688,10 +46982,10 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
   }
   console.log("\n--- Generating Reports ---\n");
   const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-  const suffix = comparison ? "comparison" : "";
+  const suffix = comparison ? "paired" : "";
   const reportBaseName = [evaluation.skillName, suffix, timestamp].filter(Boolean).join("-");
-  const reportPath = path14.join(config.outputDir, `${reportBaseName}.md`);
-  const jsonPath = path14.join(config.outputDir, `${reportBaseName}.json`);
+  const reportPath = path15.join(config.outputDir, `${reportBaseName}.md`);
+  const jsonPath = path15.join(config.outputDir, `${reportBaseName}.json`);
   const metadata = {
     skillPath: options.tasksPath,
     runnerType: config.runnerType,
@@ -46705,6 +46999,7 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
     metadata,
     numRuns,
     runDetails: primaryPhase.runDetails,
+    humanFeedback,
     comparison,
     blindComparison,
     crossIterationComparison,
@@ -46712,7 +47007,7 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
   };
   await generateReport({ ...reportOptions, outputPath: reportPath });
   const report = await generateJsonResults({ ...reportOptions, outputPath: jsonPath });
-  const htmlPath = await maybeGenerateHtmlReport(config, reportBaseName, reportOptions);
+  await maybeGenerateHtmlReport(config, reportBaseName, reportOptions);
   if (config.githubSummary) {
     const wrote = await writeGitHubSummary(report, config);
     if (wrote) {
@@ -46720,7 +47015,7 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
     }
   }
   const markdownSummary = generateGitHubSummary(report, config);
-  printSummary(report);
+  printSummary(report, runSummary);
   if (comparison) {
     printComparisonSummary(comparison);
   }
@@ -46737,6 +47032,8 @@ Comparison mode: running each task with skill AND "${baselineLabel}"`);
     results: primaryPhase.results,
     scores: primaryPhase.scores,
     report,
+    runSummary,
+    summaryJsonPath,
     reportPath,
     jsonPath,
     markdownSummary,
@@ -46750,7 +47047,7 @@ async function maybeGenerateHtmlReport(config, reportBaseName, reportOptions) {
   if (!config.htmlReport)
     return void 0;
   try {
-    const htmlPath = path14.join(config.outputDir, `${reportBaseName}.html`);
+    const htmlPath = path15.join(config.outputDir, `${reportBaseName}.html`);
     await generateHtmlReport({ ...reportOptions, outputPath: htmlPath });
     return htmlPath;
   } catch (err) {
@@ -46758,19 +47055,26 @@ async function maybeGenerateHtmlReport(config, reportBaseName, reportOptions) {
     return void 0;
   }
 }
-function printSummary(report) {
+function printSummary(report, runSummary) {
   const s = report.summary;
   console.log("\n" + "=".repeat(50));
   console.log(`  Skill Evaluation: ${report.skillName}`);
   console.log("=".repeat(50));
   console.log(`  Result: ${report.passed ? "PASS" : "FAIL"}`);
   if (s.numRuns > 1) {
-    console.log(`  Runs: ${s.numRuns}`);
+    console.log(`  Trials per task: ${s.numRuns}`);
   }
-  console.log(`  Discovery: ${(s.discoveryAccuracy * 100).toFixed(0)}%${s.stddev ? ` (\xB1 ${(s.stddev.discovery * 100).toFixed(1)}%)` : ""}`);
-  console.log(`  Avg Adherence: ${s.avgAdherence.toFixed(2)}/5${s.stddev ? ` (\xB1 ${s.stddev.adherence.toFixed(2)})` : ""}`);
-  console.log(`  Avg Output Quality: ${s.avgOutputQuality.toFixed(2)}/5${s.stddev ? ` (\xB1 ${s.stddev.outputQuality.toFixed(2)})` : ""}`);
-  console.log(`  Weighted Score: ${s.avgWeightedScore.toFixed(2)}${s.stddev ? ` (\xB1 ${s.stddev.weightedScore.toFixed(2)})` : ""}`);
+  console.log(`  Resolution Rate: ${(s.resolutionRate * 100).toFixed(0)}% (CI ${(s.resolutionCI.low * 100).toFixed(0)}-${(s.resolutionCI.high * 100).toFixed(0)}%)`);
+  console.log(`  Pass@${s.numRuns}: ${(s.passAtK * 100).toFixed(0)}%`);
+  if (runSummary?.metrics.skillLift !== void 0) {
+    console.log(`  Skill Lift: ${formatDelta(runSummary.metrics.skillLift * 100, 1)}%`);
+  }
+  if (s.invocationRate !== void 0) {
+    console.log(`  Skill Invocation Rate: ${(s.invocationRate * 100).toFixed(0)}%`);
+  }
+  if (s.avgAdherence !== void 0 && s.avgOutputQuality !== void 0) {
+    console.log(`  Judge diagnostics: adherence ${s.avgAdherence.toFixed(2)}/5, output ${s.avgOutputQuality.toFixed(2)}/5`);
+  }
   console.log(`  Duration: ${(s.totalDurationMs / 1e3).toFixed(1)}s | Cost: $${s.totalCostUsd.toFixed(4)}`);
   if (!report.passed && report.failureReasons.length > 0) {
     console.log(`
@@ -46786,10 +47090,8 @@ function printComparisonSummary(comparison) {
   console.log("\n" + "-".repeat(50));
   console.log(`  Skill Impact (vs ${comparison.summary.baselineLabel})`);
   console.log("-".repeat(50));
-  console.log(`  Discovery Delta: ${formatDelta(d.discoveryAccuracyDelta * 100, 0)}%`);
-  console.log(`  Adherence Delta: ${formatDelta(d.avgAdherenceDelta)}`);
-  console.log(`  Output Quality Delta: ${formatDelta(d.avgOutputQualityDelta)}`);
-  console.log(`  Weighted Score Delta: ${formatDelta(d.avgWeightedScoreDelta, 2)}`);
+  console.log(`  Skill Lift (resolution delta): ${formatDelta(d.resolutionRateDelta * 100, 1)}%`);
+  console.log(`  Pass@k Delta: ${formatDelta(d.passAtKDelta * 100, 1)}%`);
   console.log(`  Duration Delta: ${formatDelta(d.totalDurationDeltaMs / 1e3, 1)}s`);
   console.log(`  Cost Delta: $${formatDelta(d.totalCostDeltaUsd, 4)}`);
   console.log("-".repeat(50));
@@ -46825,8 +47127,9 @@ async function run() {
     const model = core.getInput("model") || "sonnet";
     const judgeModel = core.getInput("judge-model") || "haiku";
     const configPath = core.getInput("config") || void 0;
-    const thresholdDiscovery = parseFloat(core.getInput("threshold-discovery") || "0.8");
-    const thresholdScore = parseFloat(core.getInput("threshold-score") || "4.0");
+    const thresholdResolution = parseFloat(core.getInput("threshold-resolution") || "0.8");
+    const thresholdLiftRaw = core.getInput("threshold-lift");
+    const thresholdLift = thresholdLiftRaw ? parseFloat(thresholdLiftRaw) : void 0;
     const timeout = parseInt(core.getInput("timeout") || "300000", 10);
     const concurrencyRaw = core.getInput("concurrency") || "1";
     const concurrency = Number(concurrencyRaw);
@@ -46837,12 +47140,11 @@ async function run() {
     const tasksFilter = core.getInput("tasks-filter") || void 0;
     const skillsDir = core.getInput("skills-dir") || void 0;
     const cwd = core.getInput("working-directory") || process.cwd();
-    const noJudge = core.getInput("no-judge") === "true";
-    const noDeterministic = core.getInput("no-deterministic") === "true";
+    const baseline = core.getInput("baseline") === "false" ? false : void 0;
+    const judge = core.getInput("judge") === "true" ? true : void 0;
     const numRuns = parseInt(core.getInput("runs") || "3", 10);
     const generateFeedbackPath = core.getInput("generate-feedback") || void 0;
     const feedbackPath = core.getInput("feedback") || void 0;
-    const compare = core.getInput("compare") === "true";
     const compareSkillPath = core.getInput("compare-skill") || void 0;
     const compareLabel = core.getInput("compare-label") || void 0;
     const compareResultsPath = core.getInput("compare-results") || void 0;
@@ -46856,8 +47158,8 @@ async function run() {
       runnerType: runner,
       defaultAgentModel: model,
       defaultJudgeModel: judgeModel,
-      discoveryThreshold: thresholdDiscovery,
-      scoreThreshold: thresholdScore,
+      resolutionThreshold: thresholdResolution,
+      liftThreshold: thresholdLift,
       taskTimeoutMs: timeout,
       concurrency,
       githubSummary: true
@@ -46869,29 +47171,31 @@ async function run() {
       cwd,
       skillsDir,
       taskFilter: tasksFilter,
-      noJudge,
-      noDeterministic,
+      judge,
+      baseline,
       numRuns,
       generateFeedbackPath,
       feedbackPath,
-      compare: compare || !!compareSkillPath,
       compareSkillPath,
       compareLabel,
       compareResultsPath,
       blindCompare
     });
+    const metrics = result.runSummary.metrics;
     core.setOutput("passed", String(result.passed));
-    core.setOutput("discovery-rate", String(result.report.summary.discoveryAccuracy));
-    core.setOutput("avg-score", String(result.report.summary.avgWeightedScore));
+    core.setOutput("resolution-rate", String(metrics.resolutionRate));
+    core.setOutput("pass-at-k", String(metrics.passAtK));
+    if (metrics.skillLift !== void 0) {
+      core.setOutput("skill-lift", String(metrics.skillLift));
+    }
+    if (metrics.skillInvocationRate !== void 0) {
+      core.setOutput("invocation-rate", String(metrics.skillInvocationRate));
+    }
     core.setOutput("report-path", result.reportPath || "");
     core.setOutput("json-path", result.jsonPath || "");
+    core.setOutput("summary-json-path", result.summaryJsonPath || "");
     core.setOutput("feedback-template-path", result.feedbackTemplatePath || "");
     core.setOutput("has-regressions", "false");
-    if (result.comparison) {
-      core.setOutput("adherence-delta", String(result.comparison.summary.delta.avgAdherenceDelta));
-      core.setOutput("output-delta", String(result.comparison.summary.delta.avgOutputQualityDelta));
-      core.setOutput("score-delta", String(result.comparison.summary.delta.avgWeightedScoreDelta));
-    }
     if (result.blindComparison) {
       core.setOutput("blind-with-skill-preferred", String(result.blindComparison.aggregate.withSkillPreferred));
       core.setOutput("blind-without-skill-preferred", String(result.blindComparison.aggregate.withoutSkillPreferred));

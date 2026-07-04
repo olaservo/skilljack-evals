@@ -7,23 +7,23 @@ on:
         description: 'Path to a task-package or suite directory'
         required: false
         default: 'evals/example-greeting'
-      no-judge:
-        description: 'Skip LLM judge (deterministic only)'
-        required: false
-        type: boolean
-        default: true
-      runs-number:
-        description: 'Number of times to run each task'
-        required: false
-        type: number
-        default: 3
-      compare:
-        description: 'Run with and without skill to measure skill impact'
+      judge:
+        description: 'Enable LLM judge diagnostics'
         required: false
         type: boolean
         default: false
+      runs-number:
+        description: 'Number of trials per task per condition'
+        required: false
+        type: number
+        default: 3
+      baseline:
+        description: 'Run the paired no-skill baseline (default: on when skills present)'
+        required: false
+        type: boolean
+        default: true
       blind-compare:
-        description: 'Run blind A/B comparison alongside --compare'
+        description: 'Run blind A/B comparison (requires compare-skill + judge)'
         required: false
         type: boolean
         default: false
@@ -59,15 +59,15 @@ jobs:
 
       - name: Run evaluation
         run: |
-          ARGS="--verbose --runs $RUNS_NUMBER --runner $RUNNER --model $MODEL --github-summary"
-          # NO_JUDGE defaults to "no judge"; gh CLI dispatch leaves booleans
-          # empty rather than applying the YAML default, so treat anything
-          # other than explicit "false" as "skip judge".
-          if [ "$NO_JUDGE" != "false" ]; then
-            ARGS="$ARGS --no-judge"
+          ARGS="--verbose --trials $RUNS_NUMBER --runner $RUNNER --model $MODEL --github-summary"
+          # The judge is off by default; only pass --judge when explicitly enabled.
+          if [ "$JUDGE" = "true" ]; then
+            ARGS="$ARGS --judge"
           fi
-          if [ "$COMPARE" = "true" ]; then
-            ARGS="$ARGS --compare"
+          # Baseline defaults to on when skills are present; only pass
+          # --no-baseline when explicitly disabled.
+          if [ "$BASELINE" = "false" ]; then
+            ARGS="$ARGS --no-baseline"
           fi
           if [ "$BLIND_COMPARE" = "true" ]; then
             ARGS="$ARGS --blind-compare"
@@ -79,9 +79,9 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           EVAL_FILE: ${{ inputs.eval-file }}
-          NO_JUDGE: ${{ inputs.no-judge }}
+          JUDGE: ${{ inputs.judge }}
           RUNS_NUMBER: ${{ inputs.runs-number }}
-          COMPARE: ${{ inputs.compare }}
+          BASELINE: ${{ inputs.baseline }}
           BLIND_COMPARE: ${{ inputs.blind-compare }}
           GENERATE_FEEDBACK: ${{ inputs.generate-feedback }}
           RUNNER: ${{ matrix.runner }}
@@ -113,10 +113,9 @@ jobs:
           tasks: evals/example-greeting
           runner: claude-sdk
           model: sonnet
-          no-judge: 'true'
+          judge: 'false'
           runs: '1'
-          threshold-discovery: '0'
-          threshold-score: '0'
+          threshold-resolution: '0'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 

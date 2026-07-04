@@ -54,15 +54,26 @@ describe('aggregateScores', () => {
     expect(result[0].stddev).toBeUndefined();
   });
 
-  it('averages scores across runs', () => {
-    const run1 = [makeScore({ adherence: 3, outputQuality: 3, weightedScore: 0.6 })];
-    const run2 = [makeScore({ adherence: 5, outputQuality: 5, weightedScore: 1.0 })];
+  it('averages scores across runs and keeps per-trial outcomes', () => {
+    const run1 = [makeScore({ adherence: 3, outputQuality: 3, passed: false, reward: 0 })];
+    const run2 = [makeScore({ adherence: 5, outputQuality: 5, passed: true, reward: 1 })];
     const result = aggregateScores([run1, run2]);
 
     expect(result).toHaveLength(1);
     expect(result[0].adherence).toBe(4);
     expect(result[0].outputQuality).toBe(4);
-    expect(result[0].weightedScore).toBe(0.8);
+    expect(result[0].reward).toBe(0.5);
+    expect(result[0].passed).toBe(false); // strict: passed only when every trial passed
+    expect(result[0].trials).toEqual({ passed: [false, true], rewards: [0, 1] });
+  });
+
+  it('marks the aggregate as passed when every trial passed', () => {
+    const run1 = [makeScore({ passed: true, reward: 1 })];
+    const run2 = [makeScore({ passed: true, reward: 1 })];
+    const result = aggregateScores([run1, run2]);
+
+    expect(result[0].passed).toBe(true);
+    expect(result[0].reward).toBe(1);
   });
 
   it('populates stddev for multi-run aggregation', () => {
@@ -76,16 +87,16 @@ describe('aggregateScores', () => {
   });
 
   it('produces zero stddev when all runs are identical', () => {
-    const run1 = [makeScore()];
-    const run2 = [makeScore()];
-    const run3 = [makeScore()];
+    const run1 = [makeScore({ adherence: 4, outputQuality: 4 })];
+    const run2 = [makeScore({ adherence: 4, outputQuality: 4 })];
+    const run3 = [makeScore({ adherence: 4, outputQuality: 4 })];
     const result = aggregateScores([run1, run2, run3]);
 
     expect(result[0].stddev).toBeDefined();
     expect(result[0].stddev!.discovery).toBeCloseTo(0, 10);
     expect(result[0].stddev!.adherence).toBeCloseTo(0, 10);
     expect(result[0].stddev!.outputQuality).toBeCloseTo(0, 10);
-    expect(result[0].stddev!.weightedScore).toBeCloseTo(0, 10);
+    expect(result[0].stddev!.reward).toBeCloseTo(0, 10);
   });
 });
 
@@ -100,20 +111,28 @@ describe('isFlaky', () => {
     expect(isFlaky(undefined)).toBe(false);
   });
 
-  it('returns false when both adherence and outputQuality are below threshold', () => {
-    expect(isFlaky({ discovery: 0, adherence: 0.5, outputQuality: 0.8, weightedScore: 0.1 })).toBe(false);
+  it('returns false when trials agree and judge dims are below threshold', () => {
+    expect(isFlaky({ reward: 0, discovery: 0, adherence: 0.5, outputQuality: 0.8 })).toBe(false);
+  });
+
+  it('returns true when trials disagree on pass/fail (reward variance)', () => {
+    expect(isFlaky({ reward: 0.5, discovery: 0 })).toBe(true);
   });
 
   it('returns true when adherence exceeds threshold', () => {
-    expect(isFlaky({ discovery: 0, adherence: 1.5, outputQuality: 0.5, weightedScore: 0.1 })).toBe(true);
+    expect(isFlaky({ reward: 0, discovery: 0, adherence: 1.5, outputQuality: 0.5 })).toBe(true);
   });
 
   it('returns true when outputQuality exceeds threshold', () => {
-    expect(isFlaky({ discovery: 0, adherence: 0.5, outputQuality: 1.5, weightedScore: 0.1 })).toBe(true);
+    expect(isFlaky({ reward: 0, discovery: 0, adherence: 0.5, outputQuality: 1.5 })).toBe(true);
   });
 
-  it('returns false when values equal the threshold (not exceeded)', () => {
-    expect(isFlaky({ discovery: 0, adherence: 1.0, outputQuality: 1.0, weightedScore: 0.1 })).toBe(false);
+  it('returns false when judge values equal the threshold (not exceeded)', () => {
+    expect(isFlaky({ reward: 0, discovery: 0, adherence: 1.0, outputQuality: 1.0 })).toBe(false);
+  });
+
+  it('returns false when judge dims are absent and reward is stable', () => {
+    expect(isFlaky({ reward: 0, discovery: 0.5 })).toBe(false);
   });
 });
 
@@ -130,20 +149,20 @@ describe('computeSummary', () => {
     const scores = [
       makeScore({
         taskId: 'task-1',
-        stddev: { discovery: 0.2, adherence: 0.5, outputQuality: 0.6, weightedScore: 0.1 },
+        stddev: { reward: 0.1, discovery: 0.2, adherence: 0.5, outputQuality: 0.6 },
       }),
       makeScore({
         taskId: 'task-2',
-        stddev: { discovery: 0.4, adherence: 1.5, outputQuality: 1.0, weightedScore: 0.3 },
+        stddev: { reward: 0.3, discovery: 0.4, adherence: 1.5, outputQuality: 1.0 },
       }),
     ];
     const summary = computeSummary(results, scores, 3);
 
     expect(summary.stddev).toBeDefined();
+    expect(summary.stddev!.reward).toBeCloseTo(0.2, 10);
     expect(summary.stddev!.discovery).toBeCloseTo(0.3, 10);
     expect(summary.stddev!.adherence).toBeCloseTo(1.0, 10);
     expect(summary.stddev!.outputQuality).toBeCloseTo(0.8, 10);
-    expect(summary.stddev!.weightedScore).toBeCloseTo(0.2, 10);
   });
 
   it('handles mix of tasks with and without stddev', () => {
@@ -151,7 +170,7 @@ describe('computeSummary', () => {
     const scores = [
       makeScore({
         taskId: 'task-1',
-        stddev: { discovery: 0.2, adherence: 0.8, outputQuality: 0.6, weightedScore: 0.1 },
+        stddev: { reward: 0.1, discovery: 0.2, adherence: 0.8, outputQuality: 0.6 },
       }),
       makeScore({ taskId: 'task-2' }), // no stddev
     ];
@@ -159,10 +178,10 @@ describe('computeSummary', () => {
 
     // Only one task has stddev, so summary stddev should equal that task's stddev
     expect(summary.stddev).toBeDefined();
+    expect(summary.stddev!.reward).toBeCloseTo(0.1, 10);
     expect(summary.stddev!.discovery).toBeCloseTo(0.2, 10);
     expect(summary.stddev!.adherence).toBeCloseTo(0.8, 10);
     expect(summary.stddev!.outputQuality).toBeCloseTo(0.6, 10);
-    expect(summary.stddev!.weightedScore).toBeCloseTo(0.1, 10);
   });
 
   it('produces no stddev when numRuns >= 2 but no tasks have stddev', () => {

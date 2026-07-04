@@ -8,29 +8,26 @@ import { blindCompareAll, BLIND_BIAS_THRESHOLD, SkillJudge, mapPreferredToCondit
 import { generateReport } from '../report/report.js';
 import { makeScore, makeResult } from './fixtures/test-helpers.js';
 
-/** Helper to create a TaskComparison with a given weighted score delta */
+/** Helper to create a TaskComparison with a given per-task lift (resolution delta) */
 function makeTaskComparison(
   taskId: string,
-  withSkillWeighted: number,
-  withoutSkillWeighted: number,
+  withSkillRate: number,
+  withoutSkillRate: number,
 ): TaskComparison {
   return {
     taskId,
     originalPrompt: 'test prompt',
     withSkill: {
       result: makeResult({ taskId, output: 'with-skill output' }),
-      score: makeScore({ taskId, weightedScore: withSkillWeighted }),
+      score: makeScore({ taskId, passed: withSkillRate >= 1, reward: withSkillRate }),
     },
     withoutSkill: {
       result: makeResult({ taskId, output: 'without-skill output' }),
-      score: makeScore({ taskId, weightedScore: withoutSkillWeighted }),
+      score: makeScore({ taskId, passed: withoutSkillRate >= 1, reward: withoutSkillRate }),
     },
     delta: {
       taskId,
-      discoveryDelta: 0,
-      adherenceDelta: 0,
-      outputQualityDelta: 0,
-      weightedScoreDelta: withSkillWeighted - withoutSkillWeighted,
+      lift: withSkillRate - withoutSkillRate,
       durationDeltaMs: 0,
       costDeltaUsd: 0,
     },
@@ -357,17 +354,31 @@ describe('blindCompareAll integration', () => {
 });
 
 describe('--blind-compare validation', () => {
-  it('throws when --blind-compare is used without --compare', async () => {
+  it('throws when --blind-compare is used without --compare-skill', async () => {
     // We import runPipeline dynamically to avoid triggering side effects
     const { runPipeline } = await import('../pipeline.js');
 
     await expect(
       runPipeline({
-        tasksFile: 'nonexistent.yaml',
+        tasksPath: 'nonexistent-dir',
         blindCompare: true,
-        // compare is not set
+        judge: true,
+        // compareSkillPath is not set
       })
-    ).rejects.toThrow('--blind-compare requires --compare mode');
+    ).rejects.toThrow('--blind-compare requires --compare-skill');
+  });
+
+  it('throws when --blind-compare is used without --judge', async () => {
+    const { runPipeline } = await import('../pipeline.js');
+
+    await expect(
+      runPipeline({
+        tasksPath: 'nonexistent-dir',
+        blindCompare: true,
+        compareSkillPath: 'some-skill-dir',
+        // judge not enabled (off by default)
+      })
+    ).rejects.toThrow('--blind-compare requires --judge');
   });
 });
 
@@ -434,10 +445,9 @@ describe('generateBlindComparisonSection in markdown report', () => {
         taskId: 'task-1',
         deterministic: null,
         judge: null,
+        passed: true,
+        reward: 1,
         discovery: 1,
-        adherence: 5,
-        outputQuality: 5,
-        weightedScore: 1,
         failureCategory: 'none',
         reasoning: 'Good',
       }],
@@ -519,10 +529,9 @@ describe('generateBlindComparisonSection in markdown report', () => {
         taskId: 'task-1',
         deterministic: null,
         judge: null,
+        passed: true,
+        reward: 1,
         discovery: 1,
-        adherence: 5,
-        outputQuality: 5,
-        weightedScore: 1,
         failureCategory: 'none',
         reasoning: 'Good',
       }],

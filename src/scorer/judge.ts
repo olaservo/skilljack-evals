@@ -261,7 +261,6 @@ export function extractJsonObject(text: string): string | null {
 export function parseJudgeResponseJson(
   response: string,
   taskId: string,
-  weights: Map<string, number>
 ): JudgeScore {
   const jsonStr = extractJsonObject(response);
   if (!jsonStr) {
@@ -274,14 +273,6 @@ export function parseJudgeResponseJson(
     const discovery = Number(data.discovery) || 0;
     const adherence = Number(data.adherence) || 1;
     const outputQuality = Number(data.output_quality) || 1;
-
-    const adherenceNorm = (adherence - 1) / 4;
-    const outputNorm = (outputQuality - 1) / 4;
-
-    const weightedScore =
-      (weights.get('discovery') ?? 0.3) * discovery +
-      (weights.get('adherence') ?? 0.4) * adherenceNorm +
-      (weights.get('output') ?? 0.3) * outputNorm;
 
     // Parse checklist results
     const checklistResults: ChecklistItemResult[] = Array.isArray(data.checklist_results)
@@ -305,7 +296,6 @@ export function parseJudgeResponseJson(
       discovery,
       adherence,
       outputQuality,
-      weightedScore,
       failureCategory: isValidFailureCategory(data.failure_category) ? data.failure_category : 'agent_error',
       reasoning: data.reasoning || '',
       checklistResults,
@@ -346,7 +336,6 @@ function createErrorScore(taskId: string, reason: string): JudgeScore {
     discovery: 0,
     adherence: 1,
     outputQuality: 1,
-    weightedScore: 0,
     failureCategory: 'agent_error',
     reasoning: reason,
     checklistResults: [],
@@ -457,16 +446,10 @@ export class SkillJudge {
         discovery: 0,
         adherence: 1,
         outputQuality: 1,
-        weightedScore: 0,
         failureCategory: 'agent_error',
         reasoning: `Task failed with error: ${result.errorMessage}`,
         checklistResults: [],
       };
-    }
-
-    const weights = new Map<string, number>();
-    for (const c of task.criteria) {
-      weights.set(c.dimension, c.weight);
     }
 
     const prompt = this.buildJudgePrompt(task, result, feedback);
@@ -498,7 +481,7 @@ export class SkillJudge {
         }
       }
 
-      return parseJudgeResponseJson(responseText, task.id, weights);
+      return parseJudgeResponseJson(responseText, task.id);
     } catch (error) {
       // Fallback: heuristic scoring
       const errorMsg = error instanceof Error ? error.message : 'unknown';
@@ -508,7 +491,6 @@ export class SkillJudge {
           discovery: 0,
           adherence: 3,
           outputQuality: 3,
-          weightedScore: 0.5,
           failureCategory: 'none',
           reasoning: `Heuristic baseline scoring (judge error: ${errorMsg})`,
           checklistResults: [],
@@ -520,7 +502,6 @@ export class SkillJudge {
         discovery,
         adherence: 3,
         outputQuality: 3,
-        weightedScore: 0.5,
         failureCategory: discovery === 0 ? 'discovery_failure' : 'none',
         reasoning: `Heuristic scoring (judge error: ${errorMsg})`,
         checklistResults: [],
@@ -648,7 +629,7 @@ export function parseBlindJudgeResponse(
   }
 }
 
-/** Minimum weighted score delta to classify bias signal (on 0-1 scale). */
+/** Minimum per-task lift (resolution-rate delta) to classify bias signal (on 0-1 scale). */
 export const BLIND_BIAS_THRESHOLD = 0.05;
 
 export interface BlindCompareOptions {
@@ -724,8 +705,8 @@ export async function blindCompareAll(
 
     const preferredCondition = mapPreferredToCondition(result.preferred, withSkillIsA);
 
-    // Detect bias signal: standard scoring prefers with-skill but blind prefers without (or vice versa)
-    const standardDelta = task.delta.weightedScoreDelta;
+    // Detect bias signal: deterministic scoring prefers with-skill but blind prefers without (or vice versa)
+    const standardDelta = task.delta.lift;
     const standardPrefersWithSkill = standardDelta > threshold;
     const standardPrefersWithout = standardDelta < -threshold;
     const biasSignal =

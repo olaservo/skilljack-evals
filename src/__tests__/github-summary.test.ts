@@ -2,10 +2,24 @@ import { describe, it, expect } from 'vitest';
 import { generateGitHubSummary } from '../report/github-summary.js';
 import { DEFAULT_CONFIG } from '../config.js';
 import type { EvalConfig } from '../config.js';
+import type { JudgeScore } from '../types.js';
 import { makeReport } from './fixtures/test-helpers.js';
 
+function makeJudge(overrides: Partial<JudgeScore> = {}): JudgeScore {
+  return {
+    taskId: 'task-1',
+    discovery: 1,
+    adherence: 5,
+    outputQuality: 5,
+    failureCategory: 'none',
+    reasoning: 'Good',
+    checklistResults: [],
+    ...overrides,
+  };
+}
+
 describe('generateGitHubSummary', () => {
-  it('escapes markdown special characters in checklist evidence', () => {
+  it('escapes markdown special characters in assertion evidence (judge diagnostics)', () => {
     const report = makeReport({
       tasks: [
         {
@@ -31,11 +45,12 @@ describe('generateGitHubSummary', () => {
           score: {
             taskId: 'task-1',
             deterministic: null,
-            judge: null,
+            judge: makeJudge(),
+            passed: true,
+            reward: 1,
             discovery: 1,
             adherence: 5,
             outputQuality: 5,
-            weightedScore: 1,
             failureCategory: 'none',
             reasoning: 'Good',
             checklistResults: [
@@ -55,6 +70,15 @@ describe('generateGitHubSummary', () => {
     expect(summary).toContain('No \\`code\\` found');
     // Passing items should not show evidence
     expect(summary).not.toContain('Looks good');
+    // Rendered under a diagnostics header
+    expect(summary).toContain('### Diagnostics (LLM judge)');
+  });
+
+  it('omits the diagnostics section when the judge did not run', () => {
+    const report = makeReport();
+    const summary = generateGitHubSummary(report);
+    expect(summary).not.toContain('Diagnostics');
+    expect(summary).not.toContain('Adherence');
   });
 
   it('includes blind comparison section when present', () => {
@@ -123,106 +147,77 @@ describe('generateGitHubSummary', () => {
     expect(summary).toContain(':warning: **1 bias signal(s):**');
   });
 
-  it('handles checklist items with no evidence', () => {
-    const report = makeReport({
-      tasks: [
-        {
-          task: {
-            id: 'task-1',
-            prompt: 'Do something',
-            expectedSkillLoad: 'test-skill',
-            criteria: [],
-            goldenChecklist: ['Check something'],
-          },
-          result: {
-            taskId: 'task-1',
-            prompt: 'Do something',
-            output: 'done',
-            durationMs: 500,
-            numTurns: 1,
-            costUsd: 0.001,
-            skillLoads: ['test-skill'],
-            toolCalls: [],
-            isError: false,
-            errorMessage: '',
-          },
-          score: {
-            taskId: 'task-1',
-            deterministic: null,
-            judge: null,
-            discovery: 1,
-            adherence: 5,
-            outputQuality: 5,
-            weightedScore: 1,
-            failureCategory: 'none',
-            reasoning: 'Good',
-            checklistResults: [
-              { item: 'No evidence item', passed: false },
-            ],
-          },
-        },
-      ],
-    });
-
+  it('lists failed tasks with reasoning', () => {
+    const report = makeReport();
     const summary = generateGitHubSummary(report);
-    expect(summary).toContain('- FAIL: No evidence item');
-    // Should not have a trailing dash for missing evidence
-    expect(summary).not.toContain('— ');
+
+    // task-2 in the fixture failed
+    expect(summary).toContain('### Failures (1)');
+    expect(summary).toContain('| task-2 |');
   });
 
-  it('uses custom thresholds from config', () => {
-    const customConfig: EvalConfig = { ...DEFAULT_CONFIG, discoveryThreshold: 0.5, scoreThreshold: 3.0 };
+  it('uses custom resolution threshold from config', () => {
+    const customConfig: EvalConfig = { ...DEFAULT_CONFIG, resolutionThreshold: 0.4 };
+    const report = makeReport({ passed: true });
+
+    const summary = generateGitHubSummary(report, customConfig);
+
+    // Resolution rate 50% >= 40% threshold → PASS
+    expect(summary).toMatch(/Resolution Rate.*40%.*PASS/);
+  });
+
+  it('fails the resolution row when below threshold', () => {
+    const customConfig: EvalConfig = { ...DEFAULT_CONFIG, resolutionThreshold: 0.9 };
+    const report = makeReport({ passed: false });
+
+    const summary = generateGitHubSummary(report, customConfig);
+
+    expect(summary).toMatch(/Resolution Rate.*90%.*FAIL/);
+  });
+
+  it('shows skill lift row with threshold gating when a comparison ran', () => {
+    const customConfig: EvalConfig = { ...DEFAULT_CONFIG, liftThreshold: 0.1 };
+    const base = makeReport();
     const report = makeReport({
-      passed: true,
-      summary: {
-        totalTasks: 2,
-        numRuns: 1,
-        discoveryAccuracy: 0.6,
-        avgAdherence: 3.5,
-        avgOutputQuality: 3.5,
-        avgWeightedScore: 0.6,
-        totalDurationMs: 2000,
-        totalCostUsd: 0.02,
+      comparison: {
+        summary: {
+          withSkill: base.summary,
+          withoutSkill: { ...base.summary, resolutionRate: 0.25, passAtK: 0.25 },
+          delta: {
+            resolutionRateDelta: 0.25,
+            passAtKDelta: 0.25,
+            totalDurationDeltaMs: 0,
+            totalCostDeltaUsd: 0,
+          },
+          baselineLabel: 'No Skill',
+        },
+        tasks: [],
       },
     });
 
     const summary = generateGitHubSummary(report, customConfig);
 
-    // These would be FAIL with default thresholds (0.8 / 4.0) but PASS with custom (0.5 / 3.0)
-    expect(summary).toContain('| Discovery Rate | 60%');
-    expect(summary).toContain('PASS');
-    expect(summary).not.toMatch(/Discovery Rate.*FAIL/);
-    expect(summary).not.toMatch(/Avg Adherence.*FAIL/);
-    expect(summary).not.toMatch(/Avg Output Quality.*FAIL/);
+    expect(summary).toMatch(/Skill Lift \| \+25% \| \+10% \| PASS/);
+    expect(summary).toContain('### Skill Impact (vs No Skill)');
   });
 
-  it('displays threshold column with configured values', () => {
-    const customConfig: EvalConfig = { ...DEFAULT_CONFIG, discoveryThreshold: 0.7, scoreThreshold: 3.5 };
+  it('renders invocation rate row when available', () => {
     const report = makeReport();
+    report.summary.invocationRate = 0.75;
+    const summary = generateGitHubSummary(report);
+    expect(summary).toMatch(/Invocation Rate \| 75%/);
+  });
 
-    const summary = generateGitHubSummary(report, customConfig);
-
-    expect(summary).toContain('| Metric | Value | Threshold | Status |');
-    expect(summary).toMatch(/Discovery Rate.*70%/);
-    expect(summary).toMatch(/Avg Adherence.*3\.5/);
-    expect(summary).toMatch(/Avg Output Quality.*3\.5/);
+  it('renders pass@k row with the trial count', () => {
+    const report = makeReport();
+    report.summary.numRuns = 3;
+    const summary = generateGitHubSummary(report);
+    expect(summary).toMatch(/Pass@3 \| 50%/);
   });
 
   it('renders Tokens row with thousand-separated value when summary reports totalTokens', () => {
-    const report = makeReport({
-      summary: {
-        totalTasks: 1,
-        numRuns: 1,
-        discoveryAccuracy: 1,
-        avgAdherence: 5,
-        avgOutputQuality: 5,
-        avgWeightedScore: 1,
-        totalDurationMs: 1000,
-        totalCostUsd: 0.01,
-        totalTokens: 123456,
-      },
-    });
-
+    const report = makeReport();
+    report.summary.totalTokens = 123456;
     const summary = generateGitHubSummary(report);
     expect(summary).toMatch(/\| Tokens \| 123,456 \|/);
   });
@@ -234,26 +229,19 @@ describe('generateGitHubSummary', () => {
   });
 
   it('passes at exact threshold boundary (>=)', () => {
-    const customConfig: EvalConfig = { ...DEFAULT_CONFIG, discoveryThreshold: 0.6, scoreThreshold: 3.0 };
-    const report = makeReport({
-      passed: true,
-      summary: {
-        totalTasks: 5,
-        numRuns: 1,
-        discoveryAccuracy: 0.6,
-        avgAdherence: 3.0,
-        avgOutputQuality: 3.0,
-        avgWeightedScore: 0.5,
-        totalDurationMs: 1000,
-        totalCostUsd: 0.01,
-      },
-    });
+    const customConfig: EvalConfig = { ...DEFAULT_CONFIG, resolutionThreshold: 0.5 };
+    const report = makeReport({ passed: true });
 
     const summary = generateGitHubSummary(report, customConfig);
 
     // Exactly at threshold should be PASS
-    expect(summary).not.toMatch(/Discovery Rate.*FAIL/);
-    expect(summary).not.toMatch(/Avg Adherence.*FAIL/);
-    expect(summary).not.toMatch(/Avg Output Quality.*FAIL/);
+    expect(summary).not.toMatch(/Resolution Rate.*FAIL/);
+  });
+
+  it('shows per-task passed ratios in the collapsible table', () => {
+    const report = makeReport();
+    const summary = generateGitHubSummary(report);
+    expect(summary).toContain('| task-1 | 1/1 | 1.00 | 100% | PASS |');
+    expect(summary).toContain('| task-2 | 0/1 | 0.00 | 100% | FAIL |');
   });
 });

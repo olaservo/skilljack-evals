@@ -16,6 +16,13 @@ import type {
 
 export interface DeterministicOptions {
   cwd?: string;
+  /**
+   * Baseline (no-skill) mode: skill activation is not evaluated — no skills
+   * are mounted, so nothing can activate. Output assertions and the verifier
+   * run unconditionally, giving baseline trials a real reward for the paired
+   * comparison.
+   */
+  ignoreActivation?: boolean;
 }
 
 /**
@@ -48,6 +55,7 @@ export function scoreDeterministic(
   const check = task.deterministic;
   if (!check) return null;
 
+  const ignoreActivation = options?.ignoreActivation ?? false;
   const details: string[] = [];
 
   // 1. Check skill activation
@@ -77,7 +85,9 @@ export function scoreDeterministic(
   }
 
   // Verify activation matches expectations
-  if (check.expectSkillActivation) {
+  if (ignoreActivation) {
+    details.push('Baseline: skill activation not evaluated');
+  } else if (check.expectSkillActivation) {
     if (skillActivated) {
       // Check if the correct skill was activated
       if (task.expectedSkillLoad && task.expectedSkillLoad !== 'none') {
@@ -153,7 +163,8 @@ export function scoreDeterministic(
 
   // Only run output assertions when skill activation succeeded (or was not expected).
   // If skill activation was expected but failed, output checks would be misleading.
-  if (check.expectSkillActivation !== false && (skillActivated || !check.expectSkillActivation)) {
+  // In baseline mode output assertions always run — they ARE the reward signal.
+  if (ignoreActivation || (check.expectSkillActivation !== false && (skillActivated || !check.expectSkillActivation))) {
     // 5. Check expect_contains (case-sensitive, unlike expect_marker)
     if (Array.isArray(check.expectContains) && check.expectContains.length > 0) {
       const missing = check.expectContains.filter((s) => !result.output.includes(s));
@@ -276,7 +287,19 @@ export function scoreDeterministic(
 
   // Compute overall pass/fail
   let passed: boolean;
-  if (check.expectSkillActivation) {
+  if (ignoreActivation) {
+    // Baseline: pass = every evaluated output assertion + verifier passed, no agent error.
+    passed = !result.isError;
+    if (markerFound !== null) passed = passed && markerFound;
+    if (expectedToolsCalled !== null) passed = passed && expectedToolsCalled;
+    if (unexpectedToolsCalled !== null) passed = passed && !unexpectedToolsCalled;
+    if (containsCheckPassed !== null) passed = passed && containsCheckPassed;
+    if (notContainsCheckPassed !== null) passed = passed && notContainsCheckPassed;
+    if (regexCheckPassed !== null) passed = passed && regexCheckPassed;
+    if (javascriptCheckPassed !== null) passed = passed && javascriptCheckPassed;
+    if (fileExistsCheckPassed !== null) passed = passed && fileExistsCheckPassed;
+    if (verifierPassed !== null) passed = passed && verifierPassed;
+  } else if (check.expectSkillActivation) {
     // For positive tests: skill must be activated and all checks must pass
     passed = skillActivated;
     if (markerFound !== null) passed = passed && markerFound;

@@ -35,7 +35,7 @@ const program = new Command();
 program
   .name('skilljack-evals')
   .description('Skill evaluation CLI — run evaluations, score results, generate reports')
-  .version('1.0.0');
+  .version('2.0.0-alpha.0');
 
 // ============================================
 // Primary command: run
@@ -54,25 +54,30 @@ program
   .option('--tasks <ids>', 'Comma-separated task IDs to run')
   .option('--skills-dir <path>', 'Skills directory override applied to all tasks')
   .option('--cwd <path>', 'Fallback working directory (trial workspaces take precedence)')
-  .option('--threshold-discovery <rate>', 'Min discovery rate (0-1)')
-  .option('--threshold-score <score>', 'Min avg score (1-5)')
-  .option('--no-judge', 'Skip LLM judge scoring (deterministic only)')
-  .option('--no-deterministic', 'Skip deterministic scoring (LLM judge only)')
+  .option('--threshold-resolution <rate>', 'Min with-skill resolution rate (0-1, default: 0.8)')
+  .option('--threshold-lift <delta>', 'Min macro skill lift (default: not gated)')
+  .option('--threshold-discovery <rate>', '(removed) use --threshold-resolution')
+  .option('--threshold-score <score>', '(removed) use --threshold-resolution / --threshold-lift')
+  .option('--judge', 'Enable LLM judge diagnostics (off by default; never affects pass/fail)')
+  .option('--no-judge', '(deprecated no-op) the judge is off by default')
+  .option('--baseline', 'Run the paired no-skill baseline (default: on when tasks have skills)')
+  .option('--no-baseline', 'Skip the paired baseline condition')
   .option('--concurrency <number>', 'Max concurrent tasks (1=sequential, 0=unlimited)')
-  .option('--runs <number>', 'Number of times to run each task (default: 3)')
+  .option('-k, --trials <number>', 'Number of trials per task per condition (default: 3)')
+  .option('--runs <number>', 'Alias of --trials')
   .option('--nudge <level>', 'Skill nudge appended to with-skill prompts: off|name|description|full (default: off)')
   .option('--keep-workspaces <policy>', 'Workspace retention: all|failures|none (default: failures)')
   .option('--generate-feedback <path>', 'Generate feedback template JSON with task IDs after run')
-  .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
+  .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment (requires --judge)')
   .option('--github-summary', 'Write GitHub Actions step summary')
   .option('--html', 'Generate HTML report (default: true)')
   .option('--no-html', 'Skip HTML report generation')
-  .option('--compare-results <path>', 'Path to previous JSON results for comparison')
+  .option('--compare-results <path>', 'Path to a previous run summary.json for cross-iteration comparison')
   .option('--verbose', 'Enable verbose output')
-  .option('--compare', 'Run with and without skill to measure skill impact')
-  .option('--compare-skill <path>', 'Path to baseline skill directory (e.g., previous version) for A/B comparison')
+  .option('--compare', '(deprecated alias of --baseline)')
+  .option('--compare-skill <path>', 'Path to baseline skill directory (e.g., previous version) for A/B comparison; implies baseline mode')
   .option('--compare-label <label>', 'Custom label for the baseline in comparison reports')
-  .option('--blind-compare', 'Run blind A/B comparison alongside --compare')
+  .option('--blind-compare', 'Run blind A/B comparison of two skill versions (requires --compare-skill and --judge)')
   .option('--skip-cache', 'Skip cached results and re-execute all tasks (cache writes still occur)')
   .option('--bust-cache', 'Disable caching entirely (skip both reads and writes)')
   .action(async (tasksPath: string, options: {
@@ -85,11 +90,14 @@ program
     tasks?: string;
     skillsDir?: string;
     cwd?: string;
+    thresholdResolution?: string;
+    thresholdLift?: string;
     thresholdDiscovery?: string;
     thresholdScore?: string;
     judge?: boolean;
-    deterministic?: boolean;
+    baseline?: boolean;
     concurrency?: string;
+    trials?: string;
     runs?: string;
     nudge?: string;
     keepWorkspaces?: string;
@@ -107,6 +115,11 @@ program
     bustCache?: boolean;
   }) => {
     try {
+      if (options.thresholdDiscovery !== undefined || options.thresholdScore !== undefined) {
+        console.error('Error: --threshold-discovery and --threshold-score were removed. Use --threshold-resolution <0-1> (min with-skill resolution rate) and optionally --threshold-lift <delta>.');
+        process.exit(1);
+      }
+
       if (options.runner && !VALID_RUNNER_TYPES.includes(options.runner as RunnerType)) {
         console.error(`Error: Invalid runner "${options.runner}". Valid options: ${VALID_RUNNER_TYPES.join(', ')}`);
         process.exit(1);
@@ -122,14 +135,22 @@ program
         process.exit(1);
       }
 
+      // Deprecated flags: keep accepting them, print a note.
+      if (options.judge === false) {
+        console.log('Note: --no-judge is deprecated — the judge is off by default. Use --judge to enable diagnostics.');
+      }
+      if (options.compare) {
+        console.log('Note: --compare is deprecated — the paired baseline is now the default when skills are present. Use --baseline / --no-baseline.');
+      }
+
       const configOverrides: Partial<EvalConfig> = {};
       if (options.runner) configOverrides.runnerType = options.runner as RunnerType;
       if (options.model) configOverrides.defaultAgentModel = options.model;
       if (options.judgeModel) configOverrides.defaultJudgeModel = options.judgeModel;
       if (options.outputDir) configOverrides.outputDir = options.outputDir;
       if (options.timeout) configOverrides.taskTimeoutMs = parseInt(options.timeout, 10);
-      if (options.thresholdDiscovery) configOverrides.discoveryThreshold = parseFloat(options.thresholdDiscovery);
-      if (options.thresholdScore) configOverrides.scoreThreshold = parseFloat(options.thresholdScore);
+      if (options.thresholdResolution) configOverrides.resolutionThreshold = parseFloat(options.thresholdResolution);
+      if (options.thresholdLift) configOverrides.liftThreshold = parseFloat(options.thresholdLift);
       if (options.githubSummary) configOverrides.githubSummary = true;
       if (options.html !== undefined) configOverrides.htmlReport = options.html;
       if (options.concurrency !== undefined) {
@@ -141,6 +162,13 @@ program
         configOverrides.concurrency = c;
       }
 
+      // --baseline / --no-baseline / deprecated --compare. Undefined = auto
+      // (on when the tasks have skills resolved). --compare-skill implies baseline.
+      let baseline: boolean | undefined = options.baseline;
+      if (baseline === undefined && options.compare) baseline = true;
+
+      const trialsRaw = options.trials ?? options.runs;
+
       const result = await runPipeline({
         tasksPath,
         configPath: options.config,
@@ -148,16 +176,15 @@ program
         cwd: options.cwd,
         skillsDir: options.skillsDir,
         taskFilter: options.tasks,
-        noJudge: options.judge === false,
-        noDeterministic: options.deterministic === false,
-        numRuns: options.runs ? parseInt(options.runs, 10) : undefined,
+        judge: options.judge === true ? true : undefined,
+        numRuns: trialsRaw ? parseInt(trialsRaw, 10) : undefined,
         nudge: options.nudge as NudgeLevel | undefined,
         keepWorkspaces: options.keepWorkspaces as WorkspaceCleanupPolicy | undefined,
         generateFeedbackPath: options.generateFeedback,
         feedbackPath: options.feedback,
         compareResultsPath: options.compareResults,
         verbose: options.verbose,
-        compare: options.compare || !!options.compareSkill,
+        baseline,
         compareSkillPath: options.compareSkill,
         compareLabel: options.compareLabel,
         blindCompare: options.blindCompare,
@@ -180,13 +207,13 @@ program
 
 program
   .command('score')
-  .description('Score existing results JSON (no runner)')
+  .description('Score existing results JSON (no runner); --judge adds diagnostics after the fact')
   .argument('<results>', 'Path to results JSON file')
+  .option('--judge', 'Enable LLM judge diagnostics (off by default)')
   .option('--judge-model <model>', 'Judge model')
   .option('--config <path>', 'Path to eval.config.yaml')
-  .option('--no-judge', 'Skip LLM judge')
   .option('--no-deterministic', 'Skip deterministic checks')
-  .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment')
+  .option('--feedback <path>', 'Path to human review feedback JSON for judge prompt enrichment (requires --judge)')
   .action(async (resultsFile: string, options: {
     judgeModel?: string;
     config?: string;
@@ -201,7 +228,7 @@ program
       const result = await scorePipeline(resultsFile, {
         configPath: options.config,
         configOverrides,
-        noJudge: options.judge === false,
+        judge: options.judge === true ? true : undefined,
         noDeterministic: options.deterministic === false,
         feedbackPath: options.feedback,
       });

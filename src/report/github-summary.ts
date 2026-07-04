@@ -6,44 +6,49 @@
 
 import * as fs from 'fs/promises';
 import { formatDelta, formatCategory, formatTokens, pct, ARROW_DIRECTION_EPSILON } from '../utils/format.js';
-import type {
-  EvaluationReport,
-  EvaluationSummary,
-  FailureBreakdown,
-  CombinedScore,
-} from '../types.js';
+import type { EvaluationReport } from '../types.js';
 import { loadConfigSync, type EvalConfig } from '../config.js';
 import { isFlaky } from '../scorer/aggregator.js';
-import { evaluatePassFail } from './report.js';
+import { evaluatePassFail, trialFlags } from './report.js';
 
 /**
  * Generate a condensed summary for GitHub Actions.
  */
 export function generateGitHubSummary(report: EvaluationReport, config?: EvalConfig): string {
   const resolvedConfig = config ?? loadConfigSync();
-  const { summary, failureBreakdown, tasks } = report;
-  const { discoveryPassed, adherencePassed, outputQualityPassed } = evaluatePassFail(summary, resolvedConfig);
+  const { summary, tasks } = report;
+  const skillLift = report.comparison?.summary.delta.resolutionRateDelta;
+  const { resolutionPassed, liftPassed } = evaluatePassFail(summary, resolvedConfig, skillLift);
   const lines: string[] = [];
 
   const icon = report.passed ? ':white_check_mark:' : ':x:';
-  const runsLabel = summary.numRuns > 1 ? ` (${summary.numRuns} runs)` : '';
+  const runsLabel = summary.numRuns > 1 ? ` (${summary.numRuns} trials)` : '';
   lines.push(`## ${icon} Skill Evaluation: ${report.skillName}${runsLabel}`);
   lines.push('');
 
   // Summary table
+  const ci = summary.resolutionCI;
   lines.push('| Metric | Value | Threshold | Status |');
   lines.push('|--------|-------|-----------|--------|');
-  lines.push(`| Discovery Rate | ${(summary.discoveryAccuracy * 100).toFixed(0)}%${summary.stddev ? ` \u00B1 ${(summary.stddev.discovery * 100).toFixed(0)}%` : ''} (${Math.round(summary.discoveryAccuracy * summary.totalTasks)}/${summary.totalTasks}) | ${(resolvedConfig.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Avg Adherence | ${summary.avgAdherence.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.adherence.toFixed(1)}` : ''} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${adherencePassed ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Avg Output Quality | ${summary.avgOutputQuality.toFixed(1)}/5${summary.stddev ? ` \u00B1 ${summary.stddev.outputQuality.toFixed(1)}` : ''} | ${resolvedConfig.scoreThreshold.toFixed(1)} | ${outputQualityPassed ? 'PASS' : 'FAIL'} |`);
-  lines.push(`| Weighted Score | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | | |`);
+  lines.push(`| Resolution Rate | ${(summary.resolutionRate * 100).toFixed(0)}% (CI ${(ci.low * 100).toFixed(0)}–${(ci.high * 100).toFixed(0)}%) | ${(resolvedConfig.resolutionThreshold * 100).toFixed(0)}% | ${resolutionPassed ? 'PASS' : 'FAIL'} |`);
+  lines.push(`| Pass@${summary.numRuns} | ${(summary.passAtK * 100).toFixed(0)}% | | |`);
+  if (skillLift !== undefined) {
+    const liftThresholdCell = resolvedConfig.liftThreshold !== undefined
+      ? `${formatDelta(resolvedConfig.liftThreshold * 100, 0)}%`
+      : '';
+    const liftStatus = liftPassed === undefined ? '' : liftPassed ? 'PASS' : 'FAIL';
+    lines.push(`| Skill Lift | ${formatDelta(skillLift * 100, 0)}% | ${liftThresholdCell} | ${liftStatus} |`);
+  }
+  if (summary.invocationRate !== undefined) {
+    lines.push(`| Invocation Rate | ${(summary.invocationRate * 100).toFixed(0)}% | | |`);
+  }
   lines.push(`| Duration | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |`);
   lines.push(`| Cost | $${summary.totalCostUsd.toFixed(4)} | | |`);
   lines.push(`| Tokens | ${formatTokens(summary.totalTokens)} | | |`);
   lines.push('');
 
   // Failures
-  const failures = tasks.filter((t) => t.score.failureCategory !== 'none');
+  const failures = tasks.filter((t) => !t.score.passed);
   if (failures.length > 0) {
     lines.push(`### Failures (${failures.length})`);
     lines.push('');
@@ -74,10 +79,11 @@ export function generateGitHubSummary(report: EvaluationReport, config?: EvalCon
     lines.push('');
     lines.push('| Metric | Delta | |');
     lines.push('|--------|-------|-|');
-    lines.push(`| Discovery | ${formatDelta(sd.discoveryAccuracy * 100)}% | ${arrow(sd.discoveryAccuracy)} |`);
-    lines.push(`| Adherence | ${formatDelta(sd.avgAdherence)} | ${arrow(sd.avgAdherence)} |`);
-    lines.push(`| Output Quality | ${formatDelta(sd.avgOutputQuality)} | ${arrow(sd.avgOutputQuality)} |`);
-    lines.push(`| Weighted Score | ${formatDelta(sd.avgWeightedScore)} | ${arrow(sd.avgWeightedScore)} |`);
+    lines.push(`| Resolution Rate | ${formatDelta(sd.resolutionRate * 100)}% | ${arrow(sd.resolutionRate)} |`);
+    lines.push(`| Pass@k | ${formatDelta(sd.passAtK * 100)}% | ${arrow(sd.passAtK)} |`);
+    if (sd.skillLift !== undefined) {
+      lines.push(`| Skill Lift | ${formatDelta(sd.skillLift * 100)}% | ${arrow(sd.skillLift)} |`);
+    }
     lines.push('');
 
     const regressions = c.taskDeltas.filter((t) => t.significantChange === 'regressed');
@@ -96,37 +102,55 @@ export function generateGitHubSummary(report: EvaluationReport, config?: EvalCon
   lines.push('<details><summary>All task results</summary>');
   lines.push('');
   if (isMultiRun) {
-    lines.push('| Task | Discovery | Adherence | Output | Weighted | Variance | Status |');
-    lines.push('|------|-----------|-----------|--------|----------|----------|--------|');
+    lines.push('| Task | Passed | Reward | Invoked | Variance | Status |');
+    lines.push('|------|--------|--------|---------|----------|--------|');
   } else {
-    lines.push('| Task | Discovery | Adherence | Output | Weighted | Status |');
-    lines.push('|------|-----------|-----------|--------|----------|--------|');
+    lines.push('| Task | Passed | Reward | Invoked | Status |');
+    lines.push('|------|--------|--------|---------|--------|');
   }
   for (const t of tasks) {
     const s = t.score;
-    const status = s.failureCategory === 'none' ? 'PASS' : 'FAIL';
+    const flags = trialFlags(s);
+    const passedCell = `${flags.filter(Boolean).length}/${flags.length}`;
+    const status = s.passed ? 'PASS' : 'FAIL';
+    const invoked = s.invocation !== undefined ? `${(s.invocation * 100).toFixed(0)}%` : 'n/a';
     const taskId = t.task.id.replace(/\|/g, '\\|');
     if (isMultiRun) {
-      // Only check adherence and outputQuality against the threshold since they
-      // use the 1-5 scale. Discovery (0/1) and weightedScore (0-1) cannot exceed 1.0.
       const varianceLabel = s.stddev
         ? (isFlaky(s.stddev) ? ':warning: High' : 'Low')
         : 'N/A';
-      lines.push(`| ${taskId} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${varianceLabel} | ${status} |`);
+      lines.push(`| ${taskId} | ${passedCell} | ${s.reward.toFixed(2)} | ${invoked} | ${varianceLabel} | ${status} |`);
     } else {
-      lines.push(`| ${taskId} | ${(s.discovery * 100).toFixed(0)}% | ${s.adherence.toFixed(1)}/5 | ${s.outputQuality.toFixed(1)}/5 | ${s.weightedScore.toFixed(2)} | ${status} |`);
+      lines.push(`| ${taskId} | ${passedCell} | ${s.reward.toFixed(2)} | ${invoked} | ${status} |`);
     }
   }
-  // Per-task checklist summaries
-  const tasksWithChecklist = tasks.filter(
-    (t) => (t.score.checklistResults ?? []).length > 0
-  );
-  if (tasksWithChecklist.length > 0) {
+  lines.push('');
+  lines.push('</details>');
+  lines.push('');
+
+  // Judge diagnostics (only when the judge ran) — never affect pass/fail.
+  const judgedTasks = tasks.filter((t) => t.score.judge);
+  if (judgedTasks.length > 0) {
+    lines.push('### Diagnostics (LLM judge)');
     lines.push('');
+    lines.push('| Task | Adherence | Output Quality |');
+    lines.push('|------|-----------|----------------|');
+    for (const t of judgedTasks) {
+      const taskId = t.task.id.replace(/\|/g, '\\|');
+      const adh = t.score.adherence !== undefined ? `${t.score.adherence.toFixed(1)}/5` : 'n/a';
+      const out = t.score.outputQuality !== undefined ? `${t.score.outputQuality.toFixed(1)}/5` : 'n/a';
+      lines.push(`| ${taskId} | ${adh} | ${out} |`);
+    }
+    lines.push('');
+
+    // Per-task assertion summaries
+    const tasksWithChecklist = judgedTasks.filter(
+      (t) => (t.score.checklistResults ?? []).length > 0
+    );
     for (const t of tasksWithChecklist) {
       const results = t.score.checklistResults ?? [];
-      const passed = results.filter((cr) => cr.passed).length;
-      lines.push(`**${t.task.id} checklist:** ${passed}/${results.length}`);
+      const passedCount = results.filter((cr) => cr.passed).length;
+      lines.push(`**${t.task.id} assertions:** ${passedCount}/${results.length}`);
       for (const cr of results) {
         const safeItem = cr.item.replace(/\|/g, '\\|');
         const line = `- ${cr.passed ? 'PASS' : 'FAIL'}: ${safeItem}`;
@@ -137,10 +161,6 @@ export function generateGitHubSummary(report: EvaluationReport, config?: EvalCon
     }
   }
 
-  lines.push('');
-  lines.push('</details>');
-  lines.push('');
-
   // Comparison section (primary data first)
   if (report.comparison) {
     const d = report.comparison.summary.delta;
@@ -150,10 +170,8 @@ export function generateGitHubSummary(report: EvaluationReport, config?: EvalCon
     lines.push('');
     lines.push('| Metric | With Skill | Baseline | Delta |');
     lines.push('|--------|-----------|----------|-------|');
-    lines.push(`| Discovery | ${(ws.discoveryAccuracy * 100).toFixed(0)}% | ${(bs.discoveryAccuracy * 100).toFixed(0)}% | **${formatDelta(d.discoveryAccuracyDelta * 100, 0)}%** |`);
-    lines.push(`| Adherence | ${ws.avgAdherence.toFixed(1)}/5 | ${bs.avgAdherence.toFixed(1)}/5 | **${formatDelta(d.avgAdherenceDelta)}** |`);
-    lines.push(`| Output Quality | ${ws.avgOutputQuality.toFixed(1)}/5 | ${bs.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
-    lines.push(`| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
+    lines.push(`| Resolution Rate | ${(ws.resolutionRate * 100).toFixed(0)}% | ${(bs.resolutionRate * 100).toFixed(0)}% | **${formatDelta(d.resolutionRateDelta * 100, 0)}%** |`);
+    lines.push(`| Pass@k | ${(ws.passAtK * 100).toFixed(0)}% | ${(bs.passAtK * 100).toFixed(0)}% | **${formatDelta(d.passAtKDelta * 100, 0)}%** |`);
     if (d.totalTokensDelta !== undefined) {
       lines.push(`| Tokens | ${formatTokens(ws.totalTokens)} | ${formatTokens(bs.totalTokens)} | **${formatDelta(d.totalTokensDelta, 0)}** |`);
     }
@@ -200,4 +218,3 @@ export async function writeGitHubSummary(report: EvaluationReport, config?: Eval
   await fs.appendFile(summaryPath, summary + '\n');
   return true;
 }
-

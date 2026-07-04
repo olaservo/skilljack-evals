@@ -119,6 +119,85 @@ describe('loadConfig htmlReport', () => {
   });
 });
 
+describe('judge + threshold config', () => {
+  const tmpDirs: string[] = [];
+  const savedEnv: Record<string, string | undefined> = {};
+  const ENV_KEYS = ['EVAL_JUDGE', 'EVAL_RESOLUTION_THRESHOLD', 'EVAL_LIFT_THRESHOLD'];
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterEach(async () => {
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] !== undefined) process.env[key] = savedEnv[key];
+      else delete process.env[key];
+    }
+    for (const dir of tmpDirs) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    tmpDirs.length = 0;
+  });
+
+  async function writeConfig(content: string): Promise<string> {
+    const tmpDir = path.join(os.tmpdir(), `eval-test-judge-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    await fs.mkdir(tmpDir, { recursive: true });
+    tmpDirs.push(tmpDir);
+    const configPath = path.join(tmpDir, 'eval.config.yaml');
+    await fs.writeFile(configPath, content);
+    return configPath;
+  }
+
+  it('judge is disabled by default', async () => {
+    expect(DEFAULT_CONFIG.judgeEnabled).toBe(false);
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.judgeEnabled).toBe(false);
+  });
+
+  it('resolution threshold defaults to 0.8 and lift threshold is unset', async () => {
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.resolutionThreshold).toBe(0.8);
+    expect(config.liftThreshold).toBeUndefined();
+  });
+
+  it('EVAL_JUDGE=true enables the judge', async () => {
+    process.env.EVAL_JUDGE = 'true';
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.judgeEnabled).toBe(true);
+  });
+
+  it('EVAL_RESOLUTION_THRESHOLD and EVAL_LIFT_THRESHOLD are honored', async () => {
+    process.env.EVAL_RESOLUTION_THRESHOLD = '0.6';
+    process.env.EVAL_LIFT_THRESHOLD = '0.15';
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.resolutionThreshold).toBe(0.6);
+    expect(config.liftThreshold).toBe(0.15);
+  });
+
+  it('reads judge.enabled + judge.model from the config file', async () => {
+    const configPath = await writeConfig('judge:\n  enabled: true\n  model: opus\n');
+    const config = await loadConfig(configPath);
+    expect(config.judgeEnabled).toBe(true);
+    expect(config.defaultJudgeModel).toBe('opus');
+  });
+
+  it('reads thresholds.resolution_rate + thresholds.min_lift from the config file', async () => {
+    const configPath = await writeConfig('thresholds:\n  resolution_rate: 0.9\n  min_lift: 0.25\n');
+    const config = await loadConfig(configPath);
+    expect(config.resolutionThreshold).toBe(0.9);
+    expect(config.liftThreshold).toBe(0.25);
+  });
+
+  it('CLI overrides win over env vars', async () => {
+    process.env.EVAL_RESOLUTION_THRESHOLD = '0.6';
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml', { resolutionThreshold: 0.95 });
+    expect(config.resolutionThreshold).toBe(0.95);
+  });
+});
+
 describe('concurrency config', () => {
   const tmpDirs: string[] = [];
   let savedEnv: string | undefined;
