@@ -1,2 +1,6 @@
 # Baseline JSON files are generated — collapse in diffs, exclude from language stats
 evals/example-greeting/baselines/*.json linguist-generated=true
+
+# Generated Action bundle — no EOL conversion so it is byte-identical across
+# platforms (keeps the CI bundle-sync check from false-failing on Windows vs Linux)
+action/dist/index.cjs -text linguist-generated=true
