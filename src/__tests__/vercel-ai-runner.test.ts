@@ -51,7 +51,7 @@ function createMockAiModule(overrides: {
   } else {
     mockGenerateText = vi.fn().mockResolvedValue(overrides.generateTextResult ?? {
       text: 'Hello!',
-      usage: { promptTokens: 100, completionTokens: 50 },
+      usage: { inputTokens: 100, outputTokens: 50 },
     });
   }
 
@@ -89,7 +89,7 @@ describe('VercelAiRunner', () => {
     mockAi = createMockAiModule();
     runner = new TestableVercelAiRunner({
       cwd: '/tmp/test',
-      model: 'openai:gpt-5.2',
+      model: 'openai:gpt-5.5',
       skillsDir: '/skills',
     });
     runner.mockModules = {
@@ -125,6 +125,23 @@ describe('VercelAiRunner', () => {
     expect(result.costUsd).toBeGreaterThan(0);
   });
 
+  it('populates tokens from generateText usage (cache fields default to 0)', async () => {
+    const result = await runner.runTask(mockTask);
+    expect(result.tokens).toEqual({
+      input: 100,
+      output: 50,
+      cacheRead: 0,
+      cacheCreation: 0,
+      total: 150,
+    });
+  });
+
+  it('leaves tokens undefined when generateText does not return usage', async () => {
+    mockAi.generateText.mockImplementation(async () => ({ text: 'Hello!' }));
+    const result = await runner.runTask(mockTask);
+    expect(result.tokens).toBeUndefined();
+  });
+
   it('does NOT detect skill via readFile when countReadAsFallback is false', async () => {
     mockAi.generateText.mockImplementation(async (opts: any) => {
       opts.onStepFinish?.({
@@ -134,7 +151,7 @@ describe('VercelAiRunner', () => {
           toolCallId: 'tc-1',
         }],
       });
-      return { text: 'Hello!', usage: { promptTokens: 100, completionTokens: 50 } };
+      return { text: 'Hello!', usage: { inputTokens: 100, outputTokens: 50 } };
     });
 
     const result = await runner.runTask(mockTask);
@@ -144,7 +161,7 @@ describe('VercelAiRunner', () => {
   it('detects skill via readFile when countReadAsFallback is true', async () => {
     runner = new TestableVercelAiRunner({
       cwd: '/tmp/test',
-      model: 'openai:gpt-5.2',
+      model: 'openai:gpt-5.5',
       skillsDir: '/skills',
       countReadAsFallback: true,
     });
@@ -162,7 +179,7 @@ describe('VercelAiRunner', () => {
           toolCallId: 'tc-1',
         }],
       });
-      return { text: 'Hello!', usage: { promptTokens: 100, completionTokens: 50 } };
+      return { text: 'Hello!', usage: { inputTokens: 100, outputTokens: 50 } };
     });
 
     const result = await runner.runTask(mockTask);
@@ -177,7 +194,7 @@ describe('VercelAiRunner', () => {
           { toolName: 'bash', args: { command: 'echo hi' }, toolCallId: 'tc-2' },
         ],
       });
-      return { text: 'Hello!', usage: { promptTokens: 100, completionTokens: 50 } };
+      return { text: 'Hello!', usage: { inputTokens: 100, outputTokens: 50 } };
     });
 
     const result = await runner.runTask(mockTask);

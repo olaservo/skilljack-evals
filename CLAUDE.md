@@ -51,9 +51,9 @@ YAML tasks → Config → Runner (Claude SDK | Vercel AI | OpenAI Agents | Copil
 ## Runners
 
 Five runners selected via `--runner` flag:
-- `claude-sdk` (default) — uses Claude Agent SDK, model aliases like `sonnet`, `haiku`
-- `vercel-ai` — uses Vercel AI SDK, model format `"provider:model"` (e.g., `anthropic:claude-sonnet-4-6`, `google:gemini-2.5-pro`, `openai:gpt-5.2`, `openrouter:deepseek/deepseek-v3.2`)
-- `openai-agents` — uses OpenAI Agents SDK, plain model names (e.g., `gpt-5.2`)
+- `claude-sdk` (default) — uses Claude Agent SDK, model aliases like `sonnet`, `haiku`, `opus`
+- `vercel-ai` — uses Vercel AI SDK, model format `"provider:model"` (e.g., `anthropic:claude-sonnet-4-6`, `google:gemini-3.1-pro`, `openai:gpt-5.5`, `openrouter:deepseek/deepseek-v4-pro`)
+- `openai-agents` — uses OpenAI Agents SDK, plain model names (e.g., `gpt-5.5`)
 - `copilot-sdk` — uses GitHub Copilot SDK, model names like `gpt-5`, `claude-sonnet-4-6`
 - `google-adk` — Python subprocess bridge to Google ADK. Spawns `python/adk_runner.py`. Model names like `gemini-2.5-flash`, `gemini-2.5-pro`. v1 leaves `toolCalls`/`skillLoads` empty — judge `discovery` rating is the activation signal.
 

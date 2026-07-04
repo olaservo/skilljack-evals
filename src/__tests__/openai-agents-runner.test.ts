@@ -123,7 +123,7 @@ describe('OpenAiAgentsRunner', () => {
 
     runner = new TestableOpenAiAgentsRunner({
       cwd: '/tmp/test',
-      model: 'gpt-5.2',
+      model: 'gpt-5.5',
       skillsDir: '/skills',
     });
 
@@ -146,7 +146,7 @@ describe('OpenAiAgentsRunner', () => {
     await runner.runTask(mockTask);
     // The first arg to run() is the agent instance
     const agent = runner.mockSdk.run.mock.calls[0][0] as MockAgent;
-    expect(agent.config.model).toBe('gpt-5.2');
+    expect(agent.config.model).toBe('gpt-5.5');
     expect(agent.config.name).toBe('SkillEvalAgent');
     expect(agent.config.instructions).toBeDefined();
   });

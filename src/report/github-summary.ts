@@ -5,7 +5,7 @@
  */
 
 import * as fs from 'fs/promises';
-import { formatDelta, formatCategory, pct, ARROW_DIRECTION_EPSILON } from '../utils/format.js';
+import { formatDelta, formatCategory, formatTokens, pct, ARROW_DIRECTION_EPSILON } from '../utils/format.js';
 import type {
   EvaluationReport,
   EvaluationSummary,
@@ -39,6 +39,7 @@ export function generateGitHubSummary(report: EvaluationReport, config?: EvalCon
   lines.push(`| Weighted Score | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | | |`);
   lines.push(`| Duration | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |`);
   lines.push(`| Cost | $${summary.totalCostUsd.toFixed(4)} | | |`);
+  lines.push(`| Tokens | ${formatTokens(summary.totalTokens)} | | |`);
   lines.push('');
 
   // Failures
@@ -153,6 +154,9 @@ export function generateGitHubSummary(report: EvaluationReport, config?: EvalCon
     lines.push(`| Adherence | ${ws.avgAdherence.toFixed(1)}/5 | ${bs.avgAdherence.toFixed(1)}/5 | **${formatDelta(d.avgAdherenceDelta)}** |`);
     lines.push(`| Output Quality | ${ws.avgOutputQuality.toFixed(1)}/5 | ${bs.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
     lines.push(`| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
+    if (d.totalTokensDelta !== undefined) {
+      lines.push(`| Tokens | ${formatTokens(ws.totalTokens)} | ${formatTokens(bs.totalTokens)} | **${formatDelta(d.totalTokensDelta, 0)}** |`);
+    }
     lines.push('');
   }
 

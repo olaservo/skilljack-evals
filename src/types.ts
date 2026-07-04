@@ -63,6 +63,14 @@ export interface ToolCallRecord {
   input?: unknown;
 }
 
+export interface TokenUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheCreation: number;
+  total: number;
+}
+
 export interface TaskResult {
   taskId: string;
   prompt: string;
@@ -74,6 +82,8 @@ export interface TaskResult {
   toolCalls: ToolCallRecord[];
   isError: boolean;
   errorMessage: string;
+  /** Undefined when the runner cannot report usage (e.g. Copilot SDK). */
+  tokens?: TokenUsage;
 }
 
 // ============================================
@@ -229,6 +239,8 @@ export interface EvaluationSummary {
   avgWeightedScore: number; // 0-1
   totalDurationMs: number;
   totalCostUsd: number;
+  /** Undefined when any task's runner couldn't report tokens. */
+  totalTokens?: number;
   stddev?: ScoreStddev; // Only populated when N >= 2
 }
 
@@ -282,6 +294,8 @@ export interface TaskComparisonDelta {
   weightedScoreDelta: number;
   durationDeltaMs: number;
   costDeltaUsd: number;
+  /** Undefined when either arm lacks tokens. */
+  totalTokensDelta?: number;
 }
 
 /** Per-task comparison data with both sides */
@@ -304,6 +318,8 @@ export interface ComparisonSummary {
     avgWeightedScoreDelta: number;
     totalDurationDeltaMs: number;
     totalCostDeltaUsd: number;
+    /** Undefined when either arm lacks tokens. */
+    totalTokensDelta?: number;
   };
   baselineLabel: string;
 }

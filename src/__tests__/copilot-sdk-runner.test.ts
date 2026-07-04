@@ -109,6 +109,11 @@ describe('CopilotSdkRunner', () => {
     expect(result.costUsd).toBe(0);
   });
 
+  it('leaves tokens undefined (Copilot SDK does not expose usage)', async () => {
+    const result = await runner.runTask(mockTask);
+    expect(result.tokens).toBeUndefined();
+  });
+
   it('sends task prompt via sendAndWait', async () => {
     await runner.runTask(mockTask);
 

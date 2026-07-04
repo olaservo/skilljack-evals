@@ -14,6 +14,7 @@ import type {
   EvalTask,
   ToolCallRecord,
   TaskResult,
+  TokenUsage,
 } from '../types.js';
 import {
   isAssistantMessage,
@@ -22,7 +23,7 @@ import {
   isToolUseBlock,
 } from '../types.js';
 import { createToolPolicy } from './security.js';
-import { BaseRunner } from './base-runner.js';
+import { BaseRunner, buildTokenUsage } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
 
 export class ClaudeSdkRunner extends BaseRunner {
@@ -41,6 +42,7 @@ export class ClaudeSdkRunner extends BaseRunner {
       let resultDurationMs = 0;
       let resultNumTurns = 0;
       let resultCostUsd = 0;
+      let resultTokens: TokenUsage | undefined;
 
       const toolPolicy = createToolPolicy(
         this.options.allowedWriteDirs ?? [],
@@ -118,6 +120,16 @@ export class ClaudeSdkRunner extends BaseRunner {
           resultNumTurns = message.num_turns ?? 0;
           resultCostUsd = message.total_cost_usd ?? 0;
 
+          const u = message.usage;
+          if (u) {
+            resultTokens = buildTokenUsage({
+              input: u.input_tokens,
+              output: u.output_tokens,
+              cacheRead: u.cache_read_input_tokens,
+              cacheCreation: u.cache_creation_input_tokens,
+            });
+          }
+
           if (message.result) {
             resultOutput = message.result;
           }
@@ -131,6 +143,7 @@ export class ClaudeSdkRunner extends BaseRunner {
         costUsd: resultCostUsd,
         skillLoads,
         toolCalls,
+        tokens: resultTokens,
       });
     } catch (error) {
       return this.handleRunError(task, error, startTime, logger);

@@ -22756,12 +22756,28 @@ var init_fixture_runner = __esm({
 });
 
 // dist/src/runner/base-runner.js
-var BaseRunner;
+function buildTokenUsage(raw) {
+  if (!raw)
+    return void 0;
+  const input = raw.input ?? 0;
+  const output = raw.output ?? 0;
+  const cacheRead = raw.cacheRead ?? 0;
+  const cacheCreation = raw.cacheCreation ?? 0;
+  return {
+    input,
+    output,
+    cacheRead,
+    cacheCreation,
+    total: input + output + cacheRead + cacheCreation
+  };
+}
+var ROUGH_COST_PER_TOKEN, BaseRunner;
 var init_base_runner = __esm({
   "dist/src/runner/base-runner.js"() {
     "use strict";
     init_config();
     init_fixture_runner();
+    ROUGH_COST_PER_TOKEN = 3e-6;
     BaseRunner = class {
       options;
       /** Read-only access to resolved runner options (for testing and introspection). */
@@ -22817,7 +22833,8 @@ var init_base_runner = __esm({
           skillLoads: [...new Set(fields.skillLoads)],
           toolCalls: fields.toolCalls,
           isError: false,
-          errorMessage: ""
+          errorMessage: "",
+          tokens: fields.tokens
         };
       }
       /**
@@ -22992,7 +23009,7 @@ async function resolveModel(modelString, importFn) {
       return openrouter(model);
     }
     default:
-      throw new Error(`Unknown provider "${provider}". Supported: openai, anthropic, google, openrouter. Use format "provider:model" (e.g. "openai:gpt-5.2").`);
+      throw new Error(`Unknown provider "${provider}". Supported: openai, anthropic, google, openrouter. Use format "provider:model" (e.g. "openai:gpt-5.5").`);
   }
 }
 function buildSkillsPrompt(skills) {
@@ -23035,7 +23052,7 @@ var init_vercel_ai_runner = __esm({
           const systemPrompt = skillsPrompt ? `You are a helpful AI assistant.
 
 ${skillsPrompt}` : "You are a helpful AI assistant.";
-          const model = await resolveModel(this.options.model ?? "openai:gpt-5.2", importFn);
+          const model = await resolveModel(this.options.model ?? "openai:gpt-5.5", importFn);
           const cwd2 = this.options.cwd ?? process.cwd();
           const allowedWriteDirs = this.options.allowedWriteDirs ?? [];
           const tools = {
@@ -23155,16 +23172,17 @@ ${skillsPrompt}` : "You are a helpful AI assistant.";
           });
           const output = result.text ?? "";
           logger?.addTextMessage(output);
-          const usage = result.usage ?? { promptTokens: 0, completionTokens: 0 };
-          const totalTokens = (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0);
-          const costUsd = totalTokens * 3e-6;
+          const rawUsage = result.usage;
+          const tokens = buildTokenUsage(rawUsage && { input: rawUsage.inputTokens, output: rawUsage.outputTokens });
+          const costUsd = ((tokens?.input ?? 0) + (tokens?.output ?? 0)) * ROUGH_COST_PER_TOKEN;
           return this.buildTaskResult(task, {
             output,
             durationMs: Date.now() - startTime,
             numTurns: stepCount,
             costUsd,
             skillLoads,
-            toolCalls
+            toolCalls,
+            tokens
           });
         } catch (error2) {
           return this.handleRunError(task, error2, startTime, logger);
@@ -23320,7 +23338,7 @@ var init_openai_agents_runner = __esm({
         try {
           const localSkills = this.options.skillsDir ? await discoverSkills(this.options.skillsDir) : [];
           const cwd2 = this.options.cwd ?? process.cwd();
-          const model = this.options.model ?? "gpt-5.2";
+          const model = this.options.model ?? "gpt-5.5";
           const agent = new Agent({
             name: "SkillEvalAgent",
             model,
@@ -23344,15 +23362,16 @@ var init_openai_agents_runner = __esm({
           }
           const skillLoads = detectSkillLoadsFromShellCommands(shellCommands, localSkills);
           const usage = result.usage;
-          const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
-          const costUsd = totalTokens * 3e-6;
+          const tokens = buildTokenUsage(usage && { input: usage.inputTokens, output: usage.outputTokens });
+          const costUsd = ((tokens?.input ?? 0) + (tokens?.output ?? 0)) * ROUGH_COST_PER_TOKEN;
           return this.buildTaskResult(task, {
             output: typeof output === "string" ? output : JSON.stringify(output),
             durationMs: Date.now() - startTime,
             numTurns,
             costUsd,
             skillLoads,
-            toolCalls
+            toolCalls,
+            tokens
           });
         } catch (error2) {
           return this.handleRunError(task, error2, startTime, logger);
@@ -23609,6 +23628,9 @@ function formatDelta(value, decimals = 2) {
 }
 function pct(count, total) {
   return total > 0 ? (count / total * 100).toFixed(0) : "0";
+}
+function formatTokens(n, fallback = "n/a") {
+  return n !== void 0 ? n.toLocaleString() : fallback;
 }
 function formatCategory(cat) {
   if (cat === "none")
@@ -45576,6 +45598,7 @@ var ClaudeSdkRunner = class extends BaseRunner {
       let resultDurationMs = 0;
       let resultNumTurns = 0;
       let resultCostUsd = 0;
+      let resultTokens;
       const toolPolicy = createToolPolicy(this.options.allowedWriteDirs ?? [], this.options.cwd ?? process.cwd());
       const q = query({
         prompt: task.prompt,
@@ -45639,6 +45662,15 @@ var ClaudeSdkRunner = class extends BaseRunner {
           resultDurationMs = message.duration_ms ?? 0;
           resultNumTurns = message.num_turns ?? 0;
           resultCostUsd = message.total_cost_usd ?? 0;
+          const u = message.usage;
+          if (u) {
+            resultTokens = buildTokenUsage({
+              input: u.input_tokens,
+              output: u.output_tokens,
+              cacheRead: u.cache_read_input_tokens,
+              cacheCreation: u.cache_creation_input_tokens
+            });
+          }
           if (message.result) {
             resultOutput = message.result;
           }
@@ -45650,7 +45682,8 @@ var ClaudeSdkRunner = class extends BaseRunner {
         numTurns: resultNumTurns,
         costUsd: resultCostUsd,
         skillLoads,
-        toolCalls
+        toolCalls,
+        tokens: resultTokens
       });
     } catch (error2) {
       return this.handleRunError(task, error2, startTime, logger);
@@ -46824,6 +46857,20 @@ function aggregateResults(allResults, allScores) {
     const scores = allScores.map((s) => s[t]);
     const repIdx = findRepresentativeIndex(scores);
     const rep = runs[repIdx];
+    let allHaveTokens = true;
+    let tInput = 0, tOutput = 0, tCacheRead = 0, tCacheCreation = 0, tTotal = 0;
+    for (const r of runs) {
+      if (!r.tokens) {
+        allHaveTokens = false;
+        break;
+      }
+      tInput += r.tokens.input;
+      tOutput += r.tokens.output;
+      tCacheRead += r.tokens.cacheRead;
+      tCacheCreation += r.tokens.cacheCreation;
+      tTotal += r.tokens.total;
+    }
+    const tokens = allHaveTokens ? { input: tInput, output: tOutput, cacheRead: tCacheRead, cacheCreation: tCacheCreation, total: tTotal } : void 0;
     aggregated.push({
       taskId: rep.taskId,
       prompt: rep.prompt,
@@ -46834,7 +46881,8 @@ function aggregateResults(allResults, allScores) {
       skillLoads: [...new Set(runs.flatMap((r) => r.skillLoads))],
       toolCalls: rep.toolCalls,
       isError: runs.some((r) => r.isError),
-      errorMessage: runs.filter((r) => r.isError).map((r) => r.errorMessage).join("; ")
+      errorMessage: runs.filter((r) => r.isError).map((r) => r.errorMessage).join("; "),
+      tokens
     });
   }
   return aggregated;
@@ -47150,6 +47198,7 @@ ${metaSection}
 | **Avg Weighted Score** | ${summary2.avgWeightedScore.toFixed(2)}${summary2.stddev ? ` \xB1 ${summary2.stddev.weightedScore.toFixed(2)}` : ""} | | |
 | **Total Duration** | ${(summary2.totalDurationMs / 1e3).toFixed(1)}s | | |
 | **Total Cost** | $${summary2.totalCostUsd.toFixed(4)} | | |
+| **Total Tokens** | ${formatTokens(summary2.totalTokens)} | | |
 
 ## Failure Analysis
 
@@ -47270,20 +47319,20 @@ ${result.output.slice(0, config2.reportOutputTruncation) || "(no output)"}
 
 </details>
 
-**Metrics:** Duration: ${(result.durationMs / 1e3).toFixed(1)}s | Turns: ${result.numTurns} | Cost: $${result.costUsd.toFixed(4)}
+**Metrics:** Duration: ${(result.durationMs / 1e3).toFixed(1)}s | Turns: ${result.numTurns} | Cost: $${result.costUsd.toFixed(4)} | Tokens: ${formatTokens(result.tokens?.total)}
 `;
     if (runDetails && runDetails[i] && runDetails[i].length > 1) {
       report += `
 <details>
 <summary>Per-run breakdown (${runDetails[i].length} runs)</summary>
 
-| Run | Discovery | Adherence | Output | Weighted | Skills Loaded |
-|-----|-----------|-----------|--------|----------|---------------|
+| Run | Discovery | Adherence | Output | Weighted | Tokens | Skills Loaded |
+|-----|-----------|-----------|--------|----------|--------|---------------|
 `;
       for (let r = 0; r < runDetails[i].length; r++) {
         const rd = runDetails[i][r];
         const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(", ") : "none";
-        report += `| ${r + 1} | ${rd.score.discovery} | ${rd.score.adherence}/5 | ${rd.score.outputQuality}/5 | ${rd.score.weightedScore.toFixed(2)} | ${skills} |
+        report += `| ${r + 1} | ${rd.score.discovery} | ${rd.score.adherence}/5 | ${rd.score.outputQuality}/5 | ${rd.score.weightedScore.toFixed(2)} | ${formatTokens(rd.result.tokens?.total)} | ${skills} |
 `;
       }
       report += `
@@ -47374,6 +47423,18 @@ function computeSummary(results, scores, numRuns = 1) {
   const avgAdherence = totalTasks > 0 ? scores.reduce((sum, s) => sum + s.adherence, 0) / totalTasks : 0;
   const avgOutputQuality = totalTasks > 0 ? scores.reduce((sum, s) => sum + s.outputQuality, 0) / totalTasks : 0;
   const avgWeightedScore = totalTasks > 0 ? scores.reduce((sum, s) => sum + s.weightedScore, 0) / totalTasks : 0;
+  let totalDurationMs = 0;
+  let totalCostUsd = 0;
+  let tokenSum = 0;
+  let hasAllTokens = results.length > 0;
+  for (const r of results) {
+    totalDurationMs += r.durationMs;
+    totalCostUsd += r.costUsd;
+    if (r.tokens)
+      tokenSum += r.tokens.total;
+    else
+      hasAllTokens = false;
+  }
   const summary2 = {
     totalTasks,
     numRuns,
@@ -47381,8 +47442,9 @@ function computeSummary(results, scores, numRuns = 1) {
     avgAdherence,
     avgOutputQuality,
     avgWeightedScore,
-    totalDurationMs: results.reduce((sum, r) => sum + r.durationMs, 0),
-    totalCostUsd: results.reduce((sum, r) => sum + r.costUsd, 0)
+    totalDurationMs,
+    totalCostUsd,
+    totalTokens: hasAllTokens ? tokenSum : void 0
   };
   if (numRuns >= 2) {
     const tasksWithStddev = scores.filter((s) => s.stddev);
@@ -47430,6 +47492,7 @@ function generateComparisonSection(comparison) {
 | Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | ${formatDelta(d.avgWeightedScoreDelta)} | ${qualityImpact(d.avgWeightedScoreDelta, WEIGHTED_SCORE_IMPACT_THRESHOLD)} |
 | Duration | ${(ws.totalDurationMs / 1e3).toFixed(1)}s | ${(bs.totalDurationMs / 1e3).toFixed(1)}s | ${formatDelta(d.totalDurationDeltaMs / 1e3, 1)}s | ${durationImpact(d.totalDurationDeltaMs)} |
 | Cost | $${ws.totalCostUsd.toFixed(4)} | $${bs.totalCostUsd.toFixed(4)} | $${formatDelta(d.totalCostDeltaUsd, 4)} | ${costImpact(d.totalCostDeltaUsd)} |
+| Tokens | ${formatTokens(ws.totalTokens)} | ${formatTokens(bs.totalTokens)} | ${d.totalTokensDelta !== void 0 ? formatDelta(d.totalTokensDelta, 0) : "n/a"} | ${d.totalTokensDelta !== void 0 ? tokenImpact(d.totalTokensDelta) : ""} |
 
 ### Per-Task Comparison
 
@@ -47468,6 +47531,14 @@ function costImpact(delta) {
   if (delta > COST_IMPACT_THRESHOLD_USD)
     return "Higher";
   if (delta < -COST_IMPACT_THRESHOLD_USD)
+    return "Lower";
+  return "Similar";
+}
+var TOKEN_IMPACT_THRESHOLD = 1e3;
+function tokenImpact(delta) {
+  if (delta > TOKEN_IMPACT_THRESHOLD)
+    return "Higher";
+  if (delta < -TOKEN_IMPACT_THRESHOLD)
     return "Lower";
   return "Similar";
 }
@@ -47548,7 +47619,8 @@ async function generateHtmlReport(options) {
     outputQuality: t.score.outputQuality,
     weightedScore: t.score.weightedScore,
     failureCategory: t.score.failureCategory,
-    isFlaky: isFlaky(t.score.stddev)
+    isFlaky: isFlaky(t.score.stddev),
+    tokens: t.result.tokens?.total ?? null
   }));
   const regressedTaskIds = new Set(crossIterationComparison?.taskDeltas.filter((d) => d.significantChange === "regressed").map((d) => d.taskId) ?? []);
   const clientDataWithRegression = clientData.map((d) => ({
@@ -47663,6 +47735,10 @@ function renderDashboard(summary2, config2) {
       <div class="stat-value">$${summary2.totalCostUsd.toFixed(4)}</div>
       <div class="stat-label">Cost</div>
     </div>
+    <div class="stat">
+      <div class="stat-value">${formatTokens(summary2.totalTokens, "&mdash;")}</div>
+      <div class="stat-label">Tokens</div>
+    </div>
   </div>
 </section>`;
 }
@@ -47709,6 +47785,7 @@ function renderTaskTable(tasks, config2, humanFeedback) {
     const flaky = isFlaky(t.score.stddev);
     const statusClass = isFailed ? "status-fail" : flaky ? "status-flaky" : "status-pass";
     const statusLabel = isFailed ? "FAIL" : flaky ? "FLAKY" : "PASS";
+    const tokensCell = formatTokens(t.result.tokens?.total);
     rows += `
     <tr class="task-row" data-task-id="${escapeHtml(t.task.id)}" data-index="${t.index}">
       <td>${t.index + 1}</td>
@@ -47717,11 +47794,12 @@ function renderTaskTable(tasks, config2, humanFeedback) {
       <td>${t.score.adherence.toFixed(1)}</td>
       <td>${t.score.outputQuality.toFixed(1)}</td>
       <td>${t.score.weightedScore.toFixed(2)}</td>
+      <td>${tokensCell}</td>
       <td>${escapeHtml(formatCategory(t.score.failureCategory))}</td>
       <td><span class="status ${statusClass}">${statusLabel}</span></td>
     </tr>
     <tr class="detail-row" data-task-id="${escapeHtml(t.task.id)}">
-      <td colspan="8">
+      <td colspan="9">
         ${renderTaskDetail(t, config2, humanFeedback)}
       </td>
     </tr>`;
@@ -47739,6 +47817,7 @@ function renderTaskTable(tasks, config2, humanFeedback) {
           <th class="sortable" data-col="adherence">Adherence</th>
           <th class="sortable" data-col="outputQuality">Output Quality</th>
           <th class="sortable" data-col="weightedScore">Weighted</th>
+          <th class="sortable" data-col="tokens">Tokens</th>
           <th class="sortable" data-col="failureCategory">Failure</th>
           <th>Status</th>
         </tr>
@@ -47812,7 +47891,7 @@ function renderTaskDetail(t, config2, humanFeedback) {
   <div class="detail-section">
     <h4>Agent Output</h4>
     <pre class="agent-output">${escapeHtml(truncatedOutput)}</pre>
-    <p class="metrics">Duration: ${(t.result.durationMs / 1e3).toFixed(1)}s | Turns: ${t.result.numTurns} | Cost: $${t.result.costUsd.toFixed(4)}</p>
+    <p class="metrics">Duration: ${(t.result.durationMs / 1e3).toFixed(1)}s | Turns: ${t.result.numTurns} | Cost: $${t.result.costUsd.toFixed(4)} | Tokens: ${formatTokens(t.result.tokens?.total)}</p>
   </div>`;
   if (t.runDetails && t.runDetails.length > 1) {
     let runRows = "";
@@ -47825,6 +47904,7 @@ function renderTaskDetail(t, config2, humanFeedback) {
         <td>${rd.score.adherence}/5</td>
         <td>${rd.score.outputQuality}/5</td>
         <td>${rd.score.weightedScore.toFixed(2)}</td>
+        <td>${formatTokens(rd.result.tokens?.total)}</td>
         <td>${escapeHtml(skills)}</td>
       </tr>`;
     }
@@ -47832,7 +47912,7 @@ function renderTaskDetail(t, config2, humanFeedback) {
   <div class="detail-section">
     <h4>Per-Run Breakdown (${t.runDetails.length} runs)</h4>
     <table class="run-table">
-      <thead><tr><th>Run</th><th>Discovery</th><th>Adherence</th><th>Output</th><th>Weighted</th><th>Skills</th></tr></thead>
+      <thead><tr><th>Run</th><th>Discovery</th><th>Adherence</th><th>Output</th><th>Weighted</th><th>Tokens</th><th>Skills</th></tr></thead>
       <tbody>${runRows}</tbody>
     </table>
   </div>`;
@@ -47849,11 +47929,15 @@ function renderComparisonSection(comparison) {
   for (const t of tasks) {
     const w = t.withSkill.score;
     const b = t.withoutSkill.score;
+    const wTokens = t.withSkill.result.tokens;
+    const bTokens = t.withoutSkill.result.tokens;
+    const tokenCell = wTokens && bTokens && t.delta.totalTokensDelta !== void 0 ? `${wTokens.total.toLocaleString()} / ${bTokens.total.toLocaleString()} / <span class="delta">${escapeHtml(formatDelta(t.delta.totalTokensDelta, 0))}</span>` : "n/a";
     taskRows += `<tr>
       <td>${escapeHtml(t.taskId)}</td>
       <td>${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.adherenceDelta, 1))}</span></td>
       <td>${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.outputQualityDelta, 1))}</span></td>
       <td>${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / <span class="delta">${escapeHtml(formatDelta(t.delta.weightedScoreDelta))}</span></td>
+      <td>${tokenCell}</td>
     </tr>`;
   }
   return `
@@ -47869,12 +47953,13 @@ function renderComparisonSection(comparison) {
       <tr><td>Weighted Score</td><td>${ws.avgWeightedScore.toFixed(2)}</td><td>${bs.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(d.avgWeightedScoreDelta))}</td></tr>
       <tr><td>Duration</td><td>${(ws.totalDurationMs / 1e3).toFixed(1)}s</td><td>${(bs.totalDurationMs / 1e3).toFixed(1)}s</td><td class="delta">${escapeHtml(formatDelta(d.totalDurationDeltaMs / 1e3, 1))}s</td></tr>
       <tr><td>Cost</td><td>$${ws.totalCostUsd.toFixed(4)}</td><td>$${bs.totalCostUsd.toFixed(4)}</td><td class="delta">$${escapeHtml(formatDelta(d.totalCostDeltaUsd, 4))}</td></tr>
+      <tr><td>Tokens</td><td>${formatTokens(ws.totalTokens)}</td><td>${formatTokens(bs.totalTokens)}</td><td class="delta">${d.totalTokensDelta !== void 0 ? escapeHtml(formatDelta(d.totalTokensDelta, 0)) : "n/a"}</td></tr>
     </tbody>
   </table>
   <h3>Per-Task Comparison</h3>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Task</th><th>Adherence (W / B / Delta)</th><th>Output (W / B / Delta)</th><th>Weighted (W / B / Delta)</th></tr></thead>
+      <thead><tr><th>Task</th><th>Adherence (W / B / Delta)</th><th>Output (W / B / Delta)</th><th>Weighted (W / B / Delta)</th><th>Tokens (W / B / Delta)</th></tr></thead>
       <tbody>${taskRows}</tbody>
     </table>
   </div>
@@ -48207,6 +48292,12 @@ function renderScript() {
       else if (sortCol === 'taskId') { valA = dA.taskId.toLowerCase(); valB = dB.taskId.toLowerCase(); }
       else if (sortCol === 'failureCategory') { valA = dA.failureCategory; valB = dB.failureCategory; }
       else { valA = dA[sortCol]; valB = dB[sortCol]; }
+      // Always push null/undefined to the end, regardless of direction.
+      const aMissing = valA === null || valA === undefined;
+      const bMissing = valB === null || valB === undefined;
+      if (aMissing && bMissing) return 0;
+      if (aMissing) return 1;
+      if (bMissing) return -1;
       if (valA < valB) return sortAsc ? -1 : 1;
       if (valA > valB) return sortAsc ? 1 : -1;
       return 0;
@@ -48320,6 +48411,7 @@ function generateGitHubSummary(report, config2) {
   lines.push(`| Weighted Score | ${summary2.avgWeightedScore.toFixed(2)}${summary2.stddev ? ` \xB1 ${summary2.stddev.weightedScore.toFixed(2)}` : ""} | | |`);
   lines.push(`| Duration | ${(summary2.totalDurationMs / 1e3).toFixed(1)}s | | |`);
   lines.push(`| Cost | $${summary2.totalCostUsd.toFixed(4)} | | |`);
+  lines.push(`| Tokens | ${formatTokens(summary2.totalTokens)} | | |`);
   lines.push("");
   const failures = tasks.filter((t) => t.score.failureCategory !== "none");
   if (failures.length > 0) {
@@ -48415,6 +48507,9 @@ function generateGitHubSummary(report, config2) {
     lines.push(`| Adherence | ${ws.avgAdherence.toFixed(1)}/5 | ${bs.avgAdherence.toFixed(1)}/5 | **${formatDelta(d.avgAdherenceDelta)}** |`);
     lines.push(`| Output Quality | ${ws.avgOutputQuality.toFixed(1)}/5 | ${bs.avgOutputQuality.toFixed(1)}/5 | **${formatDelta(d.avgOutputQualityDelta)}** |`);
     lines.push(`| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | **${formatDelta(d.avgWeightedScoreDelta)}** |`);
+    if (d.totalTokensDelta !== void 0) {
+      lines.push(`| Tokens | ${formatTokens(ws.totalTokens)} | ${formatTokens(bs.totalTokens)} | **${formatDelta(d.totalTokensDelta, 0)}** |`);
+    }
     lines.push("");
   }
   if (report.blindComparison) {
@@ -48779,7 +48874,8 @@ function computeComparison(withPhase, basePhase, baselineLabel, evalTasks, compa
         outputQualityDelta: w.score.outputQuality - b.score.outputQuality,
         weightedScoreDelta: w.score.weightedScore - b.score.weightedScore,
         durationDeltaMs: w.result.durationMs - b.result.durationMs,
-        costDeltaUsd: w.result.costUsd - b.result.costUsd
+        costDeltaUsd: w.result.costUsd - b.result.costUsd,
+        totalTokensDelta: w.result.tokens && b.result.tokens ? w.result.tokens.total - b.result.tokens.total : void 0
       }
     });
   }
@@ -48792,7 +48888,8 @@ function computeComparison(withPhase, basePhase, baselineLabel, evalTasks, compa
       avgOutputQualityDelta: withPhase.summary.avgOutputQuality - basePhase.summary.avgOutputQuality,
       avgWeightedScoreDelta: withPhase.summary.avgWeightedScore - basePhase.summary.avgWeightedScore,
       totalDurationDeltaMs: withPhase.summary.totalDurationMs - basePhase.summary.totalDurationMs,
-      totalCostDeltaUsd: withPhase.summary.totalCostUsd - basePhase.summary.totalCostUsd
+      totalCostDeltaUsd: withPhase.summary.totalCostUsd - basePhase.summary.totalCostUsd,
+      totalTokensDelta: withPhase.summary.totalTokens !== void 0 && basePhase.summary.totalTokens !== void 0 ? withPhase.summary.totalTokens - basePhase.summary.totalTokens : void 0
     },
     baselineLabel
   };

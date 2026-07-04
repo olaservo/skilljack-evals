@@ -11,7 +11,7 @@
  */
 
 import type { EvalTask, ToolCallRecord, TaskResult } from '../types.js';
-import { BaseRunner } from './base-runner.js';
+import { BaseRunner, ROUGH_COST_PER_TOKEN, buildTokenUsage } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
 import { discoverSkills, type SkillMetadata } from './skill-discovery.js';
 
@@ -209,7 +209,7 @@ export class OpenAiAgentsRunner extends BaseRunner {
         : [];
 
       const cwd = this.options.cwd ?? process.cwd();
-      const model = this.options.model ?? 'gpt-5.2';
+      const model = this.options.model ?? 'gpt-5.5';
 
       // 2. Create agent with shell tool + local skills
       const agent = new Agent({
@@ -244,11 +244,12 @@ export class OpenAiAgentsRunner extends BaseRunner {
       // 5. Detect skill loads
       const skillLoads = detectSkillLoadsFromShellCommands(shellCommands, localSkills);
 
-      // 6. Extract usage
+      // OpenAI Agents SDK does not surface cache tokens.
       const usage = (result as unknown as { usage?: { inputTokens?: number; outputTokens?: number } }).usage;
-      const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
-      // Rough cost estimate — actual pricing varies by model and provider
-      const costUsd = totalTokens * 0.000003;
+      const tokens = buildTokenUsage(
+        usage && { input: usage.inputTokens, output: usage.outputTokens },
+      );
+      const costUsd = ((tokens?.input ?? 0) + (tokens?.output ?? 0)) * ROUGH_COST_PER_TOKEN;
 
       return this.buildTaskResult(task, {
         output: typeof output === 'string' ? output : JSON.stringify(output),
@@ -257,6 +258,7 @@ export class OpenAiAgentsRunner extends BaseRunner {
         costUsd,
         skillLoads,
         toolCalls,
+        tokens,
       });
     } catch (error) {
       return this.handleRunError(task, error, startTime, logger);
