@@ -144,3 +144,6 @@ results/
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Ignore any folder named .inbox at any depth
+.inbox/
