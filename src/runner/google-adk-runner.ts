@@ -16,6 +16,7 @@ import { BaseRunner } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
 
 import { spawn } from 'child_process';
+import { existsSync } from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -27,10 +28,17 @@ interface AdkResult {
 }
 
 function resolveScriptPath(): string {
-  // dist/runner/google-adk-runner.js → repo root → python/adk_runner.py
-  // (Same relative depth in src/, so dev mode via tsx works too.)
+  // python/adk_runner.py lives at the repo root and is NOT compiled into dist.
+  // The distance from this module to the repo root differs between layouts:
+  //   dev  (tsx):  src/runner/google-adk-runner.ts      → ../../python
+  //   built (tsc): dist/src/runner/google-adk-runner.js  → ../../../python
+  // Probe the candidates and return the first that exists.
   const here = path.dirname(fileURLToPath(import.meta.url));
-  return path.resolve(here, '..', '..', 'python', 'adk_runner.py');
+  const candidates = [
+    path.resolve(here, '..', '..', 'python', 'adk_runner.py'),
+    path.resolve(here, '..', '..', '..', 'python', 'adk_runner.py'),
+  ];
+  return candidates.find((p) => existsSync(p)) ?? candidates[0];
 }
 
 function resolvePythonBin(): string {

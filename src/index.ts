@@ -60,7 +60,7 @@ export { CopilotSdkRunner } from './runner/copilot-sdk-runner.js';
 export type { AgentRunner, AgentRunnerOptions } from './runner/agent-runner.js';
 export { createRunner } from './runner/runner-factory.js';
 export { setupLocalSkills, cleanupLocalSkills } from './runner/skill-setup.js';
-export { createToolPolicy } from './runner/security.js';
+export { createToolPolicy, createPreToolUseHook } from './runner/security.js';
 
 // Scorer
 export { scoreTask, scoreAll } from './scorer/scorer.js';

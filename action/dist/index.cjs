@@ -22066,20 +22066,35 @@ function isWriteAllowed(resolvedPath, allowedWriteDirs, cwd) {
     return true;
   return isPathInDirs(resolvedPath, resolveWriteDirs(allowedWriteDirs, cwd));
 }
-function createToolPolicy(allowedWriteDirs, cwd) {
+function createPreToolUseHook(allowedWriteDirs, cwd) {
   const resolvedDirs = resolveWriteDirs(allowedWriteDirs, cwd);
-  return async (toolName, input, _options) => {
-    if (!["Write", "Edit"].includes(toolName)) {
-      return { behavior: "allow", updatedInput: input };
+  return async (input) => {
+    if (input.hook_event_name !== "PreToolUse")
+      return {};
+    if (!["Write", "Edit"].includes(input.tool_name)) {
+      return {
+        hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" }
+      };
     }
-    const filePath = input.file_path || "";
+    if (allowedWriteDirs.length === 0) {
+      return {
+        hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" }
+      };
+    }
+    const toolInput = input.tool_input ?? {};
+    const filePath = toolInput.file_path || "";
     const resolvedPath = path2.resolve(cwd, filePath);
     if (isPathInDirs(resolvedPath, resolvedDirs)) {
-      return { behavior: "allow", updatedInput: input };
+      return {
+        hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" }
+      };
     }
     return {
-      behavior: "deny",
-      message: `Write denied: ${filePath} is outside allowed directories: ${allowedWriteDirs.join(", ")}`
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: `Write denied: ${filePath} is outside allowed directories: ${allowedWriteDirs.join(", ")}`
+      }
     };
   };
 }
@@ -23222,7 +23237,11 @@ __export(google_adk_runner_exports, {
 });
 function resolveScriptPath() {
   const here = path8.dirname((0, import_url2.fileURLToPath)(import_meta2.url));
-  return path8.resolve(here, "..", "..", "python", "adk_runner.py");
+  const candidates = [
+    path8.resolve(here, "..", "..", "python", "adk_runner.py"),
+    path8.resolve(here, "..", "..", "..", "python", "adk_runner.py")
+  ];
+  return candidates.find((p) => (0, import_fs6.existsSync)(p)) ?? candidates[0];
 }
 function resolvePythonBin() {
   const override = process.env.PYTHON_BIN;
@@ -23255,12 +23274,13 @@ Last line: ${last}`);
     skillLoads: Array.isArray(obj.skillLoads) ? obj.skillLoads.filter((s) => typeof s === "string") : []
   };
 }
-var import_child_process7, path8, import_url2, import_meta2, GoogleAdkRunner;
+var import_child_process7, import_fs6, path8, import_url2, import_meta2, GoogleAdkRunner;
 var init_google_adk_runner = __esm({
   "dist/src/runner/google-adk-runner.js"() {
     "use strict";
     init_base_runner();
     import_child_process7 = require("child_process");
+    import_fs6 = require("fs");
     path8 = __toESM(require("path"), 1);
     import_url2 = require("url");
     import_meta2 = {};
@@ -43280,7 +43300,7 @@ var ClaudeSdkRunner = class extends BaseRunner {
       let resultNumTurns = 0;
       let resultCostUsd = 0;
       let resultTokens;
-      const toolPolicy = createToolPolicy(this.options.allowedWriteDirs ?? [], this.options.cwd ?? process.cwd());
+      const preToolUseHook = createPreToolUseHook(this.options.allowedWriteDirs ?? [], this.options.cwd ?? process.cwd());
       const q = kze({
         prompt: task.prompt,
         options: {
@@ -43298,8 +43318,13 @@ var ClaudeSdkRunner = class extends BaseRunner {
             "Skill",
             "Task"
           ],
-          permissionMode: "bypassPermissions",
-          canUseTool: toolPolicy
+          // 'dontAsk' keeps execution headless (no prompts) while still
+          // consulting the PreToolUse hook per call. 'bypassPermissions' would
+          // shadow the hook/canUseTool and disable the write restriction.
+          permissionMode: "dontAsk",
+          hooks: {
+            PreToolUse: [{ hooks: [preToolUseHook] }]
+          }
         }
       });
       for await (const message of q) {

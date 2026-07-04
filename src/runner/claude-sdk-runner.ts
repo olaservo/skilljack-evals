@@ -22,7 +22,7 @@ import {
   isTextBlock,
   isToolUseBlock,
 } from '../types.js';
-import { createToolPolicy } from './security.js';
+import { createPreToolUseHook } from './security.js';
 import { BaseRunner, buildTokenUsage } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
 
@@ -44,7 +44,7 @@ export class ClaudeSdkRunner extends BaseRunner {
       let resultCostUsd = 0;
       let resultTokens: TokenUsage | undefined;
 
-      const toolPolicy = createToolPolicy(
+      const preToolUseHook = createPreToolUseHook(
         this.options.allowedWriteDirs ?? [],
         this.options.cwd ?? process.cwd(),
       );
@@ -61,8 +61,13 @@ export class ClaudeSdkRunner extends BaseRunner {
             'Glob', 'Grep', 'Bash',
             'Skill', 'Task',
           ],
-          permissionMode: 'bypassPermissions',
-          canUseTool: toolPolicy,
+          // 'dontAsk' keeps execution headless (no prompts) while still
+          // consulting the PreToolUse hook per call. 'bypassPermissions' would
+          // shadow the hook/canUseTool and disable the write restriction.
+          permissionMode: 'dontAsk',
+          hooks: {
+            PreToolUse: [{ hooks: [preToolUseHook] }],
+          },
         },
       });
 
