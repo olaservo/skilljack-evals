@@ -1,8 +1,9 @@
 /**
- * OpenCodeRunner tests — replayed against a SYNTHETIC fixture whose event
- * shapes were verified against the opencode v1.17.13 source (payloads nested
- * under `part`, error payloads under `error`), NOT captured from a live CLI.
- * Replace with a captured transcript once the live spike runs (issue #126).
+ * OpenCodeRunner tests — replayed against a REAL transcript captured from
+ * opencode 1.17.13 (2026-07-05, Windows, anthropic/claude-haiku-4-5, greeting
+ * skill mounted at .opencode/skills/, full isolation env). See
+ * fixtures/transcripts/README.md for the capture procedure and the verified
+ * contract.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'fs/promises';
@@ -14,7 +15,7 @@ import type { EvalTask } from '../types.js';
 
 const FIXTURE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  'fixtures', 'transcripts', 'opencode', 'synthetic-greeting-with-skill.jsonl',
+  'fixtures', 'transcripts', 'opencode', 'greeting-with-skill.jsonl',
 );
 
 class TestableOpenCodeRunner extends OpenCodeRunner {
@@ -58,7 +59,7 @@ beforeAll(async () => {
     .map((line) => JSON.parse(line));
 });
 
-describe('OpenCodeRunner with the synthetic transcript', () => {
+describe('OpenCodeRunner with the captured transcript', () => {
   function makeRunner(model?: string): TestableOpenCodeRunner {
     const runner = new TestableOpenCodeRunner({ model, taskTimeoutMs: 60000 });
     runner.cliResult = { ...emptyCliResult(), events: fixtureEvents };
@@ -82,15 +83,16 @@ describe('OpenCodeRunner with the synthetic transcript', () => {
   it('sums cost and tokens across step_finish events', async () => {
     const result = await makeRunner().runTask(makeTask());
 
-    // Fixture has two steps: 0.0012 + 0.0009 cost, 600+300 input, 30+50
-    // output, 200+100 cache read, 50+0 cache write.
-    expect(result.costUsd).toBeCloseTo(0.0021);
+    // Captured run has two steps (skill call, then final text):
+    // cost 0.0104655 + 0.00141995, tokens input 3+5, output 52+38,
+    // cache read 0+8162, cache write 8162+327.
+    expect(result.costUsd).toBeCloseTo(0.01188545, 6);
     expect(result.tokens).toEqual({
-      input: 900,
-      output: 80,
-      cacheRead: 300,
-      cacheCreation: 50,
-      total: 900 + 80 + 300 + 50,
+      input: 8,
+      output: 90,
+      cacheRead: 8162,
+      cacheCreation: 8489,
+      total: 8 + 90 + 8162 + 8489,
     });
     expect(result.numTurns).toBe(2);
   });
@@ -196,13 +198,15 @@ describe('OpenCodeRunner error handling', () => {
     runner.cliResult = {
       ...emptyCliResult(),
       exitCode: 1,
-      events: [{ type: 'error', error: { name: 'ProviderModelNotFoundError', data: { message: 'model refused' } } }],
+      // Shape captured live from opencode 1.17.13 with a bad -m value.
+      events: [{ type: 'error', error: { name: 'UnknownError', data: { message: 'Unexpected server error. Check server logs for details.', ref: 'err_b62b8d5e' } } }],
     };
 
     const result = await runner.runTask(makeTask());
 
     expect(result.isError).toBe(true);
-    expect(result.errorMessage).toContain('model refused');
+    expect(result.errorMessage).toContain('Unexpected server error');
+    expect(result.errorMessage).not.toContain('[object Object]');
   });
 
   it('extracts a message from a string error payload', async () => {
