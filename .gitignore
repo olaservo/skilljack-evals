@@ -129,8 +129,8 @@ dist
 # Claude Code local settings
 .claude/settings.local.json
 
-# Evaluation results (generated at runtime)
-results/
+# Evaluation results (generated at runtime) — root-anchored so src/results/ stays tracked
+/results/
 
 # yarn v3
 .pnp.*
