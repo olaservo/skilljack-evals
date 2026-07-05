@@ -128,15 +128,21 @@ function trialFailures(
   return failures;
 }
 
-/** Evaluate the pass/fail gates for a run. */
+/**
+ * Evaluate the pass/fail gates for a run.
+ *
+ * The lift gate fails CLOSED: when a lift threshold is configured but no lift
+ * is available (no baseline ran), liftPassed is false — a configured gate
+ * must never silently pass because its input went missing.
+ */
 export function evaluateThresholds(
   resolution: number,
   config: EvalConfig,
   lift?: number,
 ): RunSummaryThresholds {
   const resolutionPassed = resolution >= config.resolutionThreshold;
-  const liftPassed = config.liftThreshold !== undefined && lift !== undefined
-    ? lift >= config.liftThreshold
+  const liftPassed = config.liftThreshold !== undefined
+    ? (lift !== undefined ? lift >= config.liftThreshold : false)
     : undefined;
   return {
     resolution: config.resolutionThreshold,

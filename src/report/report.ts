@@ -326,7 +326,11 @@ export async function generateJsonResults(options: ReportOptions): Promise<Evalu
  */
 export interface PassFailResult {
   resolutionPassed: boolean;
-  /** Undefined when lift is not gated (no threshold configured or no baseline ran). */
+  /**
+   * Undefined when lift is not gated (no threshold configured). When a
+   * threshold IS configured but no baseline ran (lift unavailable), the gate
+   * fails CLOSED: liftPassed is false.
+   */
   liftPassed?: boolean;
   passed: boolean;
 }
@@ -334,8 +338,9 @@ export interface PassFailResult {
 /**
  * Evaluate whether a summary passes the configured thresholds.
  *
- * @param skillLift - Macro skill lift from a paired baseline run; lift gating
- *                    only applies when both a threshold and a lift are present.
+ * @param skillLift - Macro skill lift from a paired baseline run. When a lift
+ *                    threshold is configured but no lift is available (no
+ *                    baseline ran), the gate fails closed.
  */
 export function evaluatePassFail(
   summary: EvaluationSummary,
@@ -343,8 +348,8 @@ export function evaluatePassFail(
   skillLift?: number,
 ): PassFailResult {
   const resolutionPassed = summary.resolutionRate >= config.resolutionThreshold;
-  const liftPassed = config.liftThreshold !== undefined && skillLift !== undefined
-    ? skillLift >= config.liftThreshold
+  const liftPassed = config.liftThreshold !== undefined
+    ? (skillLift !== undefined ? skillLift >= config.liftThreshold : false)
     : undefined;
   return {
     resolutionPassed,
@@ -367,10 +372,16 @@ export function computeFailureReasons(
       `Resolution rate ${(summary.resolutionRate * 100).toFixed(1)}% below threshold ${(config.resolutionThreshold * 100).toFixed(0)}%`,
     );
   }
-  if (config.liftThreshold !== undefined && skillLift !== undefined && skillLift < config.liftThreshold) {
-    reasons.push(
-      `Skill lift ${formatDelta(skillLift * 100, 1)}% below threshold ${formatDelta(config.liftThreshold * 100, 1)}%`,
-    );
+  if (config.liftThreshold !== undefined) {
+    if (skillLift === undefined) {
+      reasons.push(
+        'min_lift threshold is configured but no baseline ran (lift unavailable) — run with baseline enabled or remove the threshold',
+      );
+    } else if (skillLift < config.liftThreshold) {
+      reasons.push(
+        `Skill lift ${formatDelta(skillLift * 100, 1)}% below threshold ${formatDelta(config.liftThreshold * 100, 1)}%`,
+      );
+    }
   }
   return reasons;
 }

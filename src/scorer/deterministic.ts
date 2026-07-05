@@ -285,42 +285,43 @@ export function scoreDeterministic(
     }
   }
 
-  // Compute overall pass/fail
-  let passed: boolean;
+  // Compute pass/fail. `checksPassed` covers every evaluated check EXCEPT the
+  // verifier — the scorer uses it to gate verifier partial credit on the other
+  // checks. `passed` then ANDs in the verifier outcome (when one ran).
+  let checksPassed: boolean;
   if (ignoreActivation) {
-    // Baseline: pass = every evaluated output assertion + verifier passed, no agent error.
-    passed = !result.isError;
-    if (markerFound !== null) passed = passed && markerFound;
-    if (expectedToolsCalled !== null) passed = passed && expectedToolsCalled;
-    if (unexpectedToolsCalled !== null) passed = passed && !unexpectedToolsCalled;
-    if (containsCheckPassed !== null) passed = passed && containsCheckPassed;
-    if (notContainsCheckPassed !== null) passed = passed && notContainsCheckPassed;
-    if (regexCheckPassed !== null) passed = passed && regexCheckPassed;
-    if (javascriptCheckPassed !== null) passed = passed && javascriptCheckPassed;
-    if (fileExistsCheckPassed !== null) passed = passed && fileExistsCheckPassed;
-    if (verifierPassed !== null) passed = passed && verifierPassed;
+    // Baseline: pass = every evaluated output assertion passed, no agent error.
+    checksPassed = !result.isError;
+    if (markerFound !== null) checksPassed = checksPassed && markerFound;
+    if (expectedToolsCalled !== null) checksPassed = checksPassed && expectedToolsCalled;
+    if (unexpectedToolsCalled !== null) checksPassed = checksPassed && !unexpectedToolsCalled;
+    if (containsCheckPassed !== null) checksPassed = checksPassed && containsCheckPassed;
+    if (notContainsCheckPassed !== null) checksPassed = checksPassed && notContainsCheckPassed;
+    if (regexCheckPassed !== null) checksPassed = checksPassed && regexCheckPassed;
+    if (javascriptCheckPassed !== null) checksPassed = checksPassed && javascriptCheckPassed;
+    if (fileExistsCheckPassed !== null) checksPassed = checksPassed && fileExistsCheckPassed;
   } else if (check.expectSkillActivation) {
     // For positive tests: skill must be activated and all checks must pass
-    passed = skillActivated;
-    if (markerFound !== null) passed = passed && markerFound;
-    if (expectedToolsCalled !== null) passed = passed && expectedToolsCalled;
-    if (unexpectedToolsCalled !== null) passed = passed && !unexpectedToolsCalled;
-    if (containsCheckPassed !== null) passed = passed && containsCheckPassed;
-    if (notContainsCheckPassed !== null) passed = passed && notContainsCheckPassed;
-    if (regexCheckPassed !== null) passed = passed && regexCheckPassed;
-    if (javascriptCheckPassed !== null) passed = passed && javascriptCheckPassed;
-    if (fileExistsCheckPassed !== null) passed = passed && fileExistsCheckPassed;
-    if (verifierPassed !== null) passed = passed && verifierPassed;
+    checksPassed = skillActivated;
+    if (markerFound !== null) checksPassed = checksPassed && markerFound;
+    if (expectedToolsCalled !== null) checksPassed = checksPassed && expectedToolsCalled;
+    if (unexpectedToolsCalled !== null) checksPassed = checksPassed && !unexpectedToolsCalled;
+    if (containsCheckPassed !== null) checksPassed = checksPassed && containsCheckPassed;
+    if (notContainsCheckPassed !== null) checksPassed = checksPassed && notContainsCheckPassed;
+    if (regexCheckPassed !== null) checksPassed = checksPassed && regexCheckPassed;
+    if (javascriptCheckPassed !== null) checksPassed = checksPassed && javascriptCheckPassed;
+    if (fileExistsCheckPassed !== null) checksPassed = checksPassed && fileExistsCheckPassed;
   } else {
     // For negative tests (false positive): skill must NOT be activated
-    passed = !skillActivated;
-    if (verifierPassed !== null) passed = passed && verifierPassed;
+    checksPassed = !skillActivated;
     const hasOtherAssertions = containsCheckPassed !== null || notContainsCheckPassed !== null
       || regexCheckPassed !== null || javascriptCheckPassed !== null || fileExistsCheckPassed !== null;
     if (hasOtherAssertions) {
       details.push('Note: non-activation assertions were evaluated but do not affect pass/fail for negative tests');
     }
   }
+
+  const passed = checksPassed && verifierPassed !== false;
 
   return {
     skillActivated,
@@ -334,6 +335,7 @@ export function scoreDeterministic(
     javascriptCheckPassed,
     fileExistsCheckPassed,
     verifierPassed,
+    checksPassed,
     passed,
     details,
   };

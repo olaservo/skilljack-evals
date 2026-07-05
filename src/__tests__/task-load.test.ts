@@ -250,6 +250,39 @@ describe('loadTaskPackages — skills resolution', () => {
     expect(suite.tasks[0].task.expectedSkillLoad).toBe('candidate-skill');
   });
 
+  it('remaps an explicit expected_skill to the injected single skill under --skills-dir', async () => {
+    const suiteDir = await makeTmpDir();
+    const taskDir = path.join(suiteDir, 't1');
+    await writeTask(taskDir, `---\nexpected_skill: greeting\nchecks: { contains: [hello] }\n---\n\nSay hello.\n`);
+
+    // Root-layout version dir with a different name than expected_skill.
+    const overrideParent = await makeTmpDir();
+    const overrideDir = path.join(overrideParent, 'greeting-v1');
+    await fs.mkdir(overrideDir, { recursive: true });
+    await fs.writeFile(
+      path.join(overrideDir, 'SKILL.md'),
+      `---\nname: greeting-v1\ndescription: 'v1'\n---\n\n# greeting-v1\n`,
+    );
+
+    const { warnings, suite } = await validateTaskPackages(taskDir, { skillsDirOverride: overrideDir });
+    expect(suite!.tasks[0].task.expectedSkillLoad).toBe('greeting-v1');
+    expect(warnings.some((w) => w.includes("remapped to injected skill 'greeting-v1'"))).toBe(true);
+  });
+
+  it('keeps expected_skill when it matches a skill in the --skills-dir override', async () => {
+    const suiteDir = await makeTmpDir();
+    const taskDir = path.join(suiteDir, 't1');
+    await writeTask(taskDir, `---\nexpected_skill: candidate-skill\nchecks: { contains: [hello] }\n---\n\nSay hello.\n`);
+
+    const overrideDir = await makeTmpDir();
+    await writeSkill(overrideDir, 'candidate-skill');
+    await writeSkill(overrideDir, 'other-skill');
+
+    const { warnings, suite } = await validateTaskPackages(taskDir, { skillsDirOverride: overrideDir });
+    expect(suite!.tasks[0].task.expectedSkillLoad).toBe('candidate-skill');
+    expect(warnings.some((w) => w.includes('remapped'))).toBe(false);
+  });
+
   it('defaults expected_skill to none when no skills exist', async () => {
     const suiteDir = await makeTmpDir();
     const taskDir = path.join(suiteDir, 't1');

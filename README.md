@@ -105,6 +105,15 @@ Notes:
 - Isolation: `claude-code` passes `--setting-sources project` and `codex` passes `--ignore-user-config --ephemeral` so your global config doesn't leak into trials (auth still works). The experimental runners have **no verified isolation story yet** — global gemini/opencode config and skills may leak into trials; see the JSDoc in `src/runner/gemini-runner.ts` / `opencode-runner.ts`.
 - `gemini` and `opencode` were built from official docs but have not been verified against a live CLI — they warn on first use, and captured transcripts are wanted (see `src/__tests__/fixtures/transcripts/README.md`).
 
+### Security model
+
+Know exactly what is and is not restricted before running untrusted skills or tasks:
+
+- **CLI runners (`claude-code`, `codex`, `gemini`, `opencode`) run the agent with ALL permissions granted on this host — no write restrictions.** The flags that make headless runs work (`--dangerously-skip-permissions`, `codex exec`, `--approval-mode yolo`, `--auto`) auto-approve every tool call, and there is no replacement for v1's `allowed_write_dirs` on these runners. A one-time warning is printed when a CLI runner starts. Run only skills and tasks you trust.
+- **`claude-sdk` is the only runner that enforces write restrictions**: a PreToolUse hook denies Write/Edit tool calls targeting paths outside `runner.allowed_write_dirs` (see `src/runner/security.ts`). Bash commands are not intercepted, so this is a guardrail, not a sandbox.
+- **`--sandbox docker` isolates VERIFIERS only, never the agent.** The agent always runs on the host. For fully containerized agent runs, export the task to BenchFlow (`skilljack-evals export`).
+- Verifier and oracle scripts run via `execFile` on the host by default — eval authors are trusted.
+
 ## Scoring and metrics
 
 The deterministic reward is authoritative. Per trial: reward = 1 when all lite `checks:` pass AND the verifier (when present) yields reward >= 1; agent error or timeout = 0. The judge never changes a reward.
@@ -114,7 +123,7 @@ The deterministic reward is authoritative. Per trial: reward = 1 when all lite `
 - **Skill Lift** — with-skill resolution minus baseline resolution, per task and macro-averaged. The paired baseline (same prompts, no skills mounted, nudge off) runs by default whenever tasks have skills; disable with `--no-baseline`, or swap in another skill version with `--compare-skill <dir>`
 - **Skill Invocation Rate** — share of with-skill trials that loaded the expected skill (anti-trigger tasks excluded; the metric is decoupled from reward except for `expect_skill_invocation: false` tasks, where invoking is a failure)
 
-Thresholds gate CI: `--threshold-resolution <0-1>` (default 0.8) on the with-skill resolution rate, and optionally `--threshold-lift <delta>` on macro lift.
+Thresholds gate CI: `--threshold-resolution <0-1>` (default 0.8) on the with-skill resolution rate, and optionally `--threshold-lift <delta>` on macro lift. The lift gate fails closed: if a lift threshold is configured but no baseline ran (lift unavailable), the run fails with an explicit reason — run with the baseline enabled or remove the threshold.
 
 ## Judge diagnostics (authoring loop)
 
@@ -125,7 +134,7 @@ Thresholds gate CI: `--threshold-resolution <0-1>` (default 0.8) on the with-ski
 
 ## Skill nudge
 
-`--nudge off|name|description|full` (default `off`) appends an escalating hint about available skills to with-skill prompts — useful for separating "can't discover the skill" from "can't follow it". The baseline condition always gets the bare prompt, and the nudge text is part of the cache key.
+`--nudge off|name|description|full` (default `off`) appends an escalating hint about available skills to with-skill prompts — useful for separating "can't discover the skill" from "can't follow it". The no-skill baseline always gets the bare prompt; a `--compare-skill` baseline gets the SAME nudge level, built from the compare directory's skills, so the two versions are compared symmetrically. The nudge text is part of the cache key.
 
 ## Caching and concurrency
 

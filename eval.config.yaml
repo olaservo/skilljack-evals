@@ -12,8 +12,8 @@ scoring:
     output: 0.3
 
 thresholds:
-  discovery_rate: 0.8  # EVAL_DISCOVERY_THRESHOLD (80%)
-  avg_score: 4.0       # EVAL_SCORE_THRESHOLD
+  resolution_rate: 0.8   # EVAL_RESOLUTION_THRESHOLD (min with-skill resolution rate, 0-1)
+  # min_lift: 0.0        # EVAL_LIFT_THRESHOLD (optional macro-lift gate; requires a baseline run — fails closed without one)
 
 runner:
   timeout_ms: 300000   # EVAL_TASK_TIMEOUT_MS (5 minutes)

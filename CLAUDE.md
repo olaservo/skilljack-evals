@@ -80,6 +80,8 @@ Five runners selected via `--runner` flag:
 - `gemini` (EXPERIMENTAL) — `gemini -p --output-format stream-json --approval-mode yolo`; skills mount at `.gemini/skills/`; built from official docs, not yet verified against a live CLI
 - `opencode` (EXPERIMENTAL) — `opencode run --format json --auto`; skills mount at `.opencode/skills/`; built from official docs, not yet verified against a live CLI
 
+Security: the CLI runners (`claude-code`, `codex`, `gemini`, `opencode`) run the agent fully auto-approved on the host with NO write restrictions (a one-time warning is printed); only `claude-sdk` enforces `allowed_write_dirs` via a PreToolUse hook, and `--sandbox docker` isolates verifiers, never the agent.
+
 ## Scoring
 
 Deterministic reward is authoritative; the judge is opt-in diagnostics and never affects pass/fail:

@@ -24,6 +24,29 @@ import { DEFAULT_SKILLS_MOUNT_PATH } from '../run/workspace.js';
  */
 export const ROUGH_COST_PER_TOKEN = 0.000003;
 
+let warnedCliRunnerSecurity = false;
+
+/**
+ * One-time-per-process security warning shared by all CLI runners. The CLI
+ * harnesses (claude-code, codex, gemini, opencode) run the real agent fully
+ * auto-approved on the host — v1's allowedWriteDirs restriction only survives
+ * in the claude-sdk runner's PreToolUse hook, so users must be told the agent
+ * is unrestricted here.
+ */
+export function warnCliRunnerSecurity(providerName: string): void {
+  if (warnedCliRunnerSecurity) return;
+  warnedCliRunnerSecurity = true;
+  console.warn(
+    `⚠ ${providerName} runs the agent with all permissions granted on this host (no write restrictions). ` +
+    'Run only skills/tasks you trust; --sandbox docker isolates verifiers, not the agent.',
+  );
+}
+
+/** Test hook: re-arm the one-time CLI runner security warning. */
+export function resetCliRunnerSecurityWarningForTests(): void {
+  warnedCliRunnerSecurity = false;
+}
+
 /**
  * Normalize a runner-provided usage snapshot into TokenUsage, enforcing
  * `total = input + output + cacheRead + cacheCreation`. Returns undefined

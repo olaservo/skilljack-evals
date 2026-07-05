@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { ClaudeCodeRunner, CLAUDE_CLI_INSTALL_HINT } from '../runner/claude-code-runner.js';
-import { skillNameFromReadPath } from '../runner/base-runner.js';
+import { CodexRunner } from '../runner/codex-runner.js';
+import { skillNameFromReadPath, resetCliRunnerSecurityWarningForTests } from '../runner/base-runner.js';
 import type { RunCliJsonlOptions, CliJsonlResult, CliDetection } from '../harness/subprocess.js';
 import type { EvalTask } from '../types.js';
 
@@ -222,5 +223,28 @@ describe('ClaudeCodeRunner error handling', () => {
     expect(result.isError).toBe(true);
     expect(result.errorMessage).toContain('Claude Code CLI not found on PATH');
     expect(result.errorMessage).toContain('npm install -g @anthropic-ai/claude-code');
+  });
+});
+
+describe('CLI runner security warning', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('warns once per process that the agent runs unrestricted, on first CLI runner construction', () => {
+    resetCliRunnerSecurityWarningForTests();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    new ClaudeCodeRunner({ model: 'haiku' });
+
+    const securityWarnings = warnSpy.mock.calls.filter((c) => String(c[0]).includes('no write restrictions'));
+    expect(securityWarnings).toHaveLength(1);
+    expect(String(securityWarnings[0][0])).toContain('claude-code runs the agent with all permissions granted on this host');
+    expect(String(securityWarnings[0][0])).toContain('--sandbox docker isolates verifiers, not the agent');
+
+    // Constructing more CLI runners does not repeat the warning.
+    new ClaudeCodeRunner({ model: 'haiku' });
+    new CodexRunner({ model: 'gpt-5.2-codex' });
+    expect(warnSpy.mock.calls.filter((c) => String(c[0]).includes('no write restrictions'))).toHaveLength(1);
   });
 });

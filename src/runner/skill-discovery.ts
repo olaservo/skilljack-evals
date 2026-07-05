@@ -52,6 +52,58 @@ export function stripFrontmatter(content: string): string {
 }
 
 /**
+ * Layout of a skills directory. Shared by the task loader, workspace
+ * mounting, the nudge builder, and the pipeline's compare-skill resolution
+ * so their semantics can't drift:
+ * - 'multi': immediate subdirectories containing their own SKILL.md are the
+ *   skills (subdirs without a SKILL.md are ignored).
+ * - 'root': no such subdirectory exists but the directory itself has a
+ *   root-level SKILL.md — the whole directory is ONE skill named after its
+ *   basename (references/, scripts/, etc. belong to that skill).
+ * - 'none': no skills found.
+ */
+export interface SkillsDirLayout {
+  kind: 'multi' | 'root' | 'none';
+  /** Skill names: subdir names for 'multi', [basename(dir)] for 'root', [] for 'none'. */
+  names: string[];
+}
+
+async function isFile(p: string): Promise<boolean> {
+  try {
+    return (await fs.stat(p)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Decide how a skills directory is laid out (see SkillsDirLayout).
+ * Missing/unreadable directories resolve to 'none'.
+ */
+export async function resolveSkillsDirLayout(skillsDir: string): Promise<SkillsDirLayout> {
+  let entries;
+  try {
+    entries = await fs.readdir(skillsDir, { withFileTypes: true });
+  } catch {
+    return { kind: 'none', names: [] };
+  }
+
+  const names: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (await isFile(path.join(skillsDir, entry.name, 'SKILL.md'))) {
+      names.push(entry.name);
+    }
+  }
+  if (names.length > 0) return { kind: 'multi', names };
+
+  if (await isFile(path.join(skillsDir, 'SKILL.md'))) {
+    return { kind: 'root', names: [path.basename(path.resolve(skillsDir))] };
+  }
+  return { kind: 'none', names: [] };
+}
+
+/**
  * Discover skills in a directory by scanning for SKILL.md files
  * and parsing their YAML frontmatter.
  */

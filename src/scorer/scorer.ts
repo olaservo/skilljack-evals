@@ -117,17 +117,29 @@ function mergeScores(
   const computeDiscovery = (activated: boolean) =>
     isNegativeTest ? (activated ? 0 : 1) : (activated ? 1 : 0);
 
-  // Trial reward: 1 when all deterministic checks passed (incl. verifier);
-  // otherwise the verifier's partial reward when one ran, else 0.
-  // Agent error/timeout always yields reward 0.
-  // With no deterministic checks (score re-runs with --no-deterministic),
-  // there is nothing to fail: passed follows the agent error status.
-  const passed = !result.isError && (det ? det.passed : true);
+  // Trial reward decomposition:
+  // - Agent error/timeout always yields reward 0.
+  // - Non-verifier deterministic checks gate the reward: if any of them
+  //   failed, reward is 0 — a passing verifier cannot rescue a trial that
+  //   failed an activation/output check.
+  // - When the other checks pass, the verifier (when present) contributes
+  //   its (possibly partial) reward; without a verifier the deterministic
+  //   outcome is binary.
+  // - With no deterministic checks (score re-runs with --no-deterministic),
+  //   there is nothing to fail: the agent error status decides.
+  // Invariant: on non-error trials, passed === (reward >= 1).
+  const hasVerifier = !!result.verifier;
+  const checksPassedExVerifier = det ? det.checksPassed : true;
   const reward = result.isError
     ? 0
-    : passed
-      ? 1
-      : clamp01(result.verifier?.reward ?? 0);
+    : !checksPassedExVerifier
+      ? 0
+      : hasVerifier
+        ? clamp01(result.verifier!.reward)
+        : det
+          ? (det.passed ? 1 : 0)
+          : 1;
+  const passed = !result.isError && reward >= 1 && (det ? det.passed : true);
 
   const discovery = det ? computeDiscovery(det.skillActivated) : 0;
   // Invocation signal feeds skillInvocationRate: only meaningful for

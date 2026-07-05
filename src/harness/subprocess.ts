@@ -7,10 +7,17 @@
  * SIGKILL on POSIX. The old Promise.race timeout in BaseRunner abandoned the
  * in-flight work but leaked the child process; this utility actually
  * terminates it.
+ *
+ * Spawning goes through cross-spawn so Windows npm `.cmd` shims (how claude,
+ * codex, gemini, and opencode are typically installed) resolve and execute
+ * without shell:true — plain spawn refuses .cmd files with EINVAL since the
+ * CVE-2024-27980 hardening, and shell:true would reintroduce the injection
+ * risk that hardening closed.
  */
 
 import { spawn } from 'child_process';
 import type { ChildProcess } from 'child_process';
+import crossSpawn from 'cross-spawn';
 
 export interface RunCliJsonlOptions {
   /** Executable to spawn (resolved via PATH). */
@@ -89,7 +96,11 @@ export async function runCliJsonl(options: RunCliJsonlOptions): Promise<CliJsonl
   const isWindows = process.platform === 'win32';
 
   return new Promise<CliJsonlResult>((resolve, reject) => {
-    const child = spawn(options.command, options.args, {
+    // cross-spawn: resolves Windows .cmd shims safely (no shell), passes all
+    // options through, and returns a normal ChildProcess — so the pid-based
+    // tree kill (taskkill on Windows, process-group SIGKILL on POSIX via
+    // detached) keeps working unchanged.
+    const child = crossSpawn(options.command, options.args, {
       cwd: options.cwd,
       env: options.env ?? process.env,
       shell: false,
@@ -214,8 +225,11 @@ export async function runCliJsonl(options: RunCliJsonlOptions): Promise<CliJsonl
 /**
  * Check whether a CLI is available by running its version command.
  *
- * ENOENT (and Windows' EINVAL for non-directly-spawnable shims) yields
- * `available: false` with the caller-provided install hint in the reason.
+ * Detection spawns through cross-spawn (via runCliJsonl), so npm-installed
+ * `.cmd` shims on Windows are found and executed like real binaries — a
+ * missing command genuinely means "not found on PATH". ENOENT yields
+ * `available: false` with the caller-provided install hint in the reason;
+ * EINVAL is kept as a belt-and-braces guard for non-spawnable paths.
  */
 export async function detectCli(
   command: string,

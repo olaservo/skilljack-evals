@@ -85,7 +85,11 @@ export interface RunSummaryThresholds {
   /** Minimum macro skill lift; unset = not gated. */
   lift?: number;
   resolutionPassed: boolean;
-  /** Undefined when lift is not gated (no threshold or no baseline). */
+  /**
+   * Undefined when lift is not gated (no threshold configured). False when a
+   * threshold is configured but the lift is below it, or when no baseline ran
+   * (lift unavailable — the gate fails closed).
+   */
   liftPassed?: boolean;
   passed: boolean;
 }

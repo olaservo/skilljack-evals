@@ -85,6 +85,82 @@ describe('buildNudge levels', () => {
   });
 });
 
+describe('buildNudgeForSkillsDir root layout (single skill, SKILL.md at dir root)', () => {
+  let rootDir: string;
+
+  beforeAll(async () => {
+    const parent = await fs.mkdtemp(path.join(os.tmpdir(), 'nudge-root-'));
+    rootDir = path.join(parent, 'greeting-v1');
+    await fs.mkdir(rootDir, { recursive: true });
+    await fs.writeFile(path.join(rootDir, 'SKILL.md'), GREETING_SKILL_MD, 'utf-8');
+  });
+
+  afterAll(async () => {
+    await fs.rm(path.dirname(rootDir), { recursive: true, force: true });
+  });
+
+  it('level name uses the frontmatter name', async () => {
+    expect(await buildNudgeForSkillsDir('name', rootDir)).toBe('\n\nAvailable skills: greeting');
+  });
+
+  it('level description renders the frontmatter description', async () => {
+    const nudge = await buildNudgeForSkillsDir('description', rootDir);
+    expect(nudge).toContain('- greeting: Use when the user greets you or asks for a welcome.');
+  });
+
+  it('level full inlines the root SKILL.md body', async () => {
+    const nudge = await buildNudgeForSkillsDir('full', rootDir);
+    expect(nudge).toContain('## greeting');
+    expect(nudge).toContain('Say GREETING_SUCCESS.');
+    expect(nudge).not.toContain('name: greeting');
+  });
+
+  it('falls back to the dir basename when frontmatter has no name', async () => {
+    const parent = await fs.mkdtemp(path.join(os.tmpdir(), 'nudge-root-noname-'));
+    const dir = path.join(parent, 'unnamed-skill');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'SKILL.md'), '---\ndescription: Does things.\n---\n\n# Body\n', 'utf-8');
+    try {
+      expect(await buildNudgeForSkillsDir('name', dir)).toBe('\n\nAvailable skills: unnamed-skill');
+    } finally {
+      await fs.rm(parent, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('buildNudgeForSkillsDir with missing descriptions', () => {
+  let skillsDir: string;
+
+  beforeAll(async () => {
+    skillsDir = await fs.mkdtemp(path.join(os.tmpdir(), 'nudge-nodesc-'));
+    await fs.mkdir(path.join(skillsDir, 'terse'), { recursive: true });
+    await fs.writeFile(
+      path.join(skillsDir, 'terse', 'SKILL.md'),
+      '---\nname: terse\n---\n\n# Terse Skill\n\nSay TERSE_SUCCESS.\n',
+      'utf-8',
+    );
+  });
+
+  afterAll(async () => {
+    await fs.rm(skillsDir, { recursive: true, force: true });
+  });
+
+  it("still appears at level 'name'", async () => {
+    expect(await buildNudgeForSkillsDir('name', skillsDir)).toBe('\n\nAvailable skills: terse');
+  });
+
+  it("renders '(no description)' at level 'description' instead of dropping the skill", async () => {
+    const nudge = await buildNudgeForSkillsDir('description', skillsDir);
+    expect(nudge).toContain('- terse: (no description)');
+  });
+
+  it("still appears with the full body at level 'full'", async () => {
+    const nudge = await buildNudgeForSkillsDir('full', skillsDir);
+    expect(nudge).toContain('## terse');
+    expect(nudge).toContain('Say TERSE_SUCCESS.');
+  });
+});
+
 describe('nudge and the response-cache key', () => {
   it('a nudged prompt produces a different cache key than the bare prompt', () => {
     const base = {

@@ -104,6 +104,9 @@ describe('runVerifierInDocker command construction', () => {
 
     const args = calls[0];
     expect(args.slice(0, 2)).toEqual(['run', '--rm']);
+    // Unique --name so the timeout path can force-remove the container.
+    expect(args).toContain('--name');
+    expect(args[args.indexOf('--name') + 1]).toMatch(/^skilljack-verifier-/);
     expect(hostMountFor(args, '/workspace')).toBe(workspaceDir);
     expect(hostMountFor(args, '/task:ro')).toBe(taskDir);
     expect(hostMountFor(args, '/logs')).toBeDefined();
@@ -328,12 +331,79 @@ describe('runVerifierInDocker failure modes', () => {
       timeoutMs: 1234,
       output: '',
       toolCalls: [],
-      execFn: async () => okResult({ exitCode: null, timedOut: true }),
+      execFn: async (args) => args[0] === 'run'
+        ? okResult({ exitCode: null, timedOut: true })
+        : okResult(),
     });
 
     expect(outcome.status).toBe('timeout');
     expect(outcome.reward).toBe(0);
     expect(outcome.stderr).toContain('1234');
+  });
+
+  it('force-removes the named container on timeout (docker rm -f, same name)', async () => {
+    const calls: string[][] = [];
+    const outcome = await runVerifierInDocker({
+      taskDir: await makeTaskDir('verify.mjs'),
+      workspaceDir: await makeTmpDir(),
+      verifierRelPath: path.join('verifier', 'verify.mjs'),
+      taskId: 'gr-001',
+      timeoutMs: 1234,
+      output: '',
+      toolCalls: [],
+      execFn: async (args) => {
+        calls.push(args);
+        return args[0] === 'run'
+          ? okResult({ exitCode: null, timedOut: true })
+          : okResult();
+      },
+    });
+
+    expect(outcome.status).toBe('timeout');
+    const runArgs = calls.find((c) => c[0] === 'run')!;
+    const containerName = runArgs[runArgs.indexOf('--name') + 1];
+    expect(containerName).toMatch(/^skilljack-verifier-gr-001-\d+-\d+-[0-9a-f]{8}$/);
+    const rmCall = calls.find((c) => c[0] === 'rm');
+    expect(rmCall).toEqual(['rm', '-f', containerName]);
+  });
+
+  it('generates a fresh container name per run', async () => {
+    const names: string[] = [];
+    const execFn: DockerExecFn = async (args) => {
+      if (args[0] === 'run') names.push(args[args.indexOf('--name') + 1]);
+      return okResult();
+    };
+    const base = {
+      taskDir: await makeTaskDir('verify.mjs'),
+      workspaceDir: await makeTmpDir(),
+      verifierRelPath: path.join('verifier', 'verify.mjs'),
+      output: '',
+      toolCalls: [],
+      execFn,
+    };
+
+    await runVerifierInDocker(base);
+    await runVerifierInDocker(base);
+
+    expect(names).toHaveLength(2);
+    expect(names[0]).not.toBe(names[1]);
+  });
+
+  it('does not issue docker rm on the normal (non-timeout) path', async () => {
+    const calls: string[][] = [];
+    await runVerifierInDocker({
+      taskDir: await makeTaskDir('verify.mjs'),
+      workspaceDir: await makeTmpDir(),
+      verifierRelPath: path.join('verifier', 'verify.mjs'),
+      output: '',
+      toolCalls: [],
+      execFn: async (args) => {
+        calls.push(args);
+        return okResult();
+      },
+    });
+
+    expect(calls.some((c) => c[0] === 'rm')).toBe(false);
   });
 
   it('surfaces docker build failures', async () => {

@@ -4023,8 +4023,8 @@ var require_util2 = __commonJS({
     function createDeferredPromise() {
       let res;
       let rej;
-      const promise = new Promise((resolve6, reject) => {
-        res = resolve6;
+      const promise = new Promise((resolve7, reject) => {
+        res = resolve7;
         rej = reject;
       });
       return { promise, resolve: res, reject: rej };
@@ -5528,8 +5528,8 @@ Content-Type: ${value.type || "application/octet-stream"}\r
                 });
               }
             });
-            const busboyResolve = new Promise((resolve6, reject) => {
-              busboy.on("finish", resolve6);
+            const busboyResolve = new Promise((resolve7, reject) => {
+              busboy.on("finish", resolve7);
               busboy.on("error", (err) => reject(new TypeError(err)));
             });
             if (this.body !== null) for await (const chunk of consumeBody(this[kState].body)) busboy.write(chunk);
@@ -6063,9 +6063,9 @@ var require_dispatcher_base = __commonJS({
       }
       close(callback) {
         if (callback === void 0) {
-          return new Promise((resolve6, reject) => {
+          return new Promise((resolve7, reject) => {
             this.close((err, data) => {
-              return err ? reject(err) : resolve6(data);
+              return err ? reject(err) : resolve7(data);
             });
           });
         }
@@ -6103,12 +6103,12 @@ var require_dispatcher_base = __commonJS({
           err = null;
         }
         if (callback === void 0) {
-          return new Promise((resolve6, reject) => {
+          return new Promise((resolve7, reject) => {
             this.destroy(err, (err2, data) => {
               return err2 ? (
                 /* istanbul ignore next: should never error */
                 reject(err2)
-              ) : resolve6(data);
+              ) : resolve7(data);
             });
           });
         }
@@ -7168,16 +7168,16 @@ var require_client = __commonJS({
         return this[kNeedDrain] < 2;
       }
       async [kClose]() {
-        return new Promise((resolve6) => {
+        return new Promise((resolve7) => {
           if (!this[kSize]) {
-            resolve6(null);
+            resolve7(null);
           } else {
-            this[kClosedResolve] = resolve6;
+            this[kClosedResolve] = resolve7;
           }
         });
       }
       async [kDestroy](err) {
-        return new Promise((resolve6) => {
+        return new Promise((resolve7) => {
           const requests = this[kQueue].splice(this[kPendingIdx]);
           for (let i = 0; i < requests.length; i++) {
             const request = requests[i];
@@ -7188,7 +7188,7 @@ var require_client = __commonJS({
               this[kClosedResolve]();
               this[kClosedResolve] = null;
             }
-            resolve6();
+            resolve7();
           };
           if (this[kHTTP2Session] != null) {
             util.destroy(this[kHTTP2Session], err);
@@ -7768,7 +7768,7 @@ var require_client = __commonJS({
         });
       }
       try {
-        const socket = await new Promise((resolve6, reject) => {
+        const socket = await new Promise((resolve7, reject) => {
           client[kConnector]({
             host,
             hostname,
@@ -7780,7 +7780,7 @@ var require_client = __commonJS({
             if (err) {
               reject(err);
             } else {
-              resolve6(socket2);
+              resolve7(socket2);
             }
           });
         });
@@ -8404,12 +8404,12 @@ upgrade: ${upgrade}\r
           cb2();
         }
       }
-      const waitForDrain = () => new Promise((resolve6, reject) => {
+      const waitForDrain = () => new Promise((resolve7, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve6;
+          callback = resolve7;
         }
       });
       if (client[kHTTPConnVersion] === "h2") {
@@ -8754,8 +8754,8 @@ var require_pool_base = __commonJS({
         if (this[kQueue].isEmpty()) {
           return Promise.all(this[kClients].map((c) => c.close()));
         } else {
-          return new Promise((resolve6) => {
-            this[kClosedResolve] = resolve6;
+          return new Promise((resolve7) => {
+            this[kClosedResolve] = resolve7;
           });
         }
       }
@@ -9333,7 +9333,7 @@ var require_readable = __commonJS({
         if (this.closed) {
           return Promise.resolve(null);
         }
-        return new Promise((resolve6, reject) => {
+        return new Promise((resolve7, reject) => {
           const signalListenerCleanup = signal ? util.addAbortListener(signal, () => {
             this.destroy();
           }) : noop;
@@ -9342,7 +9342,7 @@ var require_readable = __commonJS({
             if (signal && signal.aborted) {
               reject(signal.reason || Object.assign(new Error("The operation was aborted"), { name: "AbortError" }));
             } else {
-              resolve6(null);
+              resolve7(null);
             }
           }).on("error", noop).on("data", function(chunk) {
             limit -= chunk.length;
@@ -9364,11 +9364,11 @@ var require_readable = __commonJS({
         throw new TypeError("unusable");
       }
       assert(!stream[kConsume]);
-      return new Promise((resolve6, reject) => {
+      return new Promise((resolve7, reject) => {
         stream[kConsume] = {
           type,
           stream,
-          resolve: resolve6,
+          resolve: resolve7,
           reject,
           length: 0,
           body: []
@@ -9403,12 +9403,12 @@ var require_readable = __commonJS({
       }
     }
     function consumeEnd(consume2) {
-      const { type, body, resolve: resolve6, stream, length } = consume2;
+      const { type, body, resolve: resolve7, stream, length } = consume2;
       try {
         if (type === "text") {
-          resolve6(toUSVString(Buffer.concat(body)));
+          resolve7(toUSVString(Buffer.concat(body)));
         } else if (type === "json") {
-          resolve6(JSON.parse(Buffer.concat(body)));
+          resolve7(JSON.parse(Buffer.concat(body)));
         } else if (type === "arrayBuffer") {
           const dst = new Uint8Array(length);
           let pos = 0;
@@ -9416,12 +9416,12 @@ var require_readable = __commonJS({
             dst.set(buf, pos);
             pos += buf.byteLength;
           }
-          resolve6(dst.buffer);
+          resolve7(dst.buffer);
         } else if (type === "blob") {
           if (!Blob2) {
             Blob2 = require("buffer").Blob;
           }
-          resolve6(new Blob2(body, { type: stream[kContentType] }));
+          resolve7(new Blob2(body, { type: stream[kContentType] }));
         }
         consumeFinish(consume2);
       } catch (err) {
@@ -9676,9 +9676,9 @@ var require_api_request = __commonJS({
     };
     function request(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve6, reject) => {
+        return new Promise((resolve7, reject) => {
           request.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve6(data);
+            return err ? reject(err) : resolve7(data);
           });
         });
       }
@@ -9851,9 +9851,9 @@ var require_api_stream = __commonJS({
     };
     function stream(opts, factory, callback) {
       if (callback === void 0) {
-        return new Promise((resolve6, reject) => {
+        return new Promise((resolve7, reject) => {
           stream.call(this, opts, factory, (err, data) => {
-            return err ? reject(err) : resolve6(data);
+            return err ? reject(err) : resolve7(data);
           });
         });
       }
@@ -10134,9 +10134,9 @@ var require_api_upgrade = __commonJS({
     };
     function upgrade(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve6, reject) => {
+        return new Promise((resolve7, reject) => {
           upgrade.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve6(data);
+            return err ? reject(err) : resolve7(data);
           });
         });
       }
@@ -10225,9 +10225,9 @@ var require_api_connect = __commonJS({
     };
     function connect(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve6, reject) => {
+        return new Promise((resolve7, reject) => {
           connect.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve6(data);
+            return err ? reject(err) : resolve7(data);
           });
         });
       }
@@ -13849,7 +13849,7 @@ var require_fetch = __commonJS({
       async function dispatch({ body }) {
         const url = requestCurrentURL(request);
         const agent = fetchParams.controller.dispatcher;
-        return new Promise((resolve6, reject) => agent.dispatch(
+        return new Promise((resolve7, reject) => agent.dispatch(
           {
             path: url.pathname + url.search,
             origin: url.origin,
@@ -13925,7 +13925,7 @@ var require_fetch = __commonJS({
                   }
                 }
               }
-              resolve6({
+              resolve7({
                 status,
                 statusText,
                 headersList: headers[kHeadersList],
@@ -13968,7 +13968,7 @@ var require_fetch = __commonJS({
                 const val = headersList[n + 1].toString("latin1");
                 headers[kHeadersList].append(key, val);
               }
-              resolve6({
+              resolve7({
                 status,
                 statusText: STATUS_CODES[status],
                 headersList: headers[kHeadersList],
@@ -17322,11 +17322,11 @@ var require_lib = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P3, generator) {
       function adopt(value) {
-        return value instanceof P3 ? value : new P3(function(resolve6) {
-          resolve6(value);
+        return value instanceof P3 ? value : new P3(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P3 || (P3 = Promise))(function(resolve6, reject) {
+      return new (P3 || (P3 = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -17342,7 +17342,7 @@ var require_lib = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -17428,26 +17428,26 @@ var require_lib = __commonJS({
       }
       readBody() {
         return __awaiter(this, void 0, void 0, function* () {
-          return new Promise((resolve6) => __awaiter(this, void 0, void 0, function* () {
+          return new Promise((resolve7) => __awaiter(this, void 0, void 0, function* () {
             let output = Buffer.alloc(0);
             this.message.on("data", (chunk) => {
               output = Buffer.concat([output, chunk]);
             });
             this.message.on("end", () => {
-              resolve6(output.toString());
+              resolve7(output.toString());
             });
           }));
         });
       }
       readBodyBuffer() {
         return __awaiter(this, void 0, void 0, function* () {
-          return new Promise((resolve6) => __awaiter(this, void 0, void 0, function* () {
+          return new Promise((resolve7) => __awaiter(this, void 0, void 0, function* () {
             const chunks = [];
             this.message.on("data", (chunk) => {
               chunks.push(chunk);
             });
             this.message.on("end", () => {
-              resolve6(Buffer.concat(chunks));
+              resolve7(Buffer.concat(chunks));
             });
           }));
         });
@@ -17656,14 +17656,14 @@ var require_lib = __commonJS({
        */
       requestRaw(info, data) {
         return __awaiter(this, void 0, void 0, function* () {
-          return new Promise((resolve6, reject) => {
+          return new Promise((resolve7, reject) => {
             function callbackForResult(err, res) {
               if (err) {
                 reject(err);
               } else if (!res) {
                 reject(new Error("Unknown error"));
               } else {
-                resolve6(res);
+                resolve7(res);
               }
             }
             this.requestRawWithCallback(info, data, callbackForResult);
@@ -17845,12 +17845,12 @@ var require_lib = __commonJS({
         return __awaiter(this, void 0, void 0, function* () {
           retryNumber = Math.min(ExponentialBackoffCeiling, retryNumber);
           const ms2 = ExponentialBackoffTimeSlice * Math.pow(2, retryNumber);
-          return new Promise((resolve6) => setTimeout(() => resolve6(), ms2));
+          return new Promise((resolve7) => setTimeout(() => resolve7(), ms2));
         });
       }
       _processResponse(res, options) {
         return __awaiter(this, void 0, void 0, function* () {
-          return new Promise((resolve6, reject) => __awaiter(this, void 0, void 0, function* () {
+          return new Promise((resolve7, reject) => __awaiter(this, void 0, void 0, function* () {
             const statusCode = res.message.statusCode || 0;
             const response = {
               statusCode,
@@ -17858,7 +17858,7 @@ var require_lib = __commonJS({
               headers: {}
             };
             if (statusCode === HttpCodes.NotFound) {
-              resolve6(response);
+              resolve7(response);
             }
             function dateTimeDeserializer(key, value) {
               if (typeof value === "string") {
@@ -17897,7 +17897,7 @@ var require_lib = __commonJS({
               err.result = response.result;
               reject(err);
             } else {
-              resolve6(response);
+              resolve7(response);
             }
           }));
         });
@@ -17914,11 +17914,11 @@ var require_auth = __commonJS({
     "use strict";
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P3, generator) {
       function adopt(value) {
-        return value instanceof P3 ? value : new P3(function(resolve6) {
-          resolve6(value);
+        return value instanceof P3 ? value : new P3(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P3 || (P3 = Promise))(function(resolve6, reject) {
+      return new (P3 || (P3 = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -17934,7 +17934,7 @@ var require_auth = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18018,11 +18018,11 @@ var require_oidc_utils = __commonJS({
     "use strict";
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P3, generator) {
       function adopt(value) {
-        return value instanceof P3 ? value : new P3(function(resolve6) {
-          resolve6(value);
+        return value instanceof P3 ? value : new P3(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P3 || (P3 = Promise))(function(resolve6, reject) {
+      return new (P3 || (P3 = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -18038,7 +18038,7 @@ var require_oidc_utils = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18116,11 +18116,11 @@ var require_summary = __commonJS({
     "use strict";
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P3, generator) {
       function adopt(value) {
-        return value instanceof P3 ? value : new P3(function(resolve6) {
-          resolve6(value);
+        return value instanceof P3 ? value : new P3(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P3 || (P3 = Promise))(function(resolve6, reject) {
+      return new (P3 || (P3 = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -18136,7 +18136,7 @@ var require_summary = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18482,11 +18482,11 @@ var require_io_util = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P3, generator) {
       function adopt(value) {
-        return value instanceof P3 ? value : new P3(function(resolve6) {
-          resolve6(value);
+        return value instanceof P3 ? value : new P3(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P3 || (P3 = Promise))(function(resolve6, reject) {
+      return new (P3 || (P3 = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -18502,7 +18502,7 @@ var require_io_util = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18655,11 +18655,11 @@ var require_io = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P3, generator) {
       function adopt(value) {
-        return value instanceof P3 ? value : new P3(function(resolve6) {
-          resolve6(value);
+        return value instanceof P3 ? value : new P3(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P3 || (P3 = Promise))(function(resolve6, reject) {
+      return new (P3 || (P3 = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -18675,7 +18675,7 @@ var require_io = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -18903,11 +18903,11 @@ var require_toolrunner = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P3, generator) {
       function adopt(value) {
-        return value instanceof P3 ? value : new P3(function(resolve6) {
-          resolve6(value);
+        return value instanceof P3 ? value : new P3(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P3 || (P3 = Promise))(function(resolve6, reject) {
+      return new (P3 || (P3 = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -18923,7 +18923,7 @@ var require_toolrunner = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -19151,7 +19151,7 @@ var require_toolrunner = __commonJS({
             this.toolPath = path20.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
           }
           this.toolPath = yield io.which(this.toolPath, true);
-          return new Promise((resolve6, reject) => __awaiter(this, void 0, void 0, function* () {
+          return new Promise((resolve7, reject) => __awaiter(this, void 0, void 0, function* () {
             this._debug(`exec tool: ${this.toolPath}`);
             this._debug("arguments:");
             for (const arg of this.args) {
@@ -19234,7 +19234,7 @@ var require_toolrunner = __commonJS({
               if (error) {
                 reject(error);
               } else {
-                resolve6(exitCode);
+                resolve7(exitCode);
               }
             });
             if (this.options.input) {
@@ -19387,11 +19387,11 @@ var require_exec = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P3, generator) {
       function adopt(value) {
-        return value instanceof P3 ? value : new P3(function(resolve6) {
-          resolve6(value);
+        return value instanceof P3 ? value : new P3(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P3 || (P3 = Promise))(function(resolve6, reject) {
+      return new (P3 || (P3 = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -19407,7 +19407,7 @@ var require_exec = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -19498,11 +19498,11 @@ var require_platform = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P3, generator) {
       function adopt(value) {
-        return value instanceof P3 ? value : new P3(function(resolve6) {
-          resolve6(value);
+        return value instanceof P3 ? value : new P3(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P3 || (P3 = Promise))(function(resolve6, reject) {
+      return new (P3 || (P3 = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -19518,7 +19518,7 @@ var require_platform = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -19617,11 +19617,11 @@ var require_core = __commonJS({
     };
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P3, generator) {
       function adopt(value) {
-        return value instanceof P3 ? value : new P3(function(resolve6) {
-          resolve6(value);
+        return value instanceof P3 ? value : new P3(function(resolve7) {
+          resolve7(value);
         });
       }
-      return new (P3 || (P3 = Promise))(function(resolve6, reject) {
+      return new (P3 || (P3 = Promise))(function(resolve7, reject) {
         function fulfilled(value) {
           try {
             step(generator.next(value));
@@ -19637,7 +19637,7 @@ var require_core = __commonJS({
           }
         }
         function step(result) {
-          result.done ? resolve6(result.value) : adopt(result.value).then(fulfilled, rejected);
+          result.done ? resolve7(result.value) : adopt(result.value).then(fulfilled, rejected);
         }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
       });
@@ -19740,10 +19740,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.error = error;
-    function warning(message, properties = {}) {
+    function warning2(message, properties = {}) {
       (0, command_1.issueCommand)("warning", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports2.warning = warning;
+    exports2.warning = warning2;
     function notice(message, properties = {}) {
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -19810,6 +19810,503 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return path_utils_1.toPlatformPath;
     } });
     exports2.platform = __importStar(require_platform());
+  }
+});
+
+// node_modules/isexe/windows.js
+var require_windows = __commonJS({
+  "node_modules/isexe/windows.js"(exports2, module2) {
+    module2.exports = isexe;
+    isexe.sync = sync;
+    var fs19 = require("fs");
+    function checkPathExt(path20, options) {
+      var pathext = options.pathExt !== void 0 ? options.pathExt : process.env.PATHEXT;
+      if (!pathext) {
+        return true;
+      }
+      pathext = pathext.split(";");
+      if (pathext.indexOf("") !== -1) {
+        return true;
+      }
+      for (var i = 0; i < pathext.length; i++) {
+        var p = pathext[i].toLowerCase();
+        if (p && path20.substr(-p.length).toLowerCase() === p) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function checkStat(stat5, path20, options) {
+      if (!stat5.isSymbolicLink() && !stat5.isFile()) {
+        return false;
+      }
+      return checkPathExt(path20, options);
+    }
+    function isexe(path20, options, cb2) {
+      fs19.stat(path20, function(er2, stat5) {
+        cb2(er2, er2 ? false : checkStat(stat5, path20, options));
+      });
+    }
+    function sync(path20, options) {
+      return checkStat(fs19.statSync(path20), path20, options);
+    }
+  }
+});
+
+// node_modules/isexe/mode.js
+var require_mode = __commonJS({
+  "node_modules/isexe/mode.js"(exports2, module2) {
+    module2.exports = isexe;
+    isexe.sync = sync;
+    var fs19 = require("fs");
+    function isexe(path20, options, cb2) {
+      fs19.stat(path20, function(er2, stat5) {
+        cb2(er2, er2 ? false : checkStat(stat5, options));
+      });
+    }
+    function sync(path20, options) {
+      return checkStat(fs19.statSync(path20), options);
+    }
+    function checkStat(stat5, options) {
+      return stat5.isFile() && checkMode(stat5, options);
+    }
+    function checkMode(stat5, options) {
+      var mod = stat5.mode;
+      var uid = stat5.uid;
+      var gid = stat5.gid;
+      var myUid = options.uid !== void 0 ? options.uid : process.getuid && process.getuid();
+      var myGid = options.gid !== void 0 ? options.gid : process.getgid && process.getgid();
+      var u = parseInt("100", 8);
+      var g = parseInt("010", 8);
+      var o = parseInt("001", 8);
+      var ug = u | g;
+      var ret = mod & o || mod & g && gid === myGid || mod & u && uid === myUid || mod & ug && myUid === 0;
+      return ret;
+    }
+  }
+});
+
+// node_modules/isexe/index.js
+var require_isexe = __commonJS({
+  "node_modules/isexe/index.js"(exports2, module2) {
+    var fs19 = require("fs");
+    var core2;
+    if (process.platform === "win32" || global.TESTING_WINDOWS) {
+      core2 = require_windows();
+    } else {
+      core2 = require_mode();
+    }
+    module2.exports = isexe;
+    isexe.sync = sync;
+    function isexe(path20, options, cb2) {
+      if (typeof options === "function") {
+        cb2 = options;
+        options = {};
+      }
+      if (!cb2) {
+        if (typeof Promise !== "function") {
+          throw new TypeError("callback not provided");
+        }
+        return new Promise(function(resolve7, reject) {
+          isexe(path20, options || {}, function(er2, is2) {
+            if (er2) {
+              reject(er2);
+            } else {
+              resolve7(is2);
+            }
+          });
+        });
+      }
+      core2(path20, options || {}, function(er2, is2) {
+        if (er2) {
+          if (er2.code === "EACCES" || options && options.ignoreErrors) {
+            er2 = null;
+            is2 = false;
+          }
+        }
+        cb2(er2, is2);
+      });
+    }
+    function sync(path20, options) {
+      try {
+        return core2.sync(path20, options || {});
+      } catch (er2) {
+        if (options && options.ignoreErrors || er2.code === "EACCES") {
+          return false;
+        } else {
+          throw er2;
+        }
+      }
+    }
+  }
+});
+
+// node_modules/which/which.js
+var require_which = __commonJS({
+  "node_modules/which/which.js"(exports2, module2) {
+    var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
+    var path20 = require("path");
+    var COLON = isWindows ? ";" : ":";
+    var isexe = require_isexe();
+    var getNotFoundError = (cmd) => Object.assign(new Error(`not found: ${cmd}`), { code: "ENOENT" });
+    var getPathInfo = (cmd, opt) => {
+      const colon = opt.colon || COLON;
+      const pathEnv = cmd.match(/\//) || isWindows && cmd.match(/\\/) ? [""] : [
+        // windows always checks the cwd first
+        ...isWindows ? [process.cwd()] : [],
+        ...(opt.path || process.env.PATH || /* istanbul ignore next: very unusual */
+        "").split(colon)
+      ];
+      const pathExtExe = isWindows ? opt.pathExt || process.env.PATHEXT || ".EXE;.CMD;.BAT;.COM" : "";
+      const pathExt = isWindows ? pathExtExe.split(colon) : [""];
+      if (isWindows) {
+        if (cmd.indexOf(".") !== -1 && pathExt[0] !== "")
+          pathExt.unshift("");
+      }
+      return {
+        pathEnv,
+        pathExt,
+        pathExtExe
+      };
+    };
+    var which = (cmd, opt, cb2) => {
+      if (typeof opt === "function") {
+        cb2 = opt;
+        opt = {};
+      }
+      if (!opt)
+        opt = {};
+      const { pathEnv, pathExt, pathExtExe } = getPathInfo(cmd, opt);
+      const found = [];
+      const step = (i) => new Promise((resolve7, reject) => {
+        if (i === pathEnv.length)
+          return opt.all && found.length ? resolve7(found) : reject(getNotFoundError(cmd));
+        const ppRaw = pathEnv[i];
+        const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
+        const pCmd = path20.join(pathPart, cmd);
+        const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
+        resolve7(subStep(p, i, 0));
+      });
+      const subStep = (p, i, ii2) => new Promise((resolve7, reject) => {
+        if (ii2 === pathExt.length)
+          return resolve7(step(i + 1));
+        const ext = pathExt[ii2];
+        isexe(p + ext, { pathExt: pathExtExe }, (er2, is2) => {
+          if (!er2 && is2) {
+            if (opt.all)
+              found.push(p + ext);
+            else
+              return resolve7(p + ext);
+          }
+          return resolve7(subStep(p, i, ii2 + 1));
+        });
+      });
+      return cb2 ? step(0).then((res) => cb2(null, res), cb2) : step(0);
+    };
+    var whichSync = (cmd, opt) => {
+      opt = opt || {};
+      const { pathEnv, pathExt, pathExtExe } = getPathInfo(cmd, opt);
+      const found = [];
+      for (let i = 0; i < pathEnv.length; i++) {
+        const ppRaw = pathEnv[i];
+        const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
+        const pCmd = path20.join(pathPart, cmd);
+        const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
+        for (let j2 = 0; j2 < pathExt.length; j2++) {
+          const cur = p + pathExt[j2];
+          try {
+            const is2 = isexe.sync(cur, { pathExt: pathExtExe });
+            if (is2) {
+              if (opt.all)
+                found.push(cur);
+              else
+                return cur;
+            }
+          } catch (ex) {
+          }
+        }
+      }
+      if (opt.all && found.length)
+        return found;
+      if (opt.nothrow)
+        return null;
+      throw getNotFoundError(cmd);
+    };
+    module2.exports = which;
+    which.sync = whichSync;
+  }
+});
+
+// node_modules/path-key/index.js
+var require_path_key = __commonJS({
+  "node_modules/path-key/index.js"(exports2, module2) {
+    "use strict";
+    var pathKey = (options = {}) => {
+      const environment = options.env || process.env;
+      const platform = options.platform || process.platform;
+      if (platform !== "win32") {
+        return "PATH";
+      }
+      return Object.keys(environment).reverse().find((key) => key.toUpperCase() === "PATH") || "Path";
+    };
+    module2.exports = pathKey;
+    module2.exports.default = pathKey;
+  }
+});
+
+// node_modules/cross-spawn/lib/util/resolveCommand.js
+var require_resolveCommand = __commonJS({
+  "node_modules/cross-spawn/lib/util/resolveCommand.js"(exports2, module2) {
+    "use strict";
+    var path20 = require("path");
+    var which = require_which();
+    var getPathKey = require_path_key();
+    function resolveCommandAttempt(parsed, withoutPathExt) {
+      const env = parsed.options.env || process.env;
+      const cwd = process.cwd();
+      const hasCustomCwd = parsed.options.cwd != null;
+      const shouldSwitchCwd = hasCustomCwd && process.chdir !== void 0 && !process.chdir.disabled;
+      if (shouldSwitchCwd) {
+        try {
+          process.chdir(parsed.options.cwd);
+        } catch (err) {
+        }
+      }
+      let resolved;
+      try {
+        resolved = which.sync(parsed.command, {
+          path: env[getPathKey({ env })],
+          pathExt: withoutPathExt ? path20.delimiter : void 0
+        });
+      } catch (e) {
+      } finally {
+        if (shouldSwitchCwd) {
+          process.chdir(cwd);
+        }
+      }
+      if (resolved) {
+        resolved = path20.resolve(hasCustomCwd ? parsed.options.cwd : "", resolved);
+      }
+      return resolved;
+    }
+    function resolveCommand(parsed) {
+      return resolveCommandAttempt(parsed) || resolveCommandAttempt(parsed, true);
+    }
+    module2.exports = resolveCommand;
+  }
+});
+
+// node_modules/cross-spawn/lib/util/escape.js
+var require_escape = __commonJS({
+  "node_modules/cross-spawn/lib/util/escape.js"(exports2, module2) {
+    "use strict";
+    var metaCharsRegExp = /([()\][%!^"`<>&|;, *?])/g;
+    function escapeCommand(arg) {
+      arg = arg.replace(metaCharsRegExp, "^$1");
+      return arg;
+    }
+    function escapeArgument(arg, doubleEscapeMetaChars) {
+      arg = `${arg}`;
+      arg = arg.replace(/(?=(\\+?)?)\1"/g, '$1$1\\"');
+      arg = arg.replace(/(?=(\\+?)?)\1$/, "$1$1");
+      arg = `"${arg}"`;
+      arg = arg.replace(metaCharsRegExp, "^$1");
+      if (doubleEscapeMetaChars) {
+        arg = arg.replace(metaCharsRegExp, "^$1");
+      }
+      return arg;
+    }
+    module2.exports.command = escapeCommand;
+    module2.exports.argument = escapeArgument;
+  }
+});
+
+// node_modules/shebang-regex/index.js
+var require_shebang_regex = __commonJS({
+  "node_modules/shebang-regex/index.js"(exports2, module2) {
+    "use strict";
+    module2.exports = /^#!(.*)/;
+  }
+});
+
+// node_modules/shebang-command/index.js
+var require_shebang_command = __commonJS({
+  "node_modules/shebang-command/index.js"(exports2, module2) {
+    "use strict";
+    var shebangRegex = require_shebang_regex();
+    module2.exports = (string = "") => {
+      const match = string.match(shebangRegex);
+      if (!match) {
+        return null;
+      }
+      const [path20, argument] = match[0].replace(/#! ?/, "").split(" ");
+      const binary = path20.split("/").pop();
+      if (binary === "env") {
+        return argument;
+      }
+      return argument ? `${binary} ${argument}` : binary;
+    };
+  }
+});
+
+// node_modules/cross-spawn/lib/util/readShebang.js
+var require_readShebang = __commonJS({
+  "node_modules/cross-spawn/lib/util/readShebang.js"(exports2, module2) {
+    "use strict";
+    var fs19 = require("fs");
+    var shebangCommand = require_shebang_command();
+    function readShebang(command) {
+      const size = 150;
+      const buffer = Buffer.alloc(size);
+      let fd2;
+      try {
+        fd2 = fs19.openSync(command, "r");
+        fs19.readSync(fd2, buffer, 0, size, 0);
+        fs19.closeSync(fd2);
+      } catch (e) {
+      }
+      return shebangCommand(buffer.toString());
+    }
+    module2.exports = readShebang;
+  }
+});
+
+// node_modules/cross-spawn/lib/parse.js
+var require_parse2 = __commonJS({
+  "node_modules/cross-spawn/lib/parse.js"(exports2, module2) {
+    "use strict";
+    var path20 = require("path");
+    var resolveCommand = require_resolveCommand();
+    var escape2 = require_escape();
+    var readShebang = require_readShebang();
+    var isWin = process.platform === "win32";
+    var isExecutableRegExp = /\.(?:com|exe)$/i;
+    var isCmdShimRegExp = /node_modules[\\/].bin[\\/][^\\/]+\.cmd$/i;
+    function detectShebang(parsed) {
+      parsed.file = resolveCommand(parsed);
+      const shebang = parsed.file && readShebang(parsed.file);
+      if (shebang) {
+        parsed.args.unshift(parsed.file);
+        parsed.command = shebang;
+        return resolveCommand(parsed);
+      }
+      return parsed.file;
+    }
+    function parseNonShell(parsed) {
+      if (!isWin) {
+        return parsed;
+      }
+      const commandFile = detectShebang(parsed);
+      const needsShell = !isExecutableRegExp.test(commandFile);
+      if (parsed.options.forceShell || needsShell) {
+        const needsDoubleEscapeMetaChars = isCmdShimRegExp.test(commandFile);
+        parsed.command = path20.normalize(parsed.command);
+        parsed.command = escape2.command(parsed.command);
+        parsed.args = parsed.args.map((arg) => escape2.argument(arg, needsDoubleEscapeMetaChars));
+        const shellCommand = [parsed.command].concat(parsed.args).join(" ");
+        parsed.args = ["/d", "/s", "/c", `"${shellCommand}"`];
+        parsed.command = process.env.comspec || "cmd.exe";
+        parsed.options.windowsVerbatimArguments = true;
+      }
+      return parsed;
+    }
+    function parse(command, args, options) {
+      if (args && !Array.isArray(args)) {
+        options = args;
+        args = null;
+      }
+      args = args ? args.slice(0) : [];
+      options = Object.assign({}, options);
+      const parsed = {
+        command,
+        args,
+        options,
+        file: void 0,
+        original: {
+          command,
+          args
+        }
+      };
+      return options.shell ? parsed : parseNonShell(parsed);
+    }
+    module2.exports = parse;
+  }
+});
+
+// node_modules/cross-spawn/lib/enoent.js
+var require_enoent = __commonJS({
+  "node_modules/cross-spawn/lib/enoent.js"(exports2, module2) {
+    "use strict";
+    var isWin = process.platform === "win32";
+    function notFoundError(original, syscall) {
+      return Object.assign(new Error(`${syscall} ${original.command} ENOENT`), {
+        code: "ENOENT",
+        errno: "ENOENT",
+        syscall: `${syscall} ${original.command}`,
+        path: original.command,
+        spawnargs: original.args
+      });
+    }
+    function hookChildProcess(cp, parsed) {
+      if (!isWin) {
+        return;
+      }
+      const originalEmit = cp.emit;
+      cp.emit = function(name, arg1) {
+        if (name === "exit") {
+          const err = verifyENOENT(arg1, parsed);
+          if (err) {
+            return originalEmit.call(cp, "error", err);
+          }
+        }
+        return originalEmit.apply(cp, arguments);
+      };
+    }
+    function verifyENOENT(status, parsed) {
+      if (isWin && status === 1 && !parsed.file) {
+        return notFoundError(parsed.original, "spawn");
+      }
+      return null;
+    }
+    function verifyENOENTSync(status, parsed) {
+      if (isWin && status === 1 && !parsed.file) {
+        return notFoundError(parsed.original, "spawnSync");
+      }
+      return null;
+    }
+    module2.exports = {
+      hookChildProcess,
+      verifyENOENT,
+      verifyENOENTSync,
+      notFoundError
+    };
+  }
+});
+
+// node_modules/cross-spawn/index.js
+var require_cross_spawn = __commonJS({
+  "node_modules/cross-spawn/index.js"(exports2, module2) {
+    "use strict";
+    var cp = require("child_process");
+    var parse = require_parse2();
+    var enoent = require_enoent();
+    function spawn2(command, args, options) {
+      const parsed = parse(command, args, options);
+      const spawned = cp.spawn(parsed.command, parsed.args, parsed.options);
+      enoent.hookChildProcess(spawned, parsed);
+      return spawned;
+    }
+    function spawnSync(command, args, options) {
+      const parsed = parse(command, args, options);
+      const result = cp.spawnSync(parsed.command, parsed.args, parsed.options);
+      result.error = result.error || enoent.verifyENOENTSync(result.status, parsed);
+      return result;
+    }
+    module2.exports = spawn2;
+    module2.exports.spawn = spawn2;
+    module2.exports.sync = spawnSync;
+    module2.exports._parse = parse;
+    module2.exports._enoent = enoent;
   }
 });
 
@@ -22150,36 +22647,34 @@ function stripFrontmatter(content) {
   const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   return match ? content.slice(match[0].length).trim() : content.trim();
 }
-async function discoverSkills(skillsDir) {
-  const skills = [];
+async function isFile(p) {
+  try {
+    return (await fs.stat(p)).isFile();
+  } catch {
+    return false;
+  }
+}
+async function resolveSkillsDirLayout(skillsDir) {
   let entries;
   try {
     entries = await fs.readdir(skillsDir, { withFileTypes: true });
   } catch {
-    return skills;
+    return { kind: "none", names: [] };
   }
+  const names = [];
   for (const entry of entries) {
     if (!entry.isDirectory())
       continue;
-    const skillDir = path.join(skillsDir, entry.name);
-    const skillFile = path.join(skillDir, "SKILL.md");
-    try {
-      const content = await fs.readFile(skillFile, "utf-8");
-      const frontmatter = parseFrontmatter(content);
-      if (frontmatter.name && frontmatter.description) {
-        skills.push({
-          name: frontmatter.name,
-          description: frontmatter.description,
-          path: path.resolve(skillDir)
-        });
-      } else if (frontmatter.name || frontmatter.description) {
-        console.warn(`Skipping skill in ${entry.name}: SKILL.md frontmatter missing ${!frontmatter.name ? "name" : "description"}`);
-      }
-    } catch {
-      continue;
+    if (await isFile(path.join(skillsDir, entry.name, "SKILL.md"))) {
+      names.push(entry.name);
     }
   }
-  return skills;
+  if (names.length > 0)
+    return { kind: "multi", names };
+  if (await isFile(path.join(skillsDir, "SKILL.md"))) {
+    return { kind: "root", names: [path.basename(path.resolve(skillsDir))] };
+  }
+  return { kind: "none", names: [] };
 }
 
 // dist/src/task/schema.js
@@ -22249,7 +22744,7 @@ async function buildNudge(level, skills) {
 Available skills: ${skills.map((s) => s.name).join(", ")}`;
   }
   if (level === "description") {
-    const lines = skills.map((s) => `- ${s.name}: ${s.description}`);
+    const lines = skills.map((s) => `- ${s.name}: ${s.description || "(no description)"}`);
     return `
 
 Available skills:
@@ -22270,8 +22765,26 @@ ${sections.join("\n\n")}`;
 async function buildNudgeForSkillsDir(level, skillsDir) {
   if (level === "off" || !skillsDir)
     return "";
-  const skills = await discoverSkills(skillsDir);
-  return buildNudge(level, skills.map((s) => ({ name: s.name, description: s.description, skillDir: s.path })));
+  const layout = await resolveSkillsDirLayout(skillsDir);
+  if (layout.kind === "none")
+    return "";
+  const skillDirs = layout.kind === "root" ? [path2.resolve(skillsDir)] : layout.names.map((name) => path2.resolve(skillsDir, name));
+  const skills = [];
+  for (let i = 0; i < skillDirs.length; i++) {
+    const skillDir = skillDirs[i];
+    let frontmatter = {};
+    try {
+      frontmatter = parseFrontmatter(await fs2.readFile(path2.join(skillDir, "SKILL.md"), "utf-8"));
+    } catch {
+      continue;
+    }
+    skills.push({
+      name: frontmatter.name || layout.names[i],
+      description: frontmatter.description ?? "",
+      skillDir
+    });
+  }
+  return buildNudge(level, skills);
 }
 
 // dist/src/config.js
@@ -22337,6 +22850,9 @@ async function loadConfigFile(configPath) {
       config.resolutionThreshold = raw.thresholds.resolution_rate;
     if (raw.thresholds?.min_lift !== void 0)
       config.liftThreshold = raw.thresholds.min_lift;
+    if (raw.thresholds?.discovery_rate !== void 0 || raw.thresholds?.avg_score !== void 0) {
+      console.warn("Warning: eval.config.yaml thresholds.discovery_rate/avg_score were removed in v2 and are IGNORED \u2014 use thresholds.resolution_rate / thresholds.min_lift");
+    }
     if (raw.judge?.enabled !== void 0)
       config.judgeEnabled = raw.judge.enabled === true;
     if (raw.judge?.model)
@@ -22445,6 +22961,9 @@ function loadEnvConfig() {
   const liftThreshold = parseFloat(process.env.EVAL_LIFT_THRESHOLD || "");
   if (!isNaN(liftThreshold))
     config.liftThreshold = liftThreshold;
+  if (process.env.EVAL_DISCOVERY_THRESHOLD !== void 0 || process.env.EVAL_SCORE_THRESHOLD !== void 0) {
+    console.warn("Warning: EVAL_DISCOVERY_THRESHOLD/EVAL_SCORE_THRESHOLD were removed in v2 and are IGNORED \u2014 use EVAL_RESOLUTION_THRESHOLD / EVAL_LIFT_THRESHOLD");
+  }
   if (process.env.EVAL_GITHUB_SUMMARY !== void 0) {
     config.githubSummary = process.env.EVAL_GITHUB_SUMMARY === "true";
   }
@@ -22505,7 +23024,7 @@ async function isDirectory(p) {
     return false;
   }
 }
-async function isFile(p) {
+async function isFile2(p) {
   try {
     return (await fs4.stat(p)).isFile();
   } catch {
@@ -22521,16 +23040,7 @@ async function listSubdirs(dir) {
   }
 }
 async function resolveSkillNames(skillsDir) {
-  const names = [];
-  for (const sub of await listSubdirs(skillsDir)) {
-    if (await isFile(path4.join(skillsDir, sub, "SKILL.md"))) {
-      names.push(sub);
-    }
-  }
-  if (names.length === 0 && await isFile(path4.join(skillsDir, "SKILL.md"))) {
-    names.push(path4.basename(skillsDir));
-  }
-  return names;
+  return (await resolveSkillsDirLayout(skillsDir)).names;
 }
 async function findScript(dir, prefixes) {
   let entries;
@@ -22686,7 +23196,12 @@ async function loadTaskPackage(taskDir, suiteSkillsDir, options, errors, warning
   } else if (fm2.expected_skill) {
     expectedSkill = fm2.expected_skill;
     if (skillNames.length > 0 && !skillNames.includes(expectedSkill)) {
-      warnings.push(`${label}: expected_skill '${expectedSkill}' not found among available skills: ${skillNames.join(", ")}`);
+      if (options.skillsDirOverride && skillNames.length === 1) {
+        warnings.push(`${label}: expected_skill '${expectedSkill}' remapped to injected skill '${skillNames[0]}' (--skills-dir override)`);
+        expectedSkill = skillNames[0];
+      } else {
+        warnings.push(`${label}: expected_skill '${expectedSkill}' not found among available skills: ${skillNames.join(", ")}`);
+      }
     }
   } else if (skillNames.length === 1) {
     expectedSkill = skillNames[0];
@@ -22759,7 +23274,7 @@ async function validateTaskPackages(inputPath, options = {}) {
   }
   let taskDirs;
   let suiteDir;
-  if (await isFile(path4.join(resolved, "task.md"))) {
+  if (await isFile2(path4.join(resolved, "task.md"))) {
     taskDirs = [resolved];
     suiteDir = path4.dirname(resolved);
   } else {
@@ -22768,7 +23283,7 @@ async function validateTaskPackages(inputPath, options = {}) {
     taskDirs = [];
     for (const sub of subdirs.sort()) {
       const candidate = path4.join(resolved, sub);
-      if (await isFile(path4.join(candidate, "task.md"))) {
+      if (await isFile2(path4.join(candidate, "task.md"))) {
         taskDirs.push(candidate);
       }
     }
@@ -22807,8 +23322,8 @@ async function loadTaskPackages(inputPath, options = {}) {
     throw new Error(`Invalid task package(s) at ${inputPath}:
   - ${errors.join("\n  - ")}`);
   }
-  for (const warning of warnings) {
-    console.warn(`Warning: ${warning}`);
+  for (const warning2 of warnings) {
+    console.warn(`Warning: ${warning2}`);
   }
   return suite;
 }
@@ -42635,20 +43150,15 @@ async function copyDir(src, dest) {
 }
 async function mountSkills(skillsSourceDir, targetDir) {
   await fs6.mkdir(targetDir, { recursive: true });
-  const skillNames = [];
-  const entries = await fs6.readdir(skillsSourceDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      await copyDir(path6.join(skillsSourceDir, entry.name), path6.join(targetDir, entry.name));
-      skillNames.push(entry.name);
-    } else if (entry.name === "SKILL.md") {
-      const skillName = path6.basename(skillsSourceDir);
-      await fs6.mkdir(path6.join(targetDir, skillName), { recursive: true });
-      await fs6.copyFile(path6.join(skillsSourceDir, entry.name), path6.join(targetDir, skillName, "SKILL.md"));
-      skillNames.push(skillName);
+  const layout = await resolveSkillsDirLayout(skillsSourceDir);
+  if (layout.kind === "root") {
+    await copyDir(skillsSourceDir, path6.join(targetDir, layout.names[0]));
+  } else {
+    for (const name of layout.names) {
+      await copyDir(path6.join(skillsSourceDir, name), path6.join(targetDir, name));
     }
   }
-  return skillNames;
+  return layout.names;
 }
 async function createTrialWorkspace(options) {
   const dir = path6.resolve(options.baseDir, "workspaces", options.taskId, `run-${options.runIndex + 1}`);
@@ -42681,6 +43191,13 @@ async function applyCleanupPolicy(workspace, policy, trialFailed) {
 
 // dist/src/runner/base-runner.js
 var ROUGH_COST_PER_TOKEN = 3e-6;
+var warnedCliRunnerSecurity = false;
+function warnCliRunnerSecurity(providerName) {
+  if (warnedCliRunnerSecurity)
+    return;
+  warnedCliRunnerSecurity = true;
+  console.warn(`\u26A0 ${providerName} runs the agent with all permissions granted on this host (no write restrictions). Run only skills/tasks you trust; --sandbox docker isolates verifiers, not the agent.`);
+}
 function buildTokenUsage(raw) {
   if (!raw)
     return void 0;
@@ -42930,6 +43447,7 @@ var ClaudeSdkRunner = class extends BaseRunner {
 
 // dist/src/harness/subprocess.js
 var import_child_process4 = require("child_process");
+var import_cross_spawn = __toESM(require_cross_spawn(), 1);
 var KILL_GRACE_MS = 5e3;
 function killProcessTree(child) {
   const pid = child.pid;
@@ -42966,8 +43484,8 @@ function killProcessTree(child) {
 async function runCliJsonl(options) {
   const start = Date.now();
   const isWindows = process.platform === "win32";
-  return new Promise((resolve6, reject) => {
-    const child = (0, import_child_process4.spawn)(options.command, options.args, {
+  return new Promise((resolve7, reject) => {
+    const child = (0, import_cross_spawn.default)(options.command, options.args, {
       cwd: options.cwd,
       env: options.env ?? process.env,
       shell: false,
@@ -43011,7 +43529,7 @@ async function runCliJsonl(options) {
       cleanup();
       if (stdoutBuffer)
         consumeLine(stdoutBuffer.replace(/\r$/, ""));
-      resolve6({
+      resolve7({
         events,
         rawLines,
         stderr,
@@ -43115,6 +43633,10 @@ var ClaudeCodeRunner = class extends BaseRunner {
   providerName = "claude-code";
   /** Lazy preflight result, shared across tasks. */
   cliDetection;
+  constructor(options = {}, config) {
+    super(options, config);
+    warnCliRunnerSecurity(this.providerName);
+  }
   /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
   runCli(options) {
     return runCliJsonl(options);
@@ -43274,6 +43796,10 @@ var CodexRunner = class extends BaseRunner {
   skillsMountPath = path7.join(".agents", "skills");
   /** Lazy preflight result, shared across tasks. */
   cliDetection;
+  constructor(options = {}, config) {
+    super(options, config);
+    warnCliRunnerSecurity(this.providerName);
+  }
   /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
   runCli(options) {
     return runCliJsonl(options);
@@ -43424,6 +43950,10 @@ var GeminiRunner = class extends BaseRunner {
   /** Canonical documented project-level skills dir (`.agents/skills` is an alias). */
   skillsMountPath = path8.join(".gemini", "skills");
   cliDetection;
+  constructor(options = {}, config) {
+    super(options, config);
+    warnCliRunnerSecurity(this.providerName);
+  }
   /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
   runCli(options) {
     return runCliJsonl(options);
@@ -43596,6 +44126,10 @@ var OpenCodeRunner = class extends BaseRunner {
   /** OpenCode's native project-level skills dir (docs: plural `skills`). */
   skillsMountPath = path9.join(".opencode", "skills");
   cliDetection;
+  constructor(options = {}, config) {
+    super(options, config);
+    warnCliRunnerSecurity(this.providerName);
+  }
   /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
   runCli(options) {
     return runCliJsonl(options);
@@ -43972,56 +44506,51 @@ function scoreDeterministic(task, result, options) {
       details.push(`Verifier failed (reward ${result.verifier.reward}, status ${result.verifier.status})${stderrHint}`);
     }
   }
-  let passed;
+  let checksPassed;
   if (ignoreActivation) {
-    passed = !result.isError;
+    checksPassed = !result.isError;
     if (markerFound !== null)
-      passed = passed && markerFound;
+      checksPassed = checksPassed && markerFound;
     if (expectedToolsCalled !== null)
-      passed = passed && expectedToolsCalled;
+      checksPassed = checksPassed && expectedToolsCalled;
     if (unexpectedToolsCalled !== null)
-      passed = passed && !unexpectedToolsCalled;
+      checksPassed = checksPassed && !unexpectedToolsCalled;
     if (containsCheckPassed !== null)
-      passed = passed && containsCheckPassed;
+      checksPassed = checksPassed && containsCheckPassed;
     if (notContainsCheckPassed !== null)
-      passed = passed && notContainsCheckPassed;
+      checksPassed = checksPassed && notContainsCheckPassed;
     if (regexCheckPassed !== null)
-      passed = passed && regexCheckPassed;
+      checksPassed = checksPassed && regexCheckPassed;
     if (javascriptCheckPassed !== null)
-      passed = passed && javascriptCheckPassed;
+      checksPassed = checksPassed && javascriptCheckPassed;
     if (fileExistsCheckPassed !== null)
-      passed = passed && fileExistsCheckPassed;
-    if (verifierPassed !== null)
-      passed = passed && verifierPassed;
+      checksPassed = checksPassed && fileExistsCheckPassed;
   } else if (check.expectSkillActivation) {
-    passed = skillActivated;
+    checksPassed = skillActivated;
     if (markerFound !== null)
-      passed = passed && markerFound;
+      checksPassed = checksPassed && markerFound;
     if (expectedToolsCalled !== null)
-      passed = passed && expectedToolsCalled;
+      checksPassed = checksPassed && expectedToolsCalled;
     if (unexpectedToolsCalled !== null)
-      passed = passed && !unexpectedToolsCalled;
+      checksPassed = checksPassed && !unexpectedToolsCalled;
     if (containsCheckPassed !== null)
-      passed = passed && containsCheckPassed;
+      checksPassed = checksPassed && containsCheckPassed;
     if (notContainsCheckPassed !== null)
-      passed = passed && notContainsCheckPassed;
+      checksPassed = checksPassed && notContainsCheckPassed;
     if (regexCheckPassed !== null)
-      passed = passed && regexCheckPassed;
+      checksPassed = checksPassed && regexCheckPassed;
     if (javascriptCheckPassed !== null)
-      passed = passed && javascriptCheckPassed;
+      checksPassed = checksPassed && javascriptCheckPassed;
     if (fileExistsCheckPassed !== null)
-      passed = passed && fileExistsCheckPassed;
-    if (verifierPassed !== null)
-      passed = passed && verifierPassed;
+      checksPassed = checksPassed && fileExistsCheckPassed;
   } else {
-    passed = !skillActivated;
-    if (verifierPassed !== null)
-      passed = passed && verifierPassed;
+    checksPassed = !skillActivated;
     const hasOtherAssertions = containsCheckPassed !== null || notContainsCheckPassed !== null || regexCheckPassed !== null || javascriptCheckPassed !== null || fileExistsCheckPassed !== null;
     if (hasOtherAssertions) {
       details.push("Note: non-activation assertions were evaluated but do not affect pass/fail for negative tests");
     }
   }
+  const passed = checksPassed && verifierPassed !== false;
   return {
     skillActivated,
     skillName: activatedSkillName,
@@ -44034,6 +44563,7 @@ function scoreDeterministic(task, result, options) {
     javascriptCheckPassed,
     fileExistsCheckPassed,
     verifierPassed,
+    checksPassed,
     passed,
     details
   };
@@ -44643,8 +45173,10 @@ function mergeScores(task, result, det, judge, isBaseline) {
   const taskId = task.id;
   const isNegativeTest = task.expectedSkillLoad === "none";
   const computeDiscovery = (activated) => isNegativeTest ? activated ? 0 : 1 : activated ? 1 : 0;
-  const passed = !result.isError && (det ? det.passed : true);
-  const reward = result.isError ? 0 : passed ? 1 : clamp01(result.verifier?.reward ?? 0);
+  const hasVerifier = !!result.verifier;
+  const checksPassedExVerifier = det ? det.checksPassed : true;
+  const reward = result.isError ? 0 : !checksPassedExVerifier ? 0 : hasVerifier ? clamp01(result.verifier.reward) : det ? det.passed ? 1 : 0 : 1;
+  const passed = !result.isError && reward >= 1 && (det ? det.passed : true);
   const discovery = det ? computeDiscovery(det.skillActivated) : 0;
   const invocation = !isBaseline && !isNegativeTest && det ? det.skillActivated ? 1 : 0 : void 0;
   let failureCategory = judge?.failureCategory ?? "none";
@@ -45432,7 +45964,7 @@ async function generateJsonResults(options) {
 }
 function evaluatePassFail(summary2, config, skillLift2) {
   const resolutionPassed = summary2.resolutionRate >= config.resolutionThreshold;
-  const liftPassed = config.liftThreshold !== void 0 && skillLift2 !== void 0 ? skillLift2 >= config.liftThreshold : void 0;
+  const liftPassed = config.liftThreshold !== void 0 ? skillLift2 !== void 0 ? skillLift2 >= config.liftThreshold : false : void 0;
   return {
     resolutionPassed,
     liftPassed,
@@ -45444,8 +45976,12 @@ function computeFailureReasons(summary2, config, skillLift2) {
   if (summary2.resolutionRate < config.resolutionThreshold) {
     reasons.push(`Resolution rate ${(summary2.resolutionRate * 100).toFixed(1)}% below threshold ${(config.resolutionThreshold * 100).toFixed(0)}%`);
   }
-  if (config.liftThreshold !== void 0 && skillLift2 !== void 0 && skillLift2 < config.liftThreshold) {
-    reasons.push(`Skill lift ${formatDelta(skillLift2 * 100, 1)}% below threshold ${formatDelta(config.liftThreshold * 100, 1)}%`);
+  if (config.liftThreshold !== void 0) {
+    if (skillLift2 === void 0) {
+      reasons.push("min_lift threshold is configured but no baseline ran (lift unavailable) \u2014 run with baseline enabled or remove the threshold");
+    } else if (skillLift2 < config.liftThreshold) {
+      reasons.push(`Skill lift ${formatDelta(skillLift2 * 100, 1)}% below threshold ${formatDelta(config.liftThreshold * 100, 1)}%`);
+    }
   }
   return reasons;
 }
@@ -46692,7 +47228,7 @@ function trialFailures(trials, condition) {
 }
 function evaluateThresholds(resolution, config, lift) {
   const resolutionPassed = resolution >= config.resolutionThreshold;
-  const liftPassed = config.liftThreshold !== void 0 && lift !== void 0 ? lift >= config.liftThreshold : void 0;
+  const liftPassed = config.liftThreshold !== void 0 ? lift !== void 0 ? lift >= config.liftThreshold : false : void 0;
   return {
     resolution: config.resolutionThreshold,
     lift: config.liftThreshold,
@@ -46822,14 +47358,14 @@ var path16 = __toESM(require("path"), 1);
 var DEFAULT_DOCKER_IMAGE = "node:20-slim";
 var DOCKER_UNAVAILABLE_HINT = "Docker is required for --sandbox docker but the `docker` CLI could not be run. Install Docker (https://docs.docker.com/get-docker/), make sure the daemon is running, or drop --sandbox docker to run verifiers on the host.";
 function defaultDockerExec(args, options) {
-  return new Promise((resolve6) => {
+  return new Promise((resolve7) => {
     (0, import_child_process5.execFile)("docker", args, { timeout: options.timeoutMs, encoding: "utf-8", maxBuffer: 10 * 1024 * 1024, shell: false }, (err, stdout, stderr) => {
       if (!err) {
-        resolve6({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: 0, timedOut: false });
+        resolve7({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: 0, timedOut: false });
         return;
       }
       const execErr = err;
-      resolve6({
+      resolve7({
         stdout: stdout ?? "",
         stderr: stderr ?? "",
         exitCode: typeof execErr.code === "number" ? execErr.code : null,
@@ -46855,10 +47391,16 @@ function resolveContainerInterpreter(scriptRelPath) {
       };
   }
 }
+function sanitizeDockerName(id2) {
+  return id2.toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 40) || "task";
+}
 function dockerImageTag(taskId, dockerfileContent) {
   const hash = (0, import_crypto7.createHash)("sha256").update(dockerfileContent).digest("hex").slice(0, 12);
-  const safeId = taskId.toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 40) || "task";
-  return `skilljack-eval-${safeId}-${hash}`;
+  return `skilljack-eval-${sanitizeDockerName(taskId)}-${hash}`;
+}
+var containerCounter = 0;
+function verifierContainerName(taskId) {
+  return `skilljack-verifier-${sanitizeDockerName(taskId)}-${process.pid}-${++containerCounter}-${(0, import_crypto7.randomBytes)(4).toString("hex")}`;
 }
 var BUILD_TIMEOUT_MS = 6e5;
 async function fileExists(p) {
@@ -46952,9 +47494,12 @@ async function runVerifierInDocker(options) {
     await fs15.writeFile(path16.join(contractDir, "output.txt"), options.output, "utf-8");
     await fs15.writeFile(path16.join(contractDir, "trajectory.json"), JSON.stringify(options.toolCalls, null, 2), "utf-8");
     const scriptContainerPath = "/task/" + options.verifierRelPath.split(path16.sep).join("/");
+    const containerName = verifierContainerName(options.taskId ?? path16.basename(options.taskDir));
     const args = [
       "run",
       "--rm",
+      "--name",
+      containerName,
       "-v",
       `${options.workspaceDir}:/workspace`,
       "-v",
@@ -46976,6 +47521,10 @@ async function runVerifierInDocker(options) {
       return outcome({ status: "error", stderr: DOCKER_UNAVAILABLE_HINT });
     }
     if (run2.timedOut) {
+      try {
+        await execFn(["rm", "-f", containerName], { timeoutMs: 3e4 });
+      } catch {
+      }
       return outcome({
         status: "timeout",
         exitCode: run2.exitCode,
@@ -47035,17 +47584,17 @@ function resolveInterpreter(scriptPath, platform = process.platform) {
   }
 }
 function execAttempt(invocation, cwd, env, timeoutMs) {
-  return new Promise((resolve6) => {
+  return new Promise((resolve7) => {
     (0, import_child_process6.execFile)(invocation.file, invocation.args, { cwd, env, timeout: timeoutMs, encoding: "utf-8", maxBuffer: 10 * 1024 * 1024, shell: false }, (err, stdout, stderr) => {
       if (!err) {
-        resolve6({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: 0, timedOut: false, enoent: false });
+        resolve7({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: 0, timedOut: false, enoent: false });
         return;
       }
       const execErr = err;
       const timedOut = execErr.killed === true;
       const enoent = execErr.code === "ENOENT";
       const exitCode = typeof execErr.code === "number" ? execErr.code : null;
-      resolve6({
+      resolve7({
         stdout: stdout ?? "",
         stderr: stderr ?? "",
         exitCode,
@@ -47622,18 +48171,23 @@ async function runPipeline(options) {
     previousSummary = await loadPreviousRunSummary(options.compareResultsPath);
     console.log("Comparison file validated successfully");
   }
+  let compareSkillNames;
   if (options.compareSkillPath) {
-    let stat4;
+    let stat5;
     try {
-      stat4 = await fs18.stat(options.compareSkillPath);
+      stat5 = await fs18.stat(options.compareSkillPath);
     } catch (err) {
       if (err.code === "ENOENT") {
         throw new Error(`--compare-skill path not found: ${options.compareSkillPath}`);
       }
       throw err;
     }
-    if (!stat4.isDirectory()) {
+    if (!stat5.isDirectory()) {
       throw new Error(`--compare-skill path is not a directory: ${options.compareSkillPath}`);
+    }
+    compareSkillNames = (await resolveSkillsDirLayout(options.compareSkillPath)).names;
+    if (compareSkillNames.length === 0) {
+      throw new Error(`--compare-skill path contains no skills (no SKILL.md found): ${options.compareSkillPath}`);
     }
   }
   const numRuns = options.numRuns ?? 3;
@@ -47669,12 +48223,34 @@ Paired baseline: running each task with skill AND "${baselineLabel}"`);
       ...scorerOptions,
       isBaseline: isNoSkillBaseline
     };
-    basePhase = await runPhase(baselineLabel, suiteTasks, config, numRuns, baselineScorerOptions, path19.join(logDir, "baseline"), {
+    let baselineSuiteTasks = suiteTasks;
+    if (options.compareSkillPath && compareSkillNames) {
+      const names = compareSkillNames;
+      baselineSuiteTasks = suiteTasks.map((lt2) => {
+        const expected = lt2.task.expectedSkillLoad;
+        if (!expected || expected === "none")
+          return lt2;
+        let overrideName;
+        if (names.length === 1) {
+          overrideName = names[0];
+        } else if (names.includes(expected)) {
+          overrideName = expected;
+        } else {
+          throw new Error(`--compare-skill dir contains multiple skills (${names.join(", ")}) and none matches task ${lt2.task.id}'s expected skill '${expected}' \u2014 use a single-skill directory or align the skill names.`);
+        }
+        if (overrideName === expected)
+          return lt2;
+        return { ...lt2, task: { ...lt2.task, expectedSkillLoad: overrideName } };
+      });
+    }
+    basePhase = await runPhase(baselineLabel, baselineSuiteTasks, config, numRuns, baselineScorerOptions, path19.join(logDir, "baseline"), {
       workspaceBaseDir: path19.join(config.outputDir, "baseline"),
       keepWorkspaces,
       phaseSkills: options.compareSkillPath ? { dir: options.compareSkillPath } : "none",
-      // Baseline always gets the bare prompt — no nudge.
-      nudgeLevel: "off"
+      // Only the no-skill baseline gets the bare prompt. A skill-version
+      // comparison applies the SAME nudge level to both arms — the nudge
+      // text is built from the compare dir's skills via phaseSkillsDirFor.
+      nudgeLevel: options.compareSkillPath ? nudgeLevel : "off"
     }, cacheOpts);
     console.log("\n=== Computing Comparison Deltas ===\n");
     comparison = computeComparison(withPhase, basePhase, baselineLabel, evaluation.tasks, options.compareSkillPath);
@@ -47872,6 +48448,9 @@ async function run() {
     const thresholdResolution = parseFloat(core.getInput("threshold-resolution") || "0.8");
     const thresholdLiftRaw = core.getInput("threshold-lift");
     const thresholdLift = thresholdLiftRaw ? parseFloat(thresholdLiftRaw) : void 0;
+    if (core.getInput("threshold-discovery") || core.getInput("threshold-score")) {
+      core.warning("threshold-discovery/threshold-score inputs were removed in v2 and are IGNORED \u2014 use threshold-resolution / threshold-lift");
+    }
     const timeout = parseInt(core.getInput("timeout") || "300000", 10);
     const concurrencyRaw = core.getInput("concurrency") || "1";
     const concurrency = Number(concurrencyRaw);

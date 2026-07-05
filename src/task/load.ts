@@ -18,7 +18,7 @@
 import * as yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { extractFrontmatterBlock, stripFrontmatter } from '../runner/skill-discovery.js';
+import { extractFrontmatterBlock, resolveSkillsDirLayout, stripFrontmatter } from '../runner/skill-discovery.js';
 import {
   KNOWN_FRONTMATTER_KEYS,
   KNOWN_CHECK_KEYS,
@@ -98,18 +98,11 @@ async function listSubdirs(dir: string): Promise<string[]> {
  * Resolve skill directory names within a skills dir. A directory counts as a
  * skill when it contains a SKILL.md, or when the skills dir itself has a
  * root-level SKILL.md (single-skill convention, matching the old skill-setup).
+ * Delegates to the shared layout helper so the loader, workspace mounting,
+ * and nudge builder can never disagree about what counts as a skill.
  */
-async function resolveSkillNames(skillsDir: string): Promise<string[]> {
-  const names: string[] = [];
-  for (const sub of await listSubdirs(skillsDir)) {
-    if (await isFile(path.join(skillsDir, sub, 'SKILL.md'))) {
-      names.push(sub);
-    }
-  }
-  if (names.length === 0 && (await isFile(path.join(skillsDir, 'SKILL.md')))) {
-    names.push(path.basename(skillsDir));
-  }
-  return names;
+export async function resolveSkillNames(skillsDir: string): Promise<string[]> {
+  return (await resolveSkillsDirLayout(skillsDir)).names;
 }
 
 /** Find the first file in `dir` whose basename matches one of the given prefixes. */
@@ -312,7 +305,16 @@ async function loadTaskPackage(
   } else if (fm.expected_skill) {
     expectedSkill = fm.expected_skill;
     if (skillNames.length > 0 && !skillNames.includes(expectedSkill)) {
-      warnings.push(`${label}: expected_skill '${expectedSkill}' not found among available skills: ${skillNames.join(', ')}`);
+      if (options.skillsDirOverride && skillNames.length === 1) {
+        // Candidate injection (--skills-dir) with a single differently-named
+        // skill: the injected skill IS the skill under test, so activation
+        // must be scored against its resolved name — same defaulting rule as
+        // the pipeline's --compare-skill resolution.
+        warnings.push(`${label}: expected_skill '${expectedSkill}' remapped to injected skill '${skillNames[0]}' (--skills-dir override)`);
+        expectedSkill = skillNames[0];
+      } else {
+        warnings.push(`${label}: expected_skill '${expectedSkill}' not found among available skills: ${skillNames.join(', ')}`);
+      }
     }
   } else if (skillNames.length === 1) {
     expectedSkill = skillNames[0];

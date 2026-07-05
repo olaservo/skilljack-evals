@@ -472,6 +472,40 @@ describe('pass/fail logic', () => {
     expect(det.containsCheckPassed).toBeNull(); // Skipped for negative tests
   });
 
+  it('checksPassed excludes the verifier: verifier failure fails passed but not checksPassed', () => {
+    const task = makeTask({ expectSkillActivation: true });
+    const result = makeResult({
+      verifier: { reward: 0.5, passed: false, exitCode: 0, status: 'ok', stdout: '', stderr: '', durationMs: 5 },
+    });
+    const det = scoreDeterministic(task, result)!;
+    expect(det.checksPassed).toBe(true);
+    expect(det.verifierPassed).toBe(false);
+    expect(det.passed).toBe(false);
+  });
+
+  it('checksPassed is false when a non-verifier check fails, even if the verifier passed', () => {
+    const task = makeTask({ expectSkillActivation: true });
+    const result = makeResult({
+      skillLoads: [],
+      verifier: { reward: 1, passed: true, exitCode: 0, status: 'ok', stdout: '', stderr: '', durationMs: 5 },
+    });
+    const det = scoreDeterministic(task, result)!;
+    expect(det.checksPassed).toBe(false);
+    expect(det.verifierPassed).toBe(true);
+    expect(det.passed).toBe(false);
+  });
+
+  it('checksPassed for negative tests tracks non-activation only', () => {
+    const task = makeTask({ expectSkillActivation: false });
+    const result = makeResult({
+      skillLoads: [],
+      verifier: { reward: 0, passed: false, exitCode: 1, status: 'ok', stdout: '', stderr: '', durationMs: 5 },
+    });
+    const det = scoreDeterministic(task, result)!;
+    expect(det.checksPassed).toBe(true); // did not activate
+    expect(det.passed).toBe(false); // verifier still gates passed
+  });
+
   it('ignores non-array array-typed fields without crashing', () => {
     // Simulates YAML like `expect_contains: "hello"` (string instead of array)
     const task = makeTask({

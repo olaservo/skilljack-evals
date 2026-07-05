@@ -27,6 +27,9 @@ async function run(): Promise<void> {
     const thresholdResolution = parseFloat(core.getInput('threshold-resolution') || '0.8');
     const thresholdLiftRaw = core.getInput('threshold-lift');
     const thresholdLift = thresholdLiftRaw ? parseFloat(thresholdLiftRaw) : undefined;
+    if (core.getInput('threshold-discovery') || core.getInput('threshold-score')) {
+      core.warning('threshold-discovery/threshold-score inputs were removed in v2 and are IGNORED — use threshold-resolution / threshold-lift');
+    }
     const timeout = parseInt(core.getInput('timeout') || '300000', 10);
     const concurrencyRaw = core.getInput('concurrency') || '1';
     const concurrency = Number(concurrencyRaw);

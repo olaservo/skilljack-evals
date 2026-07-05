@@ -120,6 +120,43 @@ describe('trial reward derivation', () => {
     expect(score.reward).toBe(0.5);
   });
 
+  it('gates the verifier reward to 0 when a non-verifier check failed (regression: reward contradicted passed)', async () => {
+    // Verifier passed with reward 1 but the activation check failed: the
+    // trial must NOT report reward 1 with passed=false — non-verifier checks
+    // gate the reward to 0.
+    const result = makeResult({
+      skillLoads: [],
+      toolCalls: [],
+      verifier: { reward: 1, passed: true, exitCode: 0, status: 'ok', stdout: '', stderr: '', durationMs: 5 },
+    });
+    const score = await scoreTask(makeTask(), result);
+    expect(score.passed).toBe(false);
+    expect(score.reward).toBe(0);
+  });
+
+  it('passes with reward 1 when checks and verifier both pass', async () => {
+    const result = makeSkillResult({
+      verifier: { reward: 1, passed: true, exitCode: 0, status: 'ok', stdout: '', stderr: '', durationMs: 5 },
+    });
+    const score = await scoreTask(makeTask(), result);
+    expect(score.passed).toBe(true);
+    expect(score.reward).toBe(1);
+  });
+
+  it('holds the invariant passed === (reward >= 1) on non-error trials', async () => {
+    const cases: Array<{ result: TaskResult }> = [
+      { result: makeSkillResult() },
+      { result: makeResult({ skillLoads: [], toolCalls: [] }) },
+      { result: makeSkillResult({ verifier: { reward: 0.5, passed: false, exitCode: 0, status: 'ok', stdout: '', stderr: '', durationMs: 5 } }) },
+      { result: makeSkillResult({ verifier: { reward: 1, passed: true, exitCode: 0, status: 'ok', stdout: '', stderr: '', durationMs: 5 } }) },
+      { result: makeResult({ skillLoads: [], toolCalls: [], verifier: { reward: 1, passed: true, exitCode: 0, status: 'ok', stdout: '', stderr: '', durationMs: 5 } }) },
+    ];
+    for (const { result } of cases) {
+      const score = await scoreTask(makeTask(), result);
+      expect(score.passed).toBe(score.reward >= 1);
+    }
+  });
+
   it('sets invocation only for invocation-expecting tasks', async () => {
     const antiTask = makeTask({
       expectedSkillLoad: 'none',
@@ -172,6 +209,17 @@ describe('evaluatePassFail (report thresholds)', () => {
     const config = { ...DEFAULT_CONFIG, resolutionThreshold: 0.5, liftThreshold: 0.2 };
     expect(evaluatePassFail(makeSummary(1), config, 0.1).passed).toBe(false);
     expect(evaluatePassFail(makeSummary(1), config, 0.25).passed).toBe(true);
+  });
+
+  it('fails CLOSED when a lift threshold is configured but no baseline ran', () => {
+    const config = { ...DEFAULT_CONFIG, resolutionThreshold: 0.5, liftThreshold: 0.2 };
+    const result = evaluatePassFail(makeSummary(1), config, undefined);
+    expect(result.liftPassed).toBe(false);
+    expect(result.passed).toBe(false);
+
+    const reasons = computeFailureReasons(makeSummary(1), config, undefined);
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0]).toContain('min_lift threshold is configured but no baseline ran');
   });
 
   it('computeFailureReasons names the failing gates', () => {

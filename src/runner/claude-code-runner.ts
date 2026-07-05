@@ -18,10 +18,12 @@ import type {
   ToolCallRecord,
 } from '../types.js';
 import { isTextBlock, isToolUseBlock } from '../types.js';
-import { BaseRunner, buildTokenUsage, skillNameFromReadPath } from './base-runner.js';
+import { BaseRunner, buildTokenUsage, skillNameFromReadPath, warnCliRunnerSecurity } from './base-runner.js';
 import { runCliJsonl, detectCli } from '../harness/subprocess.js';
 import type { RunCliJsonlOptions, CliJsonlResult, CliDetection } from '../harness/subprocess.js';
 import type { SessionLogger } from '../session/session-logger.js';
+import type { AgentRunnerOptions } from './agent-runner.js';
+import type { EvalConfig } from '../config.js';
 
 export const CLAUDE_CLI_INSTALL_HINT =
   'Claude Code CLI not found on PATH. Install: npm install -g @anthropic-ai/claude-code';
@@ -44,6 +46,11 @@ export class ClaudeCodeRunner extends BaseRunner {
 
   /** Lazy preflight result, shared across tasks. */
   private cliDetection: Promise<CliDetection> | undefined;
+
+  constructor(options: AgentRunnerOptions = {}, config?: EvalConfig) {
+    super(options, config);
+    warnCliRunnerSecurity(this.providerName);
+  }
 
   /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
   protected runCli(options: RunCliJsonlOptions): Promise<CliJsonlResult> {

@@ -11,6 +11,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { resolveSkillsDirLayout } from '../runner/skill-discovery.js';
 
 export type WorkspaceCleanupPolicy = 'all' | 'failures' | 'none';
 
@@ -62,31 +63,27 @@ export async function copyDir(src: string, dest: string): Promise<void> {
 }
 
 /**
- * Mount skills from a source directory into targetDir. Handles both a
- * directory of skill folders and a single skill with a root-level SKILL.md
- * (same semantics as the old setupLocalSkills).
+ * Mount skills from a source directory into targetDir, mirroring the task
+ * loader's layout semantics exactly (shared resolveSkillsDirLayout helper):
+ * - root layout (root SKILL.md, no skill subdirs): the ENTIRE directory is
+ *   one skill copied to <targetDir>/<basename>/ — references/, scripts/, and
+ *   other relative resources stay intact.
+ * - multi layout: only immediate subdirs CONTAINING a SKILL.md are skills;
+ *   each is copied whole. Subdirs without a SKILL.md are not mounted.
  */
 async function mountSkills(skillsSourceDir: string, targetDir: string): Promise<string[]> {
   await fs.mkdir(targetDir, { recursive: true });
-  const skillNames: string[] = [];
+  const layout = await resolveSkillsDirLayout(skillsSourceDir);
 
-  const entries = await fs.readdir(skillsSourceDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      await copyDir(path.join(skillsSourceDir, entry.name), path.join(targetDir, entry.name));
-      skillNames.push(entry.name);
-    } else if (entry.name === 'SKILL.md') {
-      const skillName = path.basename(skillsSourceDir);
-      await fs.mkdir(path.join(targetDir, skillName), { recursive: true });
-      await fs.copyFile(
-        path.join(skillsSourceDir, entry.name),
-        path.join(targetDir, skillName, 'SKILL.md'),
-      );
-      skillNames.push(skillName);
+  if (layout.kind === 'root') {
+    await copyDir(skillsSourceDir, path.join(targetDir, layout.names[0]));
+  } else {
+    for (const name of layout.names) {
+      await copyDir(path.join(skillsSourceDir, name), path.join(targetDir, name));
     }
   }
 
-  return skillNames;
+  return layout.names;
 }
 
 /**

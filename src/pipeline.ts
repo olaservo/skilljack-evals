@@ -31,6 +31,7 @@ import { createTrialWorkspace, applyCleanupPolicy } from './run/workspace.js';
 import type { TrialWorkspace, WorkspaceCleanupPolicy } from './run/workspace.js';
 import { buildNudgeForSkillsDir } from './run/nudge.js';
 import type { NudgeLevel } from './run/nudge.js';
+import { resolveSkillsDirLayout } from './runner/skill-discovery.js';
 import { runVerifier } from './score/verifier.js';
 import type {
   SkillEvaluation,
@@ -179,7 +180,11 @@ interface PhaseEnvOptions {
   workspaceBaseDir: string;
   keepWorkspaces: WorkspaceCleanupPolicy;
   phaseSkills: PhaseSkills;
-  /** Skill nudge appended to task prompts. Baseline phases always pass 'off'. */
+  /**
+   * Skill nudge appended to task prompts. The no-skill baseline passes 'off';
+   * a --compare-skill baseline passes the configured level (nudge text is
+   * built from that phase's effective skills dir, i.e. the compare dir).
+   */
   nudgeLevel: NudgeLevel;
 }
 
@@ -508,7 +513,11 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     console.log('Comparison file validated successfully');
   }
 
-  // Validate compare-skill path
+  // Validate compare-skill path and resolve the skill name(s) it mounts —
+  // the baseline arm must score activation against the MOUNTED skill's name,
+  // not the with-skill arm's expected name, or differently-named version
+  // dirs would always fail with 'Wrong skill activated' and fabricate lift.
+  let compareSkillNames: string[] | undefined;
   if (options.compareSkillPath) {
     let stat;
     try {
@@ -521,6 +530,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     }
     if (!stat.isDirectory()) {
       throw new Error(`--compare-skill path is not a directory: ${options.compareSkillPath}`);
+    }
+    compareSkillNames = (await resolveSkillsDirLayout(options.compareSkillPath)).names;
+    if (compareSkillNames.length === 0) {
+      throw new Error(`--compare-skill path contains no skills (no SKILL.md found): ${options.compareSkillPath}`);
     }
   }
 
@@ -581,15 +594,43 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       isBaseline: isNoSkillBaseline,
     };
 
+    // Skill-version comparison: the baseline arm mounts the compare dir, so
+    // its activation check must expect the MOUNTED skill's resolved name.
+    // Anti-trigger tasks (expectedSkillLoad 'none') keep 'none'.
+    let baselineSuiteTasks = suiteTasks;
+    if (options.compareSkillPath && compareSkillNames) {
+      const names = compareSkillNames;
+      baselineSuiteTasks = suiteTasks.map((lt) => {
+        const expected = lt.task.expectedSkillLoad;
+        if (!expected || expected === 'none') return lt;
+        let overrideName: string;
+        if (names.length === 1) {
+          overrideName = names[0];
+        } else if (names.includes(expected)) {
+          // Same defaulting rule as the loader: an explicit expected name
+          // wins when the dir offers multiple skills.
+          overrideName = expected;
+        } else {
+          throw new Error(
+            `--compare-skill dir contains multiple skills (${names.join(', ')}) and none matches task ${lt.task.id}'s expected skill '${expected}' — use a single-skill directory or align the skill names.`,
+          );
+        }
+        if (overrideName === expected) return lt;
+        return { ...lt, task: { ...lt.task, expectedSkillLoad: overrideName } };
+      });
+    }
+
     basePhase = await runPhase(
-      baselineLabel, suiteTasks, config, numRuns, baselineScorerOptions,
+      baselineLabel, baselineSuiteTasks, config, numRuns, baselineScorerOptions,
       path.join(logDir, 'baseline'),
       {
         workspaceBaseDir: path.join(config.outputDir, 'baseline'),
         keepWorkspaces,
         phaseSkills: options.compareSkillPath ? { dir: options.compareSkillPath } : 'none',
-        // Baseline always gets the bare prompt — no nudge.
-        nudgeLevel: 'off',
+        // Only the no-skill baseline gets the bare prompt. A skill-version
+        // comparison applies the SAME nudge level to both arms — the nudge
+        // text is built from the compare dir's skills via phaseSkillsDirFor.
+        nudgeLevel: options.compareSkillPath ? nudgeLevel : 'off',
       },
       cacheOpts,
     );

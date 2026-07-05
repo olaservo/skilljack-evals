@@ -125,6 +125,13 @@ export interface DeterministicResult {
   javascriptCheckPassed: boolean | null; // null = not tested
   fileExistsCheckPassed: boolean | null; // null = not tested
   verifierPassed: boolean | null; // null = task has no verifier outcome
+  /**
+   * Pass/fail of every evaluated check EXCEPT the verifier. The scorer uses
+   * this to gate verifier partial credit: a trial only earns the verifier's
+   * reward when all other deterministic checks passed.
+   */
+  checksPassed: boolean;
+  /** Overall pass/fail: checksPassed AND the verifier outcome (when present). */
   passed: boolean;
   details: string[];
 }

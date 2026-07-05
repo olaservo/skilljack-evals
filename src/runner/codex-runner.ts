@@ -35,11 +35,13 @@ import type {
   TokenUsage,
   ToolCallRecord,
 } from '../types.js';
-import { BaseRunner, buildTokenUsage, ROUGH_COST_PER_TOKEN } from './base-runner.js';
+import { BaseRunner, buildTokenUsage, ROUGH_COST_PER_TOKEN, warnCliRunnerSecurity } from './base-runner.js';
 import { runCliJsonl, detectCli } from '../harness/subprocess.js';
 import type { RunCliJsonlOptions, CliJsonlResult, CliDetection } from '../harness/subprocess.js';
 import type { SessionLogger } from '../session/session-logger.js';
 import { DEFAULT_CONFIG } from '../config.js';
+import type { EvalConfig } from '../config.js';
+import type { AgentRunnerOptions } from './agent-runner.js';
 
 export const CODEX_CLI_INSTALL_HINT =
   'Codex CLI not found on PATH. Install: npm install -g @openai/codex';
@@ -77,6 +79,11 @@ export class CodexRunner extends BaseRunner {
 
   /** Lazy preflight result, shared across tasks. */
   private cliDetection: Promise<CliDetection> | undefined;
+
+  constructor(options: AgentRunnerOptions = {}, config?: EvalConfig) {
+    super(options, config);
+    warnCliRunnerSecurity(this.providerName);
+  }
 
   /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
   protected runCli(options: RunCliJsonlOptions): Promise<CliJsonlResult> {

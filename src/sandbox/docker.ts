@@ -33,7 +33,7 @@
  */
 
 import { execFile } from 'child_process';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
@@ -107,11 +107,27 @@ export function resolveContainerInterpreter(scriptRelPath: string): { interprete
   }
 }
 
+/** Sanitize an id for use in docker object names (images, containers). */
+function sanitizeDockerName(id: string): string {
+  return id.toLowerCase().replace(/[^a-z0-9_.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 40) || 'task';
+}
+
 /** Docker image tag for a task-specific Dockerfile build. */
 export function dockerImageTag(taskId: string, dockerfileContent: string): string {
   const hash = createHash('sha256').update(dockerfileContent).digest('hex').slice(0, 12);
-  const safeId = taskId.toLowerCase().replace(/[^a-z0-9_.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 40) || 'task';
-  return `skilljack-eval-${safeId}-${hash}`;
+  return `skilljack-eval-${sanitizeDockerName(taskId)}-${hash}`;
+}
+
+/** Monotonic per-process counter for unique verifier container names. */
+let containerCounter = 0;
+
+/**
+ * Unique container name for one verifier run: pid + counter make it unique
+ * within this process, and a random hex suffix guards against collisions
+ * across concurrent harness processes on the same host.
+ */
+export function verifierContainerName(taskId: string): string {
+  return `skilljack-verifier-${sanitizeDockerName(taskId)}-${process.pid}-${++containerCounter}-${randomBytes(4).toString('hex')}`;
 }
 
 export interface RunVerifierInDockerOptions {
@@ -253,8 +269,14 @@ export async function runVerifierInDocker(options: RunVerifierInDockerOptions): 
 
     const scriptContainerPath = '/task/' + options.verifierRelPath.split(path.sep).join('/');
 
+    // --rm cleans up on normal exit, but a timeout only kills the docker
+    // CLIENT — the container keeps running. A unique --name lets the timeout
+    // path force-remove it.
+    const containerName = verifierContainerName(options.taskId ?? path.basename(options.taskDir));
+
     const args = [
       'run', '--rm',
+      '--name', containerName,
       '-v', `${options.workspaceDir}:/workspace`,
       '-v', `${options.taskDir}:/task:ro`,
       '-v', `${logsTmp}:/logs`,
@@ -283,6 +305,11 @@ export async function runVerifierInDocker(options: RunVerifierInDockerOptions): 
       return outcome({ status: 'error', stderr: DOCKER_UNAVAILABLE_HINT });
     }
     if (run.timedOut) {
+      // Best-effort cleanup: kill + remove the container the timeout leaked
+      // (the timeout only killed the docker CLI process). Failures ignored.
+      try {
+        await execFn(['rm', '-f', containerName], { timeoutMs: 30_000 });
+      } catch { /* best-effort */ }
       return outcome({
         status: 'timeout',
         exitCode: run.exitCode,

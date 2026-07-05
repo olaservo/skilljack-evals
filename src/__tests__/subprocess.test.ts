@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
 import { runCliJsonl, detectCli } from '../harness/subprocess.js';
 
 /** True when a PID currently exists (signal 0 probe works on all platforms). */
@@ -114,6 +117,38 @@ describe('runCliJsonl', () => {
     });
 
     expect(result.events).toEqual([{ got: 'hello stdin' }]);
+  });
+});
+
+describe('Windows npm .cmd shims (cross-spawn)', () => {
+  // Regression for CVE-2024-27980 hardening: plain spawn(shell:false) refuses
+  // .cmd files with EINVAL, so npm-installed CLIs looked "not found on PATH".
+  // cross-spawn resolves and executes the shim without shell:true.
+  it.runIf(process.platform === 'win32')('executes a .cmd shim without a shell', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmd-shim-'));
+    const shim = path.join(dir, 'fake-cli.cmd');
+    await fs.writeFile(shim, '@echo {"ok":true}\r\n', 'utf-8');
+    try {
+      const result = await runCliJsonl({ command: shim, args: [], timeoutMs: 30000 });
+      expect(result.timedOut).toBe(false);
+      expect(result.exitCode).toBe(0);
+      expect(result.events).toEqual([{ ok: true }]);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it.runIf(process.platform === 'win32')('detectCli reports a .cmd shim as available', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmd-shim-detect-'));
+    const shim = path.join(dir, 'fake-cli.cmd');
+    await fs.writeFile(shim, '@echo 1.2.3\r\n', 'utf-8');
+    try {
+      const detection = await detectCli(shim, ['--version']);
+      expect(detection.available).toBe(true);
+      expect(detection.version).toBe('1.2.3');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 });
 

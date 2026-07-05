@@ -84,6 +84,44 @@ describe('createTrialWorkspace', () => {
     expect(await exists(path.join(ws.dir, DEFAULT_SKILLS_MOUNT_PATH, 'solo-skill', 'SKILL.md'))).toBe(true);
   });
 
+  it('mounts a root-layout skill INTACT: references/ and scripts/ travel with it, no phantom skills', async () => {
+    const baseDir = await makeTmpDir();
+    const parent = await makeTmpDir();
+    const skillsDir = path.join(parent, 'pdf-tools');
+    await fs.mkdir(path.join(skillsDir, 'references'), { recursive: true });
+    await fs.mkdir(path.join(skillsDir, 'scripts'), { recursive: true });
+    await fs.writeFile(path.join(skillsDir, 'SKILL.md'), '# pdf-tools');
+    await fs.writeFile(path.join(skillsDir, 'references', 'api.md'), '# api');
+    await fs.writeFile(path.join(skillsDir, 'scripts', 'extract.py'), 'pass');
+
+    const ws = await createTrialWorkspace({ baseDir, taskId: 't-1', runIndex: 0, skillsDir });
+
+    // One skill, named after the directory — subdirs are NOT phantom skills.
+    expect(ws.skillNames).toEqual(['pdf-tools']);
+    const mounted = path.join(ws.dir, DEFAULT_SKILLS_MOUNT_PATH, 'pdf-tools');
+    expect(await exists(path.join(mounted, 'SKILL.md'))).toBe(true);
+    expect(await exists(path.join(mounted, 'references', 'api.md'))).toBe(true);
+    expect(await exists(path.join(mounted, 'scripts', 'extract.py'))).toBe(true);
+    // No phantom top-level mounts for the resource subdirs.
+    expect(await exists(path.join(ws.dir, DEFAULT_SKILLS_MOUNT_PATH, 'references'))).toBe(false);
+    expect(await exists(path.join(ws.dir, DEFAULT_SKILLS_MOUNT_PATH, 'scripts'))).toBe(false);
+  });
+
+  it('ignores stray subdirs without SKILL.md in a multi-skill dir', async () => {
+    const baseDir = await makeTmpDir();
+    const skillsDir = await makeTmpDir();
+    await fs.mkdir(path.join(skillsDir, 'real-skill'), { recursive: true });
+    await fs.writeFile(path.join(skillsDir, 'real-skill', 'SKILL.md'), '# real');
+    await fs.mkdir(path.join(skillsDir, 'notes'), { recursive: true });
+    await fs.writeFile(path.join(skillsDir, 'notes', 'todo.txt'), 'not a skill');
+
+    const ws = await createTrialWorkspace({ baseDir, taskId: 't-1', runIndex: 0, skillsDir });
+
+    expect(ws.skillNames).toEqual(['real-skill']);
+    expect(await exists(path.join(ws.dir, DEFAULT_SKILLS_MOUNT_PATH, 'real-skill', 'SKILL.md'))).toBe(true);
+    expect(await exists(path.join(ws.dir, DEFAULT_SKILLS_MOUNT_PATH, 'notes'))).toBe(false);
+  });
+
   it('supports a custom skills mount path', async () => {
     const baseDir = await makeTmpDir();
     const skillsDir = await makeTmpDir();

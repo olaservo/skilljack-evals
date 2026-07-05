@@ -134,6 +134,10 @@ interface RawConfigFile {
   thresholds?: {
     resolution_rate?: number;
     min_lift?: number;
+    /** Removed in v2 — detected only to warn (was: min discovery rate). */
+    discovery_rate?: number;
+    /** Removed in v2 — detected only to warn (was: min avg weighted score). */
+    avg_score?: number;
   };
   judge?: {
     enabled?: boolean;
@@ -196,6 +200,9 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
 
     if (raw.thresholds?.resolution_rate !== undefined) config.resolutionThreshold = raw.thresholds.resolution_rate;
     if (raw.thresholds?.min_lift !== undefined) config.liftThreshold = raw.thresholds.min_lift;
+    if (raw.thresholds?.discovery_rate !== undefined || raw.thresholds?.avg_score !== undefined) {
+      console.warn('Warning: eval.config.yaml thresholds.discovery_rate/avg_score were removed in v2 and are IGNORED — use thresholds.resolution_rate / thresholds.min_lift');
+    }
 
     if (raw.judge?.enabled !== undefined) config.judgeEnabled = raw.judge.enabled === true;
     if (raw.judge?.model) config.defaultJudgeModel = raw.judge.model;
@@ -332,6 +339,10 @@ function loadEnvConfig(): Partial<EvalConfig> {
 
   const liftThreshold = parseFloat(process.env.EVAL_LIFT_THRESHOLD || '');
   if (!isNaN(liftThreshold)) config.liftThreshold = liftThreshold;
+
+  if (process.env.EVAL_DISCOVERY_THRESHOLD !== undefined || process.env.EVAL_SCORE_THRESHOLD !== undefined) {
+    console.warn('Warning: EVAL_DISCOVERY_THRESHOLD/EVAL_SCORE_THRESHOLD were removed in v2 and are IGNORED — use EVAL_RESOLUTION_THRESHOLD / EVAL_LIFT_THRESHOLD');
+  }
 
   if (process.env.EVAL_GITHUB_SUMMARY !== undefined) {
     config.githubSummary = process.env.EVAL_GITHUB_SUMMARY === 'true';

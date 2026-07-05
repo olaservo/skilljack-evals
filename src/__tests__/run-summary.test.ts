@@ -34,6 +34,7 @@ function makeDet(overrides: Partial<DeterministicResult> = {}): DeterministicRes
     javascriptCheckPassed: null,
     fileExistsCheckPassed: null,
     verifierPassed: null,
+    checksPassed: true,
     passed: true,
     details: [],
     ...overrides,
@@ -62,6 +63,7 @@ function makeWithSkillData(): PhaseTrialData {
           failureCategory: 'discovery_failure',
           deterministic: makeDet({
             skillActivated: false,
+            checksPassed: false,
             passed: false,
             details: ['Expected skill activation but no skill was loaded'],
           }),
@@ -285,9 +287,15 @@ describe('evaluateThresholds', () => {
     expect(evaluateThresholds(1, config, 0.3).passed).toBe(true);
   });
 
-  it('skips lift gating when no baseline ran (lift undefined)', () => {
+  it('fails CLOSED when a lift threshold is configured but no baseline ran (lift undefined)', () => {
     const config: EvalConfig = { ...DEFAULT_CONFIG, resolutionThreshold: 0.5, liftThreshold: 0.2 };
     const result = evaluateThresholds(1, config, undefined);
+    expect(result.liftPassed).toBe(false);
+    expect(result.passed).toBe(false);
+  });
+
+  it('does not gate lift when no threshold is configured, even without a baseline', () => {
+    const result = evaluateThresholds(1, DEFAULT_CONFIG, undefined);
     expect(result.liftPassed).toBeUndefined();
     expect(result.passed).toBe(true);
   });
