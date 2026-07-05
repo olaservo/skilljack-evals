@@ -1,41 +1,54 @@
 /**
- * OpenCode CLI Runner — EXPERIMENTAL.
+ * OpenCode CLI Runner — EXPERIMENTAL (source-verified, live capture pending).
  *
- * Built from the official OpenCode docs (opencode.ai/docs) and source
- * (anomalyco/opencode run.ts / session schema), NOT yet verified against a
- * live CLI on this machine — captured transcripts wanted. Unit tests replay a
- * hand-written SYNTHETIC fixture
+ * Every contract below was verified against the vendored opencode source
+ * (v1.17.13, packages/opencode/src/cli/cmd/run.ts + packages/schema
+ * session.ts + packages/opencode/src/skill,tool,config) — but not yet against
+ * a live CLI run; unit tests still replay a SYNTHETIC fixture
  * (src/__tests__/fixtures/transcripts/opencode/synthetic-*.jsonl).
  *
- * Documented facts this implementation relies on (July 2026):
+ * Verified contract (opencode v1.17.13):
  * - Non-interactive: `opencode run --format json --auto "<prompt>"` emits a
- *   JSONL stream of events `{type, timestamp, sessionID, ...data}` with types
- *   text, tool_use, step_start, step_finish, error. The plan's original guess
- *   included `--print-logs`; that flag only mirrors logs to stderr, so it is
- *   omitted. `--auto` is REQUIRED: without it non-interactive permission
- *   requests are auto-REJECTED (docs/permissions).
- * - Skills: native SKILL.md support. Project-level discovery from
- *   `.opencode/skills/<name>/SKILL.md` (PLURAL `skills` — the plan's
- *   `.opencode/skill` guess was wrong per current docs), plus Claude-compat
- *   `.claude/skills/` and `.agents/skills/`. We mount at `.opencode/skills`.
- * - Invocation surface: the native `skill` tool, invoked as
- *   `skill({name: "<skill-name>"})` → primary. Read-style tools touching a
- *   SKILL.md path are the fallback surface (always counted).
- * - step_finish events carry `{cost, tokens: {input, output, reasoning,
- *   cache: {read, write}}}`.
+ *   JSONL stream on stdout. Each event is `{type, timestamp, sessionID,
+ *   ...data}` where data nests the message part under `part` (types
+ *   step_start, step_finish, text, tool_use, reasoning) or, for `error`
+ *   events, under `error`. `text` fires only when the part completes;
+ *   `tool_use` fires only on state.status completed|error. `--auto` is
+ *   REQUIRED: without it every permission ask (including the `skill` tool's
+ *   own ask) is auto-REJECTED while the run still exits 0.
+ * - Skills: native SKILL.md support; config-dir discovery matches
+ *   `{skill,skills}/**\/SKILL.md`, so our `.opencode/skills/<name>/SKILL.md`
+ *   mount is found via the project `.opencode` dir walk-up. Frontmatter
+ *   `name:` is required; a missing `description:` keeps the skill out of the
+ *   <available_skills> prompt list. A built-in `customize-opencode` skill is
+ *   ALWAYS registered — filtered out of skillLoads so baselines stay clean.
+ * - Invocation surface: the native `skill` tool (`skill({name})`,
+ *   part.tool === "skill") → primary. Read-style tools touching a SKILL.md
+ *   path are the fallback surface (always counted).
+ * - step_finish parts carry `{reason, cost, tokens: {input, output,
+ *   reasoning, cache: {read, write}}}` per step; we sum across steps.
+ * - Model: `-m` takes `provider/model` (e.g. anthropic/claude-haiku-4-5);
+ *   there are no aliases, so the framework-default alias is never forwarded.
  * - Install: npm install -g opencode-ai; version via `opencode --version`.
  *
- * Isolation caveat: the user's global config (~/.config/opencode) AND global
- * skills (~/.claude/skills, ~/.agents/skills) are in scope by default and may
- * contaminate discovery metrics. OPENCODE_CONFIG_DIR may displace the global
- * config dir, but whether it also displaces global skill discovery is
- * undocumented — left to a live-CLI verification pass.
+ * Isolation (buildEnv): opencode has NO --ignore-user-config equivalent —
+ * by default it reads ~/.config/opencode (config + skills), ~/.opencode,
+ * ~/.claude/skills and ~/.agents/skills, and walks UP from cwd to the git
+ * worktree root (which reaches this repo's own .claude/ when workspaces live
+ * under <output>/workspaces). We isolate per trial with env vars: XDG_* dirs
+ * redirected under the workspace (global config/data/cache/state),
+ * OPENCODE_TEST_HOME (redirects the ~/.opencode and ~/.claude|~/.agents
+ * home-dir scans), OPENCODE_DISABLE_EXTERNAL_SKILLS=1 (kills .claude/.agents
+ * scans at home AND project level), and OPENCODE_PURE=1 (no external
+ * plugins). OPENCODE_DISABLE_PROJECT_CONFIG is deliberately NOT set — it
+ * would also disable discovery of the workspace's own .opencode skill mount.
+ * Auth survives isolation via provider env keys (e.g. ANTHROPIC_API_KEY),
+ * which auto-enable the matching provider.
  */
 
 import * as path from 'path';
 import type {
   EvalTask,
-  TokenUsage,
   ToolCallRecord,
 } from '../types.js';
 import { buildTokenUsage } from './base-runner.js';
@@ -55,6 +68,25 @@ const EXPERIMENTAL_WARNING =
 
 let warnedExperimental = false;
 
+/**
+ * Extract a human-readable message from an opencode error payload: a plain
+ * string, `{data: {message}}` (NamedError serialization), `{message}`, or
+ * `{name}` — else a JSON dump so nothing degrades to "[object Object]".
+ */
+function extractErrorMessage(error: unknown): string | undefined {
+  if (typeof error === 'string') return error || undefined;
+  if (typeof error !== 'object' || error === null) return undefined;
+  const record = error as Record<string, unknown>;
+  const data = record.data as Record<string, unknown> | undefined;
+  const message = data?.message ?? record.message ?? record.name;
+  if (typeof message === 'string' && message) return message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return undefined;
+  }
+}
+
 interface OpenCodeFoldState {
   /** Assistant text events, joined at finalize. */
   texts: string[];
@@ -62,7 +94,8 @@ interface OpenCodeFoldState {
   costUsd: number;
   skillLoads: string[];
   toolCalls: ToolCallRecord[];
-  tokens?: TokenUsage;
+  /** Raw token counters summed across step_finish events. */
+  tokenTotals?: { input: number; output: number; cacheRead: number; cacheCreation: number };
   /** True when at least one step_finish (or text) event was seen. */
   sawCompletion: boolean;
   errorMessage?: string;
@@ -76,7 +109,7 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
   protected readonly command = 'opencode';
   protected readonly installHint = OPENCODE_CLI_INSTALL_HINT;
 
-  /** OpenCode's native project-level skills dir (docs: plural `skills`). */
+  /** OpenCode's native project-level skills dir (source: `{skill,skills}/`). */
   override readonly skillsMountPath = path.join('.opencode', 'skills');
 
   protected override beforeRunTask(): void {
@@ -84,6 +117,25 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
       warnedExperimental = true;
       console.warn(EXPERIMENTAL_WARNING);
     }
+  }
+
+  /**
+   * Per-trial isolation env (see the header's Isolation section). All dirs
+   * live under the workspace so retention/cleanup follows the workspace
+   * policy; opencode creates them on demand.
+   */
+  protected override buildEnv(_task: EvalTask, workspaceDir: string): NodeJS.ProcessEnv {
+    const xdgRoot = path.join(workspaceDir, '.opencode-xdg');
+    return {
+      ...process.env,
+      XDG_CONFIG_HOME: path.join(xdgRoot, 'config'),
+      XDG_DATA_HOME: path.join(xdgRoot, 'data'),
+      XDG_CACHE_HOME: path.join(xdgRoot, 'cache'),
+      XDG_STATE_HOME: path.join(xdgRoot, 'state'),
+      OPENCODE_TEST_HOME: path.join(xdgRoot, 'home'),
+      OPENCODE_DISABLE_EXTERNAL_SKILLS: '1',
+      OPENCODE_PURE: '1',
+    };
   }
 
   protected buildArgs(task: EvalTask): string[] {
@@ -151,10 +203,12 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
         });
         logger?.addToolUse(toolName, input);
 
-        // Primary surface: the native `skill` tool.
+        // Primary surface: the native `skill` tool. The built-in
+        // `customize-opencode` skill ships with the CLI and is always
+        // registered, so loading it must not count as a skill invocation.
         if (toolName === 'skill') {
           const skillName = (input as Record<string, unknown> | undefined)?.name;
-          if (typeof skillName === 'string' && skillName) {
+          if (typeof skillName === 'string' && skillName && skillName !== 'customize-opencode') {
             state.skillLoads.push(skillName);
           }
         } else {
@@ -178,19 +232,20 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
           cache?: { read?: number; write?: number };
         } | undefined;
         if (tokens) {
-          state.tokens = buildTokenUsage({
-            input: tokens.input,
-            output: tokens.output,
-            cacheRead: tokens.cache?.read,
-            cacheCreation: tokens.cache?.write,
-          });
+          state.tokenTotals ??= { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
+          state.tokenTotals.input += tokens.input ?? 0;
+          state.tokenTotals.output += tokens.output ?? 0;
+          state.tokenTotals.cacheRead += tokens.cache?.read ?? 0;
+          state.tokenTotals.cacheCreation += tokens.cache?.write ?? 0;
         }
         break;
       }
 
       case 'error': {
-        const message = (part.message as string) ?? (record.error as string);
-        state.errorMessage = message ? String(message) : 'unknown error event';
+        // Real shape: {type: "error", error: <session error object>} — the
+        // payload nests under `error`, not `part`. Tolerate strings and the
+        // various NamedError serializations ({data: {message}}, {message}).
+        state.errorMessage = extractErrorMessage(record.error ?? part) ?? 'unknown error event';
         break;
       }
     }
@@ -211,7 +266,7 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
       costUsd: state.costUsd,
       skillLoads: state.skillLoads,
       toolCalls: state.toolCalls,
-      tokens: state.tokens,
+      tokens: buildTokenUsage(state.tokenTotals),
     };
   }
 }

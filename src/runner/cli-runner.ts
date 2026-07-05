@@ -131,6 +131,18 @@ export abstract class CliRunner<TState> extends BaseRunner {
   /** Build the CLI argument vector for a task. */
   protected abstract buildArgs(task: EvalTask): string[];
 
+  /**
+   * Environment for the spawned CLI. Default: inherit the full process env.
+   * Runners whose CLI only offers env-based isolation (no --ignore-user-config
+   * style flag) override this to layer isolation vars on top of process.env;
+   * `workspaceDir` is the resolved per-trial cwd the CLI will run in.
+   */
+  protected buildEnv(task: EvalTask, workspaceDir: string): NodeJS.ProcessEnv {
+    void task;
+    void workspaceDir;
+    return process.env;
+  }
+
   /** Create the empty fold state a fresh task starts from. */
   protected abstract createInitialState(): TState;
 
@@ -187,7 +199,7 @@ export abstract class CliRunner<TState> extends BaseRunner {
         command: this.command,
         args: this.buildArgs(task),
         cwd,
-        env: process.env,
+        env: this.buildEnv(task, cwd),
         timeoutMs,
         onEvent: foldEvent,
       });
