@@ -31,6 +31,15 @@ export interface RunCliJsonlOptions {
   input?: string;
   /** Optional abort signal — kills the process tree when fired. */
   signal?: AbortSignal;
+  /**
+   * Optional incremental consumer. When provided, each stdout line that
+   * parses as JSON is delivered here as it arrives and is NOT accumulated —
+   * `result.events` stays empty, so long transcripts never build up in
+   * memory. rawLines and stderr collection are unchanged. If the callback
+   * throws, the process tree is killed and the returned promise rejects with
+   * that error.
+   */
+  onEvent?: (event: unknown) => void;
 }
 
 export interface CliJsonlResult {
@@ -123,11 +132,29 @@ export async function runCliJsonl(options: RunCliJsonlOptions): Promise<CliJsonl
       const trimmed = line.trim();
       if (!trimmed) return;
       if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        let value: unknown;
+        let parsed = false;
         try {
-          events.push(JSON.parse(trimmed));
-          return;
+          value = JSON.parse(trimmed);
+          parsed = true;
         } catch {
           // Not valid JSON after all — keep as a raw line.
+        }
+        if (parsed) {
+          if (options.onEvent) {
+            // Incremental mode: deliver instead of accumulating. A throwing
+            // consumer aborts the run (kill tree, reject).
+            try {
+              options.onEvent(value);
+            } catch (err) {
+              killProcessTree(child);
+              scheduleForceFinish();
+              fail(err);
+            }
+          } else {
+            events.push(value);
+          }
+          return;
         }
       }
       rawLines.push(line);

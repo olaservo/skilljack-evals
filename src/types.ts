@@ -43,15 +43,8 @@ export interface EvalTask {
   workspaceDir?: string;
 }
 
-export interface EvalDefaults {
-  expectedSkillLoad?: string;
-  criteria?: Partial<Record<'discovery' | 'adherence' | 'output', { weight?: number; description?: string }>>;
-}
-
 export interface SkillEvaluation {
   skillName: string;
-  version?: string;
-  defaults?: EvalDefaults;
   tasks: EvalTask[];
 }
 

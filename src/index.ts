@@ -15,7 +15,6 @@ import type { RunSummary as RunSummaryType } from './results/types.js';
 export type {
   EvalCriteria,
   EvalTask,
-  EvalDefaults,
   SkillEvaluation,
   DeterministicCheck,
   DeterministicResult,

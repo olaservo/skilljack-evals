@@ -26,8 +26,12 @@
 import * as yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { extractFrontmatterBlock, stripFrontmatter } from '../runner/skill-discovery.js';
+import { extractFrontmatterBlock, resolveSkillsDirLayout, stripFrontmatter } from '../runner/skill-discovery.js';
 import { copyDir } from '../run/workspace.js';
+import { findScript } from './load.js';
+import { resolveContainerInterpreter } from '../sandbox/docker.js';
+import { isDirectory, isFile } from '../utils/fs.js';
+import { asRecord } from '../utils/object.js';
 import type { TaskChecks } from './schema.js';
 
 export interface ExportResult {
@@ -41,58 +45,9 @@ export interface ExportOptions {
   outDir?: string;
 }
 
-async function isDirectory(p: string): Promise<boolean> {
-  try {
-    return (await fs.stat(p)).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-async function isFile(p: string): Promise<boolean> {
-  try {
-    return (await fs.stat(p)).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-/** Find the first file in dir matching one of the prefixes (mirror of load.ts). */
-async function findScript(dir: string, prefixes: string[]): Promise<string | undefined> {
-  let entries;
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
-    return undefined;
-  }
-  const files = entries.filter((e) => e.isFile()).map((e) => e.name).sort();
-  for (const prefix of prefixes) {
-    const match = files.find((f) => f.startsWith(`${prefix}.`));
-    if (match) return path.join(dir, match);
-  }
-  return undefined;
-}
-
 /** Container interpreter for a script by extension (bash wrapper context). */
 function wrapperInterpreter(fileName: string): string | undefined {
-  const ext = path.extname(fileName).toLowerCase();
-  switch (ext) {
-    case '.mjs':
-    case '.js':
-      return 'node';
-    case '.py':
-      return 'python3';
-    case '.sh':
-      return 'bash';
-    default:
-      return undefined;
-  }
+  return resolveContainerInterpreter(fileName).interpreter;
 }
 
 /** Generate the bash wrapper that adapts our env contract to /logs/verifier/reward.txt. */
@@ -201,8 +156,13 @@ export async function exportSkillsBenchTask(taskDirInput: string, options: Expor
   const oracleScript = await findScript(path.join(taskDir, 'oracle'), ['solve']);
   const envSkills = path.join(taskDir, 'environment', 'skills');
   const suiteSkills = path.join(path.dirname(taskDir), 'skills');
-  const skillsDir = (await isDirectory(envSkills)) ? envSkills
+  let skillsDir = (await isDirectory(envSkills)) ? envSkills
     : (await isDirectory(suiteSkills)) ? suiteSkills : undefined;
+  // Same layout semantics as the loader (shared resolveSkillsDirLayout): a
+  // dir that resolves to zero skills (no SKILL.md anywhere) counts as none.
+  if (skillsDir && (await resolveSkillsDirLayout(skillsDir)).names.length === 0) {
+    skillsDir = undefined;
+  }
   const workspaceSeed = path.join(taskDir, 'environment', 'workspace');
   const hasWorkspaceSeed = await isDirectory(workspaceSeed);
   const ownDockerfile = path.join(taskDir, 'environment', 'Dockerfile');

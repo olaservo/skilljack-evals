@@ -60,7 +60,7 @@ id: my-task                   # optional, must match the directory name
 difficulty: medium            # easy|medium|hard
 category: document-processing
 tags: [pdf]
-expected_skill: pdf-tools     # defaults to the single skill under environment/skills/
+expected_skill: pdf-tools     # defaults to the single skill under environment/skills/. The name 'none' is RESERVED for anti-trigger tasks (use expect_skill_invocation: false); skills may not be named 'none' either
 expect_skill_invocation: true # false = anti-trigger (false-positive) task
 timeout_ms: 300000            # agent timeout
 verifier: { timeout_ms: 60000, command: node verify.mjs }  # command optional (extension dispatch)
@@ -215,7 +215,7 @@ const summary = await runEvaluation({ tasksPath: 'evals/my-skill', numRuns: 1, s
 run <path>            Full pipeline: workspaces → agent trials → verifier → score → report
 score <results.json>  Re-score saved results (--judge adds diagnostics after the fact)
 report -r <json>      Regenerate md/json/html reports
-validate <path>       Schema checks + oracle gate (--no-oracle for schema only)
+validate <path>       Schema checks + oracle gate (--no-oracle for schema only; --sandbox docker containerizes the gate's verifier; --runner picks the skills mount path)
 create-task <id>      Scaffold a task package
 import <dir>          SkillsBench package → our format
 export <taskDir>      Our format → BenchFlow-native package

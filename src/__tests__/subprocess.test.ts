@@ -108,6 +108,36 @@ describe('runCliJsonl', () => {
     expect(await waitForDeath(pid, 5000)).toBe(true);
   }, 20000);
 
+  it('delivers events incrementally via onEvent and leaves the events array empty', async () => {
+    const seen: unknown[] = [];
+    const result = await runCliJsonl({
+      command: process.execPath,
+      args: ['-e', 'console.log("plain banner line"); console.log(JSON.stringify({a:1})); console.log(JSON.stringify({b:2}));'],
+      timeoutMs: 30000,
+      onEvent: (event) => seen.push(event),
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(seen).toEqual([{ a: 1 }, { b: 2 }]);
+    // Incremental mode: events are delivered, never accumulated...
+    expect(result.events).toEqual([]);
+    // ...while non-JSON stdout lines are still collected as before.
+    expect(result.rawLines).toEqual(['plain banner line']);
+  });
+
+  it('rejects (and kills the process) when the onEvent callback throws', async () => {
+    await expect(
+      runCliJsonl({
+        command: process.execPath,
+        args: ['-e', 'console.log(JSON.stringify({a:1})); setInterval(()=>{},1000);'],
+        timeoutMs: 30000,
+        onEvent: () => {
+          throw new Error('reducer boom');
+        },
+      }),
+    ).rejects.toThrow('reducer boom');
+  }, 20000);
+
   it('passes input to stdin', async () => {
     const result = await runCliJsonl({
       command: process.execPath,

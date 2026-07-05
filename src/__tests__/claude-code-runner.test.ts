@@ -6,7 +6,7 @@ import { ClaudeCodeRunner, CLAUDE_CLI_INSTALL_HINT } from '../runner/claude-code
 import { CodexRunner } from '../runner/codex-runner.js';
 import { skillNameFromReadPath, resetCliRunnerSecurityWarningForTests } from '../runner/base-runner.js';
 import type { RunCliJsonlOptions, CliJsonlResult, CliDetection } from '../harness/subprocess.js';
-import type { EvalTask } from '../types.js';
+import type { EvalTask, TaskResult } from '../types.js';
 
 const FIXTURE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -29,6 +29,21 @@ class TestableClaudeCodeRunner extends ClaudeCodeRunner {
 
   protected override detect(): Promise<CliDetection> {
     return Promise.resolve(this.detection);
+  }
+}
+
+/**
+ * Fake that streams fixture events through options.onEvent (the incremental
+ * folding path used by the real runCliJsonl) instead of returning an events
+ * array — result.events stays [] exactly like real onEvent mode.
+ */
+class IncrementalClaudeCodeRunner extends TestableClaudeCodeRunner {
+  protected override runCli(options: RunCliJsonlOptions): Promise<CliJsonlResult> {
+    this.lastCliOptions = options;
+    for (const event of this.cliResult.events) {
+      options.onEvent?.(event);
+    }
+    return Promise.resolve({ ...this.cliResult, events: [] });
   }
 }
 
@@ -121,6 +136,23 @@ describe('ClaudeCodeRunner with the real captured transcript', () => {
     const runner = makeRunner();
     await runner.runTask(makeTask({ timeoutMs: 1234 }));
     expect(runner.lastCliOptions!.timeoutMs).toBe(1234);
+  });
+
+  it('produces the same TaskResult via the incremental onEvent path as the events-array path', async () => {
+    // toolCalls timestamps are Date.now() at fold time; ignore them.
+    const stripTimestamps = (r: TaskResult) => ({
+      ...r,
+      toolCalls: r.toolCalls.map(({ timestamp: _timestamp, ...rest }) => rest),
+    });
+
+    const arrayResult = await makeRunner().runTask(makeTask());
+
+    const incremental = new IncrementalClaudeCodeRunner({ model: 'haiku', taskTimeoutMs: 60000 });
+    incremental.cliResult = { ...emptyCliResult(), events: fixtureEvents };
+    const incrementalResult = await incremental.runTask(makeTask());
+
+    expect(incrementalResult.isError).toBe(false);
+    expect(stripTimestamps(incrementalResult)).toEqual(stripTimestamps(arrayResult));
   });
 });
 

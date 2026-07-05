@@ -4,7 +4,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { CodexRunner, CODEX_CLI_INSTALL_HINT, skillNameFromCommand } from '../runner/codex-runner.js';
 import type { RunCliJsonlOptions, CliJsonlResult, CliDetection } from '../harness/subprocess.js';
-import type { EvalTask } from '../types.js';
+import type { EvalTask, TaskResult } from '../types.js';
 
 const FIXTURE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -24,6 +24,21 @@ class TestableCodexRunner extends CodexRunner {
 
   protected override detect(): Promise<CliDetection> {
     return Promise.resolve(this.detection);
+  }
+}
+
+/**
+ * Fake that streams fixture events through options.onEvent (the incremental
+ * folding path used by the real runCliJsonl) instead of returning an events
+ * array — result.events stays [] exactly like real onEvent mode.
+ */
+class IncrementalCodexRunner extends TestableCodexRunner {
+  protected override runCli(options: RunCliJsonlOptions): Promise<CliJsonlResult> {
+    this.lastCliOptions = options;
+    for (const event of this.cliResult.events) {
+      options.onEvent?.(event);
+    }
+    return Promise.resolve({ ...this.cliResult, events: [] });
   }
 }
 
@@ -132,6 +147,23 @@ describe('CodexRunner with the real captured transcript', () => {
     const idx = args.indexOf('-m');
     expect(idx).toBeGreaterThan(-1);
     expect(args[idx + 1]).toBe('gpt-5.1-codex');
+  });
+
+  it('produces the same TaskResult via the incremental onEvent path as the events-array path', async () => {
+    // toolCalls timestamps are Date.now() at fold time; ignore them.
+    const stripTimestamps = (r: TaskResult) => ({
+      ...r,
+      toolCalls: r.toolCalls.map(({ timestamp: _timestamp, ...rest }) => rest),
+    });
+
+    const arrayResult = await makeRunner().runTask(makeTask());
+
+    const incremental = new IncrementalCodexRunner({ taskTimeoutMs: 60000 });
+    incremental.cliResult = { ...emptyCliResult(), events: fixtureEvents };
+    const incrementalResult = await incremental.runTask(makeTask());
+
+    expect(incrementalResult.isError).toBe(false);
+    expect(stripTimestamps(incrementalResult)).toEqual(stripTimestamps(arrayResult));
   });
 });
 

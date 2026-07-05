@@ -5,12 +5,6 @@ models:
   agent: sonnet        # EVAL_AGENT_MODEL
   judge: haiku         # EVAL_JUDGE_MODEL
 
-scoring:
-  weights:
-    discovery: 0.3
-    adherence: 0.4
-    output: 0.3
-
 thresholds:
   resolution_rate: 0.8   # EVAL_RESOLUTION_THRESHOLD (min with-skill resolution rate, 0-1)
   # min_lift: 0.0        # EVAL_LIFT_THRESHOLD (optional macro-lift gate; requires a baseline run — fails closed without one)

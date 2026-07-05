@@ -11,10 +11,8 @@
 import 'dotenv/config';
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
-import * as os from 'os';
 import * as path from 'path';
 import { validateTaskPackages } from './task/load.js';
-import type { LoadedTask } from './task/load.js';
 import { scaffoldTaskPackage } from './task/scaffold.js';
 import { runPipeline, scorePipeline } from './pipeline.js';
 import { generateReport, generateJsonResults } from './report/report.js';
@@ -26,11 +24,11 @@ import type { EvalConfig, RunnerType, SandboxMode } from './config.js';
 import { importSkillsBenchTask } from './task/import-skillsbench.js';
 import { exportSkillsBenchTask } from './task/export-skillsbench.js';
 import { ResponseCache } from './cache/response-cache.js';
-import { createTrialWorkspace } from './run/workspace.js';
 import type { WorkspaceCleanupPolicy } from './run/workspace.js';
 import { NUDGE_LEVELS } from './run/nudge.js';
 import type { NudgeLevel } from './run/nudge.js';
-import { executeVerifier } from './score/verifier.js';
+import { runOracleGate } from './score/oracle-gate.js';
+import { RUNNER_SKILLS_MOUNT_PATHS } from './runner/runner-factory.js';
 
 const program = new Command();
 
@@ -55,7 +53,7 @@ program
   .option('--timeout <ms>', 'Per-task timeout in milliseconds')
   .option('--tasks <ids>', 'Comma-separated task IDs to run')
   .option('--skills-dir <path>', 'Skills directory override applied to all tasks')
-  .option('--cwd <path>', 'Fallback working directory (trial workspaces take precedence)')
+  .option('--cwd <path>', 'Base directory for task resolution and outputs (relative tasks path, output dir, and cache dir resolve against it; default: current directory)')
   .option('--threshold-resolution <rate>', 'Min with-skill resolution rate (0-1, default: 0.8)')
   .option('--threshold-lift <delta>', 'Min macro skill lift (default: not gated)')
   .option('--threshold-discovery <rate>', '(removed) use --threshold-resolution')
@@ -76,7 +74,6 @@ program
   .option('--html', 'Generate HTML report (default: true)')
   .option('--no-html', 'Skip HTML report generation')
   .option('--compare-results <path>', 'Path to a previous run summary.json for cross-iteration comparison')
-  .option('--verbose', 'Enable verbose output')
   .option('--compare', '(deprecated alias of --baseline)')
   .option('--compare-skill <path>', 'Path to baseline skill directory (e.g., previous version) for A/B comparison; implies baseline mode')
   .option('--compare-label <label>', 'Custom label for the baseline in comparison reports')
@@ -110,7 +107,6 @@ program
     githubSummary?: boolean;
     html?: boolean;
     compareResults?: string;
-    verbose?: boolean;
     compare?: boolean;
     compareSkill?: string;
     blindCompare?: boolean;
@@ -193,7 +189,6 @@ program
         generateFeedbackPath: options.generateFeedback,
         feedbackPath: options.feedback,
         compareResultsPath: options.compareResults,
-        verbose: options.verbose,
         baseline,
         compareSkillPath: options.compareSkill,
         compareLabel: options.compareLabel,
@@ -349,73 +344,37 @@ program
 // Validate
 // ============================================
 
-/**
- * Run the oracle gate for a single task: execute the oracle in a fresh seeded
- * workspace (skills mounted), then require the verifier to yield reward 1.0.
- */
-async function runOracleGate(lt: LoadedTask): Promise<{ ok: boolean; detail: string }> {
-  const scratchBase = await fs.mkdtemp(path.join(os.tmpdir(), 'skilljack-oracle-'));
-  try {
-    const workspace = await createTrialWorkspace({
-      baseDir: scratchBase,
-      taskId: lt.task.id,
-      runIndex: 0,
-      seedDir: lt.workspaceSeedDir,
-      skillsDir: lt.skillsDir,
-    });
-
-    const outputFile = path.join(scratchBase, 'output.txt');
-    const trajectoryFile = path.join(scratchBase, 'trajectory.json');
-    const rewardFile = path.join(scratchBase, 'reward.txt');
-    await fs.writeFile(outputFile, '', 'utf-8');
-    await fs.writeFile(trajectoryFile, '[]', 'utf-8');
-
-    const shared = {
-      workspaceDir: workspace.dir,
-      taskDir: lt.taskDir,
-      outputFile,
-      trajectoryFile,
-      rewardFile,
-      timeoutMs: lt.verifierTimeoutMs,
-    };
-
-    const oracle = await executeVerifier({ ...shared, scriptPath: lt.oracleScript });
-    if (oracle.status !== 'ok' || oracle.exitCode !== 0) {
-      return {
-        ok: false,
-        detail: `oracle failed (status ${oracle.status}, exit ${oracle.exitCode})${oracle.stderr ? `: ${oracle.stderr.slice(0, 200)}` : ''}`,
-      };
-    }
-
-    // Oracle may have written a reward — remove it so the verifier's own result counts.
-    await fs.rm(rewardFile, { force: true }).catch(() => {});
-
-    const verifier = await executeVerifier({
-      ...shared,
-      scriptPath: lt.verifierScript,
-      command: lt.verifierCommand,
-    });
-    if (verifier.reward < 1) {
-      return {
-        ok: false,
-        detail: `verifier reward ${verifier.reward} after oracle (status ${verifier.status})${verifier.stderr ? `: ${verifier.stderr.slice(0, 200)}` : ''}`,
-      };
-    }
-
-    return { ok: true, detail: 'oracle → verifier reward 1.0' };
-  } finally {
-    await fs.rm(scratchBase, { recursive: true, force: true }).catch(() => {});
-  }
-}
-
 program
   .command('validate')
   .description('Validate task package(s): schema checks, plus the oracle gate when oracle + verifier exist')
   .argument('<path>', 'Path to a task-package dir or suite dir')
   .option('--skills-dir <path>', 'Skills directory override applied to all tasks')
+  .option('--config <path>', 'Path to eval.config.yaml')
+  .option('--runner <type>', 'Runner whose skills mount path the oracle-gate workspace uses (default: from config)')
+  .option('--sandbox <mode>', 'Oracle-gate verifier sandbox: host | docker (default: from config)')
   .option('--no-oracle', 'Skip the oracle gate (schema validation only)')
-  .action(async (inputPath: string, options: { skillsDir?: string; oracle?: boolean }) => {
+  .action(async (inputPath: string, options: {
+    skillsDir?: string;
+    config?: string;
+    runner?: string;
+    sandbox?: string;
+    oracle?: boolean;
+  }) => {
     try {
+      if (options.runner && !VALID_RUNNER_TYPES.includes(options.runner as RunnerType)) {
+        console.error(`Error: Invalid runner "${options.runner}". Valid options: ${VALID_RUNNER_TYPES.join(', ')}`);
+        process.exit(1);
+      }
+      if (options.sandbox && !SANDBOX_MODES.includes(options.sandbox as SandboxMode)) {
+        console.error(`Error: --sandbox must be one of: ${SANDBOX_MODES.join(', ')}`);
+        process.exit(1);
+      }
+
+      const configOverrides: Partial<EvalConfig> = {};
+      if (options.runner) configOverrides.runnerType = options.runner as RunnerType;
+      if (options.sandbox) configOverrides.sandbox = options.sandbox as SandboxMode;
+      const config = await loadConfig(options.config, configOverrides);
+
       const { errors, warnings, suite } = await validateTaskPackages(inputPath, {
         skillsDirOverride: options.skillsDir,
       });
@@ -438,6 +397,11 @@ program
         return;
       }
 
+      // The oracle-gate workspace mounts skills where the SELECTED runner
+      // discovers them (e.g. codex: .agents/skills), so oracles that read
+      // skill files see the same layout `run` would produce.
+      const skillsMountPath = RUNNER_SKILLS_MOUNT_PATHS[config.runnerType];
+
       let oracleFailures = 0;
       for (const lt of suite.tasks) {
         const hasVerifier = !!(lt.verifierScript || lt.verifierCommand);
@@ -450,7 +414,7 @@ program
           continue;
         }
 
-        const { ok, detail } = await runOracleGate(lt);
+        const { ok, detail } = await runOracleGate(lt, { sandbox: config.sandbox, skillsMountPath });
         if (ok) {
           console.log(`  ${lt.task.id}: PASS — ${detail}`);
         } else {

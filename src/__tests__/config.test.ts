@@ -18,12 +18,25 @@ describe('loadConfig', () => {
     const config = await loadConfig('/nonexistent/path/eval.config.yaml');
     expect(config).toBeDefined();
     expect(config.runnerType).toBe('claude-sdk');
-    expect(config.defaultWeights).toEqual({
-      discovery: 0.3,
-      adherence: 0.4,
-      output: 0.3,
-    });
     expect(config.taskTimeoutMs).toBe(300000);
+  });
+
+  it('warns on removed scoring.weights instead of loading it', async () => {
+    const tmpDir = path.join(os.tmpdir(), `eval-test-weights-${Date.now()}`);
+    await fs.mkdir(tmpDir, { recursive: true });
+    tmpDirs.push(tmpDir);
+
+    const configPath = path.join(tmpDir, 'eval.config.yaml');
+    await fs.writeFile(configPath, 'scoring:\n  weights:\n    discovery: 0.5\n');
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const config = await loadConfig(configPath);
+      expect('defaultWeights' in config).toBe(false);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('scoring.weights was removed in v2'));
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('loads valid YAML config file', async () => {

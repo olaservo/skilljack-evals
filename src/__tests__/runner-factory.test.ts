@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createRunner } from '../runner/runner-factory.js';
+import { createRunner, RUNNER_SKILLS_MOUNT_PATHS } from '../runner/runner-factory.js';
+import { VALID_RUNNER_TYPES } from '../config.js';
 import type { RunnerType } from '../config.js';
 
 describe('createRunner', () => {
@@ -30,6 +31,13 @@ describe('createRunner', () => {
     await expect(
       createRunner('invalid-runner' as RunnerType, {}),
     ).rejects.toThrow('Unknown runner type: invalid-runner');
+  });
+
+  it('RUNNER_SKILLS_MOUNT_PATHS matches every constructed runner (never diverges)', async () => {
+    for (const type of VALID_RUNNER_TYPES) {
+      const runner = await createRunner(type, {});
+      expect(RUNNER_SKILLS_MOUNT_PATHS[type], `mount path for ${type}`).toBe(runner.skillsMountPath);
+    }
   });
 
   it('passes options through to runner', async () => {

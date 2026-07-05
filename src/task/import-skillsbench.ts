@@ -30,7 +30,10 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { extractFrontmatterBlock, stripFrontmatter } from '../runner/skill-discovery.js';
 import { copyDir } from '../run/workspace.js';
+import { findScript } from './load.js';
 import { VALID_DIFFICULTIES } from './schema.js';
+import { isDirectory, isFile } from '../utils/fs.js';
+import { asRecord } from '../utils/object.js';
 import type { TaskDifficulty } from '../types.js';
 
 export interface ImportResult {
@@ -42,28 +45,6 @@ export interface ImportResult {
 export interface ImportOptions {
   /** Parent directory for the imported package (default: ./evals). */
   outDir?: string;
-}
-
-async function isDirectory(p: string): Promise<boolean> {
-  try {
-    return (await fs.stat(p)).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-async function isFile(p: string): Promise<boolean> {
-  try {
-    return (await fs.stat(p)).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
 }
 
 /** Convert a `*_sec` value to whole milliseconds when it is a finite number. */
@@ -180,20 +161,11 @@ export async function importSkillsBenchTask(srcDir: string, options: ImportOptio
   const srcOracleDir = path.join(resolvedSrc, 'oracle');
   const srcDockerfile = path.join(srcEnv, 'Dockerfile');
 
-  // Detect a shell-script verifier → requires_docker tag. Mirrors the
-  // loader's dispatch (first verify.* then test.*): only tag when the script
-  // the loader would actually pick is a .sh.
-  let hasShellVerifier = false;
-  if (await isDirectory(srcVerifierDir)) {
-    const files = (await fs.readdir(srcVerifierDir, { withFileTypes: true }))
-      .filter((e) => e.isFile())
-      .map((e) => e.name)
-      .sort();
-    const selected = ['verify', 'test']
-      .map((prefix) => files.find((f) => f.startsWith(`${prefix}.`)))
-      .find((f) => f !== undefined);
-    hasShellVerifier = selected !== undefined && selected.toLowerCase().endsWith('.sh');
-  }
+  // Detect a shell-script verifier → requires_docker tag. Uses the loader's
+  // own findScript dispatch (first verify.* then test.*): only tag when the
+  // script the loader would actually pick is a .sh.
+  const selectedVerifier = await findScript(srcVerifierDir, ['verify', 'test']);
+  const hasShellVerifier = selectedVerifier !== undefined && selectedVerifier.toLowerCase().endsWith('.sh');
   if (hasShellVerifier) {
     out.requires_docker = true;
     const needsNetwork = asRecord(fm.environment)?.network_mode;

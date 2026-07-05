@@ -38,6 +38,8 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import type { ToolCallRecord, VerifierOutcome } from '../types.js';
+import { createOutcomeBuilder, readReward } from '../score/verifier.js';
+import { isDirectory, isFile } from '../utils/fs.js';
 
 export const DEFAULT_DOCKER_IMAGE = 'node:20-slim';
 
@@ -159,32 +161,18 @@ export interface RunVerifierInDockerOptions {
 
 const BUILD_TIMEOUT_MS = 600_000;
 
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    return (await fs.stat(p)).isFile();
-  } catch {
-    return false;
-  }
-}
+/**
+ * Image tags already verified (inspected or built) by this process. Tags are
+ * content-addressed (taskId + Dockerfile hash), so once a tag is known to
+ * exist there is no need to `docker image inspect` (or rebuild) it again for
+ * subsequent trials — a Dockerfile edit changes the tag and misses the memo.
+ * Failures are never memoized, so a transient docker outage can recover.
+ */
+const verifiedImageTags = new Set<string>();
 
-async function isDirectory(p: string): Promise<boolean> {
-  try {
-    return (await fs.stat(p)).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-async function readRewardFile(p: string): Promise<number | null> {
-  let raw: string;
-  try {
-    raw = await fs.readFile(p, 'utf-8');
-  } catch {
-    return null;
-  }
-  const parsed = parseFloat(raw.trim());
-  if (Number.isNaN(parsed)) return 0;
-  return Math.min(1, Math.max(0, parsed));
+/** Test hook: forget which image tags this process has verified. */
+export function resetVerifiedImageTagsForTests(): void {
+  verifiedImageTags.clear();
 }
 
 /**
@@ -192,22 +180,9 @@ async function readRewardFile(p: string): Promise<number | null> {
  * modes return a structured VerifierOutcome.
  */
 export async function runVerifierInDocker(options: RunVerifierInDockerOptions): Promise<VerifierOutcome> {
-  const started = Date.now();
   const execFn = options.execFn ?? defaultDockerExec;
   const timeoutMs = options.timeoutMs ?? 60_000;
-
-  const outcome = (partial: Partial<VerifierOutcome> & Pick<VerifierOutcome, 'status'>): VerifierOutcome => {
-    const reward = partial.reward ?? 0;
-    return {
-      exitCode: null,
-      stdout: '',
-      stderr: '',
-      durationMs: Date.now() - started,
-      ...partial,
-      reward,
-      passed: reward >= 1,
-    };
-  };
+  const outcome = createOutcomeBuilder(Date.now());
 
   const { interpreter, error: interpError } = resolveContainerInterpreter(options.verifierRelPath);
   if (!interpreter) {
@@ -218,30 +193,35 @@ export async function runVerifierInDocker(options: RunVerifierInDockerOptions): 
   let image = options.image;
   if (!image) {
     const dockerfile = options.dockerfile ?? path.join(options.taskDir, 'environment', 'Dockerfile');
-    if (await fileExists(dockerfile)) {
+    if (await isFile(dockerfile)) {
       const content = await fs.readFile(dockerfile, 'utf-8');
       const tag = dockerImageTag(options.taskId ?? path.basename(options.taskDir), content);
 
-      const inspect = await execFn(['image', 'inspect', tag], { timeoutMs: 30_000 });
-      if (inspect.spawnErrorCode === 'ENOENT') {
-        return outcome({ status: 'error', stderr: DOCKER_UNAVAILABLE_HINT });
-      }
-      if (inspect.exitCode !== 0) {
-        const build = await execFn(
-          ['build', '-t', tag, '-f', dockerfile, path.dirname(dockerfile)],
-          { timeoutMs: BUILD_TIMEOUT_MS },
-        );
-        if (build.spawnErrorCode === 'ENOENT') {
+      // Content-addressed memo: an already-verified tag skips the repeat
+      // `docker image inspect` (and any rebuild) for later trials.
+      if (!verifiedImageTags.has(tag)) {
+        const inspect = await execFn(['image', 'inspect', tag], { timeoutMs: 30_000 });
+        if (inspect.spawnErrorCode === 'ENOENT') {
           return outcome({ status: 'error', stderr: DOCKER_UNAVAILABLE_HINT });
         }
-        if (build.exitCode !== 0) {
-          return outcome({
-            status: 'error',
-            exitCode: build.exitCode,
-            stdout: build.stdout,
-            stderr: `docker build failed for ${dockerfile}: ${build.stderr.slice(0, 1000)}`,
-          });
+        if (inspect.exitCode !== 0) {
+          const build = await execFn(
+            ['build', '-t', tag, '-f', dockerfile, path.dirname(dockerfile)],
+            { timeoutMs: BUILD_TIMEOUT_MS },
+          );
+          if (build.spawnErrorCode === 'ENOENT') {
+            return outcome({ status: 'error', stderr: DOCKER_UNAVAILABLE_HINT });
+          }
+          if (build.exitCode !== 0) {
+            return outcome({
+              status: 'error',
+              exitCode: build.exitCode,
+              stdout: build.stdout,
+              stderr: `docker build failed for ${dockerfile}: ${build.stderr.slice(0, 1000)}`,
+            });
+          }
         }
+        verifiedImageTags.add(tag);
       }
       image = tag;
     } else {
@@ -320,8 +300,8 @@ export async function runVerifierInDocker(options: RunVerifierInDockerOptions): 
 
     // Reward precedence: SkillsBench /logs/verifier/reward.txt > our contract
     // reward file > exit code.
-    const skillsBenchReward = await readRewardFile(path.join(logsTmp, 'verifier', 'reward.txt'));
-    const contractReward = await readRewardFile(path.join(contractDir, 'reward.txt'));
+    const skillsBenchReward = await readReward(path.join(logsTmp, 'verifier', 'reward.txt'));
+    const contractReward = await readReward(path.join(contractDir, 'reward.txt'));
     const reward = skillsBenchReward ?? contractReward ?? (run.exitCode === 0 ? 1 : 0);
 
     return outcome({

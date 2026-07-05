@@ -39,13 +39,6 @@ export interface EvalConfig {
   // LLM judge diagnostics (opt-in; never affects pass/fail)
   judgeEnabled: boolean;
 
-  // Scoring weights
-  defaultWeights: {
-    discovery: number;
-    adherence: number;
-    output: number;
-  };
-
   // Output limits
   judgeOutputTruncation: number;
   reportOutputTruncation: number;
@@ -91,11 +84,6 @@ export const DEFAULT_CONFIG: EvalConfig = {
   defaultAgentModel: 'sonnet',
   defaultJudgeModel: 'haiku',
   judgeEnabled: false,
-  defaultWeights: {
-    discovery: 0.3,
-    adherence: 0.4,
-    output: 0.3,
-  },
   judgeOutputTruncation: 5000,
   reportOutputTruncation: 2000,
   taskTimeoutMs: 300000, // 5 minutes
@@ -125,11 +113,8 @@ interface RawConfigFile {
     judge?: string;
   };
   scoring?: {
-    weights?: {
-      discovery?: number;
-      adherence?: number;
-      output?: number;
-    };
+    /** Removed in v2 — detected only to warn (judge is diagnostics-only). */
+    weights?: unknown;
   };
   thresholds?: {
     resolution_rate?: number;
@@ -191,11 +176,7 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
     if (raw.models?.judge) config.defaultJudgeModel = raw.models.judge;
 
     if (raw.scoring?.weights) {
-      config.defaultWeights = {
-        discovery: raw.scoring.weights.discovery ?? DEFAULT_CONFIG.defaultWeights.discovery,
-        adherence: raw.scoring.weights.adherence ?? DEFAULT_CONFIG.defaultWeights.adherence,
-        output: raw.scoring.weights.output ?? DEFAULT_CONFIG.defaultWeights.output,
-      };
+      console.warn('Warning: eval.config.yaml scoring.weights was removed in v2 — judge is diagnostics-only; weights no longer affect any metric');
     }
 
     if (raw.thresholds?.resolution_rate !== undefined) config.resolutionThreshold = raw.thresholds.resolution_rate;
@@ -375,7 +356,7 @@ function loadEnvConfig(): Partial<EvalConfig> {
 }
 
 /** Keys whose sub-fields should be merged, not replaced wholesale. */
-const NESTED_CONFIG_KEYS = new Set<keyof EvalConfig>(['defaultWeights', 'cache']);
+const NESTED_CONFIG_KEYS = new Set<keyof EvalConfig>(['cache']);
 
 /**
  * Deep merge multiple partial configs into a full config. Nested objects

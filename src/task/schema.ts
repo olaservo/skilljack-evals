@@ -31,6 +31,14 @@ export interface TaskFrontmatter {
   difficulty?: TaskDifficulty;
   category?: string;
   tags?: string[];
+  /**
+   * Name of the skill the agent is expected to invoke. The literal name
+   * 'none' is RESERVED as the anti-trigger sentinel (internally,
+   * expectedSkillLoad 'none' means "expect NO skill invocation"): the loader
+   * rejects a task that sets expected_skill: 'none' while skills exist, and
+   * rejects skill directories literally named 'none'. To assert that no
+   * skill should activate, set expect_skill_invocation: false instead.
+   */
   expected_skill?: string;
   expect_skill_invocation?: boolean;
   timeout_ms?: number;

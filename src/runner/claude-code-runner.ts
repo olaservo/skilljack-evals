@@ -2,7 +2,7 @@
  * Claude Code CLI Runner
  *
  * Drives the real Claude Code CLI (`claude -p`) as a subprocess per task and
- * parses its `--output-format stream-json` events into a TaskResult. Unlike
+ * folds its `--output-format stream-json` events into a TaskResult. Unlike
  * the SDK runner's in-process timeout, timeouts here kill the entire CLI
  * process tree via runCliJsonl — nothing leaks.
  *
@@ -13,23 +13,21 @@
 
 import type {
   EvalTask,
-  TaskResult,
   TokenUsage,
   ToolCallRecord,
 } from '../types.js';
 import { isTextBlock, isToolUseBlock } from '../types.js';
-import { BaseRunner, buildTokenUsage, skillNameFromReadPath, warnCliRunnerSecurity } from './base-runner.js';
-import { runCliJsonl, detectCli } from '../harness/subprocess.js';
-import type { RunCliJsonlOptions, CliJsonlResult, CliDetection } from '../harness/subprocess.js';
+import { buildTokenUsage, skillNameFromReadPath } from './base-runner.js';
+import { CliRunner } from './cli-runner.js';
+import type { CliTaskResultFields } from './cli-runner.js';
+import type { CliJsonlResult } from '../harness/subprocess.js';
 import type { SessionLogger } from '../session/session-logger.js';
-import type { AgentRunnerOptions } from './agent-runner.js';
-import type { EvalConfig } from '../config.js';
 
 export const CLAUDE_CLI_INSTALL_HINT =
   'Claude Code CLI not found on PATH. Install: npm install -g @anthropic-ai/claude-code';
 
-/** Fields extracted from a stream-json transcript. */
-interface ParsedTranscript {
+/** Fields folded from a stream-json transcript. */
+interface ClaudeCodeFoldState {
   output: string;
   durationMs: number;
   numTurns: number;
@@ -41,112 +39,30 @@ interface ParsedTranscript {
   sawResult: boolean;
 }
 
-export class ClaudeCodeRunner extends BaseRunner {
-  readonly providerName = 'claude-code';
-
-  /** Lazy preflight result, shared across tasks. */
-  private cliDetection: Promise<CliDetection> | undefined;
-
-  constructor(options: AgentRunnerOptions = {}, config?: EvalConfig) {
-    super(options, config);
-    warnCliRunnerSecurity(this.providerName);
+export class ClaudeCodeRunner extends CliRunner<ClaudeCodeFoldState> {
+  get providerName(): string {
+    return 'claude-code';
   }
 
-  /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
-  protected runCli(options: RunCliJsonlOptions): Promise<CliJsonlResult> {
-    return runCliJsonl(options);
+  protected readonly command = 'claude';
+  protected readonly installHint = CLAUDE_CLI_INSTALL_HINT;
+
+  protected buildArgs(task: EvalTask): string[] {
+    const model = this.options.model ?? 'sonnet';
+    return [
+      '-p', task.prompt,
+      '--output-format', 'stream-json',
+      '--verbose',
+      '--model', model,
+      '--dangerously-skip-permissions',
+      // REQUIRED: only load the workspace's .claude/, never ~/.claude — the
+      // per-trial workspace cwd's .claude/ is the only settings source.
+      '--setting-sources', 'project',
+    ];
   }
 
-  /** Detect the CLI. Protected so tests can bypass the preflight. */
-  protected detect(): Promise<CliDetection> {
-    return detectCli('claude', ['--version'], { installHint: CLAUDE_CLI_INSTALL_HINT });
-  }
-
-  private async ensureCliAvailable(): Promise<void> {
-    this.cliDetection ??= this.detect();
-    const detection = await this.cliDetection;
-    if (!detection.available) {
-      throw new Error(detection.reason ?? CLAUDE_CLI_INSTALL_HINT);
-    }
-  }
-
-  /**
-   * Execute a single evaluation task via the Claude Code CLI.
-   */
-  async runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult> {
-    const startTime = Date.now();
-
-    try {
-      await this.ensureCliAvailable();
-
-      // Per-trial workspace (when set) becomes the CLI cwd — its .claude/ is
-      // the only settings source thanks to --setting-sources project.
-      const cwd = task.workspaceDir ?? this.options.cwd ?? process.cwd();
-      const timeoutMs = task.timeoutMs ?? this.options.taskTimeoutMs ?? 300000;
-      const model = this.options.model ?? 'sonnet';
-
-      const args = [
-        '-p', task.prompt,
-        '--output-format', 'stream-json',
-        '--verbose',
-        '--model', model,
-        '--dangerously-skip-permissions',
-        // REQUIRED: only load the workspace's .claude/, never ~/.claude.
-        '--setting-sources', 'project',
-      ];
-
-      const cli = await this.runCli({
-        command: 'claude',
-        args,
-        cwd,
-        env: process.env,
-        timeoutMs,
-      });
-
-      if (cli.timedOut) {
-        return this.createErrorResult(
-          task,
-          `Task ${task.id} timed out after ${timeoutMs}ms`,
-          cli.durationMs,
-        );
-      }
-
-      const parsed = this.parseEvents(cli.events, logger);
-
-      if (!parsed.sawResult || cli.exitCode !== 0) {
-        const problem = !parsed.sawResult
-          ? 'exited without a result event'
-          : `exited with code ${cli.exitCode}`;
-        const stderrExcerpt = cli.stderr.trim().slice(0, 500);
-        return this.createErrorResult(
-          task,
-          `claude CLI ${problem}${stderrExcerpt ? `: ${stderrExcerpt}` : ''}`,
-          cli.durationMs,
-        );
-      }
-
-      return this.buildTaskResult(task, {
-        output: parsed.output,
-        durationMs: parsed.durationMs || cli.durationMs,
-        numTurns: parsed.numTurns,
-        costUsd: parsed.costUsd,
-        skillLoads: parsed.skillLoads,
-        toolCalls: parsed.toolCalls,
-        tokens: parsed.tokens,
-      });
-    } catch (error) {
-      return this.handleRunError(task, error, startTime, logger);
-    }
-  }
-
-  /**
-   * Parse Claude Code stream-json events into TaskResult fields.
-   *
-   * Real captured example: src/__tests__/fixtures/transcripts/claude-code/
-   * greeting-with-skill.jsonl.
-   */
-  private parseEvents(events: unknown[], logger?: SessionLogger): ParsedTranscript {
-    const parsed: ParsedTranscript = {
+  protected createInitialState(): ClaudeCodeFoldState {
+    return {
       output: '',
       durationMs: 0,
       numTurns: 0,
@@ -155,81 +71,103 @@ export class ClaudeCodeRunner extends BaseRunner {
       toolCalls: [],
       sawResult: false,
     };
+  }
 
-    for (const event of events) {
-      if (typeof event !== 'object' || event === null) continue;
-      const record = event as Record<string, unknown>;
+  /**
+   * Fold one Claude Code stream-json event into the state.
+   *
+   * Real captured example: src/__tests__/fixtures/transcripts/claude-code/
+   * greeting-with-skill.jsonl.
+   */
+  protected handleEvent(event: unknown, state: ClaudeCodeFoldState, logger?: SessionLogger): void {
+    if (typeof event !== 'object' || event === null) return;
+    const record = event as Record<string, unknown>;
 
-      if (record.type === 'assistant') {
-        const message = record.message as { content?: unknown[] } | undefined;
-        const content = Array.isArray(message?.content) ? message.content : [];
+    if (record.type === 'assistant') {
+      const message = record.message as { content?: unknown[] } | undefined;
+      const content = Array.isArray(message?.content) ? message.content : [];
 
-        logger?.addAssistantMessage(content);
+      logger?.addAssistantMessage(content);
 
-        for (const block of content) {
-          if (isTextBlock(block)) {
-            parsed.output += block.text;
-            logger?.addTextMessage(block.text);
-          }
-
-          if (isToolUseBlock(block)) {
-            const toolInput = block.input ?? {};
-
-            parsed.toolCalls.push({
-              tool: block.name,
-              toolUseId: block.id,
-              timestamp: Date.now(),
-              input: toolInput,
-            });
-
-            logger?.addToolUse(block.name, toolInput);
-
-            // Primary skill-invocation surface: the Skill tool.
-            if (block.name === 'Skill') {
-              const skillName = (toolInput.skill as string) || '';
-              if (skillName) {
-                parsed.skillLoads.push(skillName);
-              }
-            }
-
-            // Fallback surface: Read of a SKILL.md under a skills dir.
-            if (this.options.countReadAsFallback && block.name === 'Read') {
-              const skillName = skillNameFromReadPath((toolInput.file_path as string) || '');
-              if (skillName) {
-                parsed.skillLoads.push(skillName);
-              }
-            }
-          }
+      for (const block of content) {
+        if (isTextBlock(block)) {
+          state.output += block.text;
+          logger?.addTextMessage(block.text);
         }
-      }
 
-      if (record.type === 'result') {
-        parsed.sawResult = true;
-        parsed.durationMs = (record.duration_ms as number) ?? 0;
-        parsed.numTurns = (record.num_turns as number) ?? 0;
-        parsed.costUsd = (record.total_cost_usd as number) ?? 0;
+        if (isToolUseBlock(block)) {
+          const toolInput = block.input ?? {};
 
-        const usage = record.usage as {
-          input_tokens?: number;
-          output_tokens?: number;
-          cache_read_input_tokens?: number;
-          cache_creation_input_tokens?: number;
-        } | undefined;
-        if (usage) {
-          parsed.tokens = buildTokenUsage({
-            input: usage.input_tokens,
-            output: usage.output_tokens,
-            cacheRead: usage.cache_read_input_tokens,
-            cacheCreation: usage.cache_creation_input_tokens,
+          state.toolCalls.push({
+            tool: block.name,
+            toolUseId: block.id,
+            timestamp: Date.now(),
+            input: toolInput,
           });
-        }
 
-        if (typeof record.result === 'string' && record.result) {
-          parsed.output = record.result;
+          logger?.addToolUse(block.name, toolInput);
+
+          // Primary skill-invocation surface: the Skill tool.
+          if (block.name === 'Skill') {
+            const skillName = (toolInput.skill as string) || '';
+            if (skillName) {
+              state.skillLoads.push(skillName);
+            }
+          }
+
+          // Fallback surface: Read of a SKILL.md under a skills dir.
+          if (this.options.countReadAsFallback && block.name === 'Read') {
+            const skillName = skillNameFromReadPath((toolInput.file_path as string) || '');
+            if (skillName) {
+              state.skillLoads.push(skillName);
+            }
+          }
         }
       }
     }
 
-    return parsed;
+    if (record.type === 'result') {
+      state.sawResult = true;
+      state.durationMs = (record.duration_ms as number) ?? 0;
+      state.numTurns = (record.num_turns as number) ?? 0;
+      state.costUsd = (record.total_cost_usd as number) ?? 0;
+
+      const usage = record.usage as {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_read_input_tokens?: number;
+        cache_creation_input_tokens?: number;
+      } | undefined;
+      if (usage) {
+        state.tokens = buildTokenUsage({
+          input: usage.input_tokens,
+          output: usage.output_tokens,
+          cacheRead: usage.cache_read_input_tokens,
+          cacheCreation: usage.cache_creation_input_tokens,
+        });
+      }
+
+      if (typeof record.result === 'string' && record.result) {
+        state.output = record.result;
+      }
+    }
+  }
+
+  protected detectFailure(cli: CliJsonlResult, state: ClaudeCodeFoldState): string | null {
+    if (!state.sawResult) return 'exited without a result event';
+    if (cli.exitCode !== 0) return `exited with code ${cli.exitCode}`;
+    return null;
+  }
+
+  protected finalize(state: ClaudeCodeFoldState, cli: CliJsonlResult): CliTaskResultFields {
+    return {
+      output: state.output,
+      durationMs: state.durationMs || cli.durationMs,
+      numTurns: state.numTurns,
+      costUsd: state.costUsd,
+      skillLoads: state.skillLoads,
+      toolCalls: state.toolCalls,
+      tokens: state.tokens,
+    };
   }
 }

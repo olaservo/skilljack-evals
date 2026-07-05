@@ -161,18 +161,50 @@ Prompt body.
     expect(task.goldenChecklist).toEqual(['Output is valid JSON']);
   });
 
-  it('synthesizes judge criteria for all three dimensions', async () => {
+  it('synthesizes judge criteria for all three dimensions with fixed equal weights', async () => {
     const suiteDir = await makeTmpDir();
     const taskDir = path.join(suiteDir, 't1');
     await writeTask(taskDir, BASIC_TASK);
 
-    const suite = await loadTaskPackages(taskDir, {
-      weights: { discovery: 0.2, adherence: 0.5, output: 0.3 },
-    });
+    const suite = await loadTaskPackages(taskDir);
     const criteria = suite.tasks[0].task.criteria;
     expect(criteria.map((c) => c.dimension)).toEqual(['discovery', 'adherence', 'output']);
-    expect(criteria.map((c) => c.weight)).toEqual([0.2, 0.5, 0.3]);
+    // Judge is diagnostics-only: the configurable weights knob was removed.
+    expect(criteria.map((c) => c.weight)).toEqual([1, 1, 1]);
     expect(criteria.every((c) => c.description.length > 0)).toBe(true);
+  });
+});
+
+describe("loadTaskPackages — 'none' reserved sentinel", () => {
+  it("errors when a skill directory is literally named 'none'", async () => {
+    const suiteDir = await makeTmpDir();
+    const taskDir = path.join(suiteDir, 't1');
+    await writeTask(taskDir, BASIC_TASK);
+    await writeSkill(path.join(suiteDir, 'skills'), 'none');
+
+    const { errors } = await validateTaskPackages(taskDir);
+    expect(errors.some((e) => e.includes("\"none\" is reserved for anti-trigger tasks (expect_skill_invocation: false)"))).toBe(true);
+  });
+
+  it("errors when expected_skill is 'none' while skills exist", async () => {
+    const suiteDir = await makeTmpDir();
+    const taskDir = path.join(suiteDir, 't1');
+    await writeTask(taskDir, `---\nexpected_skill: none\nchecks:\n  contains: [hello]\n---\n\nPrompt.\n`);
+    await writeSkill(path.join(suiteDir, 'skills'), 'my-skill');
+
+    const { errors } = await validateTaskPackages(taskDir);
+    expect(errors.some((e) => e.includes("expected_skill 'none'") && e.includes('expect_skill_invocation: false'))).toBe(true);
+  });
+
+  it("still allows anti-trigger tasks (expect_skill_invocation: false) with skills present", async () => {
+    const suiteDir = await makeTmpDir();
+    const taskDir = path.join(suiteDir, 't1');
+    await writeTask(taskDir, `---\nexpect_skill_invocation: false\n---\n\nPrompt.\n`);
+    await writeSkill(path.join(suiteDir, 'skills'), 'my-skill');
+
+    const { errors, suite } = await validateTaskPackages(taskDir);
+    expect(errors).toEqual([]);
+    expect(suite!.tasks[0].task.expectedSkillLoad).toBe('none');
   });
 });
 

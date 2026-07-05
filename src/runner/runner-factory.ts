@@ -2,13 +2,30 @@
  * Runner factory — creates the appropriate AgentRunner based on config.
  */
 
+import * as path from 'path';
 import type { AgentRunner, AgentRunnerOptions } from './agent-runner.js';
 import { ClaudeSdkRunner } from './claude-sdk-runner.js';
 import { ClaudeCodeRunner } from './claude-code-runner.js';
 import { CodexRunner } from './codex-runner.js';
 import { GeminiRunner } from './gemini-runner.js';
 import { OpenCodeRunner } from './opencode-runner.js';
+import { DEFAULT_SKILLS_MOUNT_PATH } from '../run/workspace.js';
 import type { RunnerType, EvalConfig } from '../config.js';
+
+/**
+ * Workspace-relative skills mount path per runner type, WITHOUT constructing
+ * a runner (validate needs the mount path for its oracle-gate workspace but
+ * not a live runner — and CLI-runner constructors print a security warning).
+ * Must mirror each runner class's skillsMountPath; runner-factory tests
+ * assert the two never diverge.
+ */
+export const RUNNER_SKILLS_MOUNT_PATHS: Record<RunnerType, string> = {
+  'claude-sdk': DEFAULT_SKILLS_MOUNT_PATH,
+  'claude-code': DEFAULT_SKILLS_MOUNT_PATH,
+  codex: path.join('.agents', 'skills'),
+  gemini: path.join('.gemini', 'skills'),
+  opencode: path.join('.opencode', 'skills'),
+};
 
 /**
  * Create the appropriate AgentRunner based on runner type.

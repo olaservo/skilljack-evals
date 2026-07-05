@@ -10,6 +10,7 @@ import {
   runVerifierInDocker,
   resolveContainerInterpreter,
   dockerImageTag,
+  resetVerifiedImageTagsForTests,
   DEFAULT_DOCKER_IMAGE,
   DOCKER_UNAVAILABLE_HINT,
 } from '../sandbox/docker.js';
@@ -24,6 +25,7 @@ async function makeTmpDir(): Promise<string> {
 }
 
 afterEach(async () => {
+  resetVerifiedImageTagsForTests();
   for (const dir of tmpDirs) {
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
@@ -222,6 +224,64 @@ describe('runVerifierInDocker image build', () => {
     // Run uses the built tag.
     expect(calls[2][0]).toBe('run');
     expect(calls[2]).toContain(expectedTag);
+  });
+
+  it('memoizes a verified tag: inspect runs once for two trials of the same task', async () => {
+    const taskDir = await makeTaskDir('verify.mjs');
+    await fs.mkdir(path.join(taskDir, 'environment'), { recursive: true });
+    await fs.writeFile(path.join(taskDir, 'environment', 'Dockerfile'), 'FROM node:20-slim\n', 'utf-8');
+
+    const calls: string[][] = [];
+    const execFn: DockerExecFn = async (args) => {
+      calls.push(args);
+      if (args[0] === 'image') return okResult({ exitCode: 1, stderr: 'No such image' });
+      return okResult();
+    };
+    const base = {
+      taskDir,
+      workspaceDir: await makeTmpDir(),
+      verifierRelPath: path.join('verifier', 'verify.mjs'),
+      taskId: 'memo-001',
+      output: '',
+      toolCalls: [],
+      execFn,
+    };
+
+    await runVerifierInDocker(base);
+    await runVerifierInDocker(base);
+
+    // Trial 1: inspect (miss) + build + run. Trial 2: run only — the
+    // content-addressed tag is already verified in-process.
+    expect(calls.map((c) => c[0])).toEqual(['image', 'build', 'run', 'run']);
+    const expectedTag = dockerImageTag('memo-001', 'FROM node:20-slim\n');
+    expect(calls[3]).toContain(expectedTag);
+  });
+
+  it('does not memoize a failed build (next trial retries)', async () => {
+    const taskDir = await makeTaskDir('verify.mjs');
+    await fs.mkdir(path.join(taskDir, 'environment'), { recursive: true });
+    await fs.writeFile(path.join(taskDir, 'environment', 'Dockerfile'), 'FROM nope\n', 'utf-8');
+
+    const calls: string[][] = [];
+    const execFn: DockerExecFn = async (args) => {
+      calls.push(args);
+      return okResult({ exitCode: 1, stderr: 'nope' });
+    };
+    const base = {
+      taskDir,
+      workspaceDir: await makeTmpDir(),
+      verifierRelPath: path.join('verifier', 'verify.mjs'),
+      output: '',
+      toolCalls: [],
+      execFn,
+    };
+
+    const first = await runVerifierInDocker(base);
+    expect(first.status).toBe('error');
+    await runVerifierInDocker(base);
+
+    // Both trials attempted inspect + build — failures are never memoized.
+    expect(calls.map((c) => c[0])).toEqual(['image', 'build', 'image', 'build']);
   });
 
   it('skips the build when the image already exists', async () => {

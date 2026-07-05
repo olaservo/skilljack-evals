@@ -135,10 +135,11 @@ function execAttempt(
 }
 
 /**
- * Parse the reward file into a clamped [0, 1] float. Returns null when the
- * file was not written.
+ * Parse a reward file into a clamped [0, 1] float. Returns null when the
+ * file was not written; a written-but-non-numeric file yields 0.
+ * Shared by the host executor and the docker sandbox.
  */
-async function readReward(rewardFile: string): Promise<number | null> {
+export async function readReward(rewardFile: string): Promise<number | null> {
   let raw: string;
   try {
     raw = await fs.readFile(rewardFile, 'utf-8');
@@ -151,14 +152,14 @@ async function readReward(rewardFile: string): Promise<number | null> {
 }
 
 /**
- * Execute a verifier (or oracle) script against an existing set of contract
- * files. Never throws.
+ * VerifierOutcome factory anchored at a start timestamp: fills exit/stream
+ * defaults, stamps durationMs, and derives reward (default 0) and
+ * passed = reward >= 1. Shared by the host executor and the docker sandbox.
  */
-export async function executeVerifier(options: ExecuteVerifierOptions): Promise<VerifierOutcome> {
-  const timeoutMs = options.timeoutMs ?? DEFAULT_VERIFIER_TIMEOUT_MS;
-  const started = Date.now();
-
-  const outcome = (partial: Partial<VerifierOutcome> & Pick<VerifierOutcome, 'status'>): VerifierOutcome => {
+export function createOutcomeBuilder(
+  started: number,
+): (partial: Partial<VerifierOutcome> & Pick<VerifierOutcome, 'status'>) => VerifierOutcome {
+  return (partial) => {
     const reward = partial.reward ?? 0;
     return {
       exitCode: null,
@@ -170,6 +171,15 @@ export async function executeVerifier(options: ExecuteVerifierOptions): Promise<
       passed: reward >= 1,
     };
   };
+}
+
+/**
+ * Execute a verifier (or oracle) script against an existing set of contract
+ * files. Never throws.
+ */
+export async function executeVerifier(options: ExecuteVerifierOptions): Promise<VerifierOutcome> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_VERIFIER_TIMEOUT_MS;
+  const outcome = createOutcomeBuilder(Date.now());
 
   let candidates: VerifierInvocation[];
   if (options.command) {

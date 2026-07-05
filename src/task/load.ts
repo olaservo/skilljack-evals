@@ -26,7 +26,7 @@ import {
 } from './schema.js';
 import type { TaskFrontmatter, TaskChecks } from './schema.js';
 import type { DeterministicCheck, EvalCriteria, EvalTask } from '../types.js';
-import { loadConfigSync } from '../config.js';
+import { isDirectory, isFile } from '../utils/fs.js';
 
 /** A task package resolved on disk, wrapping the compat-bridge EvalTask. */
 export interface LoadedTask {
@@ -58,30 +58,12 @@ export interface LoadedSuite {
 export interface LoadTaskOptions {
   /** Override the resolved skills directory for ALL tasks (candidate injection). */
   skillsDirOverride?: string;
-  /** Dimension weights used to synthesize judge criteria. Defaults to config weights. */
-  weights?: { discovery: number; adherence: number; output: number };
 }
 
 export interface TaskValidationResult {
   errors: string[];
   warnings: string[];
   suite?: LoadedSuite;
-}
-
-async function isDirectory(p: string): Promise<boolean> {
-  try {
-    return (await fs.stat(p)).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-async function isFile(p: string): Promise<boolean> {
-  try {
-    return (await fs.stat(p)).isFile();
-  } catch {
-    return false;
-  }
 }
 
 /** List sub-directory names of a directory (empty when missing). */
@@ -105,8 +87,12 @@ export async function resolveSkillNames(skillsDir: string): Promise<string[]> {
   return (await resolveSkillsDirLayout(skillsDir)).names;
 }
 
-/** Find the first file in `dir` whose basename matches one of the given prefixes. */
-async function findScript(dir: string, prefixes: string[]): Promise<string | undefined> {
+/**
+ * Find the first file in `dir` whose basename matches one of the given
+ * prefixes. Shared with the SkillsBench exporter/importer so script selection
+ * (verify.* before test.*, sorted names) can never diverge from the loader.
+ */
+export async function findScript(dir: string, prefixes: string[]): Promise<string | undefined> {
   let entries;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
@@ -179,27 +165,28 @@ function buildDeterministic(
   return det;
 }
 
-/** Synthesize generic judge criteria from dimension weights. */
-function synthesizeCriteria(
-  weights: { discovery: number; adherence: number; output: number },
-  isNegative: boolean,
-): EvalCriteria[] {
+/**
+ * Synthesize generic judge criteria. The judge is diagnostics-only in v2, so
+ * criteria carry fixed equal weights (the judge prompt interpolates them but
+ * no metric is computed from them — the configurable weights knob was removed).
+ */
+function synthesizeCriteria(isNegative: boolean): EvalCriteria[] {
   return [
     {
       dimension: 'discovery',
-      weight: weights.discovery,
+      weight: 1,
       description: isNegative
         ? 'Should NOT load the skill — this prompt is out of scope for it'
         : 'Should discover and load the expected skill from task context',
     },
     {
       dimension: 'adherence',
-      weight: weights.adherence,
+      weight: 1,
       description: 'Should follow the instructions in the loaded skill',
     },
     {
       dimension: 'output',
-      weight: weights.output,
+      weight: 1,
       description: 'Should produce a quality output meeting the task requirements',
     },
   ];
@@ -292,6 +279,13 @@ async function loadTaskPackage(
     skillsDir = undefined;
   }
 
+  // 'none' is a reserved sentinel (expectedSkillLoad 'none' = anti-trigger
+  // expectation) — a skill actually NAMED 'none' would silently be scored as
+  // "expect no invocation" instead of as a real skill.
+  if (skillNames.includes('none')) {
+    errors.push(`${label}: a skill resolved to the name 'none' — "none" is reserved for anti-trigger tasks (expect_skill_invocation: false); rename the skill`);
+  }
+
   // Skill-invocation expectation. Default: expect invocation when skills are
   // present; when the task has no skills there is nothing to invoke.
   const expectInvocation = fm.expect_skill_invocation ?? skillNames.length > 0;
@@ -304,7 +298,9 @@ async function loadTaskPackage(
     }
   } else if (fm.expected_skill) {
     expectedSkill = fm.expected_skill;
-    if (skillNames.length > 0 && !skillNames.includes(expectedSkill)) {
+    if (expectedSkill === 'none' && skillNames.length > 0) {
+      errors.push(`${label}: expected_skill 'none' with skills present — "none" is reserved for anti-trigger tasks (expect_skill_invocation: false); set expect_skill_invocation: false instead`);
+    } else if (skillNames.length > 0 && !skillNames.includes(expectedSkill)) {
       if (options.skillsDirOverride && skillNames.length === 1) {
         // Candidate injection (--skills-dir) with a single differently-named
         // skill: the injected skill IS the skill under test, so activation
@@ -372,12 +368,11 @@ async function loadTaskPackage(
 
   const deterministic = buildDeterministic(fm.checks, expectInvocation, errors, label);
 
-  const weights = options.weights ?? loadConfigSync().defaultWeights;
   const task: EvalTask = {
     id,
     prompt,
     expectedSkillLoad: expectedSkill,
-    criteria: synthesizeCriteria(weights, !expectInvocation),
+    criteria: synthesizeCriteria(!expectInvocation),
     goldenChecklist: assertions,
     deterministic,
     difficulty: fm.difficulty ?? 'medium',

@@ -90,7 +90,12 @@ export interface PipelineOptions {
   configPath?: string;
   /** Config overrides from CLI flags */
   configOverrides?: Partial<EvalConfig>;
-  /** Fallback working directory (per-trial workspaces normally take precedence) */
+  /**
+   * Base directory the pipeline resolves against (default: process.cwd()):
+   * relative tasksPath, outputDir (results/, workspaces, logs), and cache dir
+   * resolve here, and the runner gets it as the fallback cwd (per-trial
+   * workspaces still take precedence).
+   */
   cwd?: string;
   /** Skills directory override applied to ALL tasks (candidate injection) */
   skillsDir?: string;
@@ -102,8 +107,6 @@ export interface PipelineOptions {
   numRuns?: number;
   /** Path to a previous run's summary.json for cross-iteration comparison */
   compareResultsPath?: string;
-  /** Enable verbose logging */
-  verbose?: boolean;
   /** Path to write feedback template JSON after run */
   generateFeedbackPath?: string;
   /** Path to feedback JSON for judge prompt enrichment (requires judge) */
@@ -186,6 +189,63 @@ interface PhaseEnvOptions {
    * built from that phase's effective skills dir, i.e. the compare dir).
    */
   nudgeLevel: NudgeLevel;
+  /** Fallback runner cwd (per-trial workspaceDir takes precedence). */
+  runnerCwd: string;
+}
+
+/**
+ * Per-pipeline-run memoization: skills/environment content hashes and nudge
+ * text are pure functions of (dir contents, level) for the duration of one
+ * run, so each is computed once per distinct input instead of once per trial.
+ * Deliberately NOT module-global — watch mode and repeated runPipeline calls
+ * in tests get a fresh memo, so content changes between runs are never stale.
+ */
+interface PipelineMemo {
+  hashes: Map<string, Promise<string>>;
+  nudges: Map<string, Promise<string>>;
+}
+
+function createPipelineMemo(): PipelineMemo {
+  return { hashes: new Map(), nudges: new Map() };
+}
+
+function memoized(map: Map<string, Promise<string>>, key: string, compute: () => Promise<string>): Promise<string> {
+  let entry = map.get(key);
+  if (!entry) {
+    entry = compute();
+    map.set(key, entry);
+  }
+  return entry;
+}
+
+function memoHashSkillsDir(memo: PipelineMemo, dir: string | undefined): Promise<string> {
+  if (!dir) return Promise.resolve('no-skills');
+  return memoized(memo.hashes, path.resolve(dir), () => ResponseCache.hashSkillsDir(dir));
+}
+
+async function memoHashEnvironment(memo: PipelineMemo, seedDir: string | undefined): Promise<string> {
+  if (!seedDir) return 'no-environment';
+  const hash = await memoHashSkillsDir(memo, seedDir);
+  return hash === 'no-skills' ? 'no-environment' : hash;
+}
+
+function memoNudge(memo: PipelineMemo, level: NudgeLevel, skillsDir: string | undefined): Promise<string> {
+  if (level === 'off' || !skillsDir) return Promise.resolve('');
+  const key = `${level}\0${path.resolve(skillsDir)}`;
+  return memoized(memo.nudges, key, () => buildNudgeForSkillsDir(level, skillsDir));
+}
+
+/** Per-trial outcome returned by each task factory (no side-channel arrays). */
+interface TrialOutcome {
+  result: TaskResult;
+  /**
+   * The task the trial actually executed and must be scored against: nudged
+   * prompt on BOTH the cache-hit and miss paths (a cached output answered the
+   * nudged prompt), plus workspaceDir on the miss path.
+   */
+  effectiveTask: EvalTask;
+  /** Undefined on cache hits — no workspace was created. */
+  workspace?: TrialWorkspace;
 }
 
 /**
@@ -203,10 +263,11 @@ async function runPhase(
   scorerOptions: ScorerOptions,
   logBaseDir: string,
   env: PhaseEnvOptions,
+  memo: PipelineMemo,
   cacheOptions?: PhaseCacheOptions,
 ): Promise<PhaseResult> {
   const runner = await createRunner(config.runnerType, {
-    cwd: process.cwd(),
+    cwd: env.runnerCwd,
     model: config.defaultAgentModel,
     allowedWriteDirs: config.allowedWriteDirs,
   }, config);
@@ -214,146 +275,161 @@ async function runPhase(
   const allResults: TaskResult[][] = [];
   const allScores: CombinedScore[][] = [];
 
-  for (let run = 0; run < numRuns; run++) {
-    if (numRuns > 1) {
-      console.log(`\n--- ${phaseLabel}: Trial ${run + 1}/${numRuns} (${config.runnerType}) ---\n`);
-    } else {
-      console.log(`\n--- ${phaseLabel}: Running Tasks (${config.runnerType}) ---\n`);
-    }
+  try {
+    for (let run = 0; run < numRuns; run++) {
+      if (numRuns > 1) {
+        console.log(`\n--- ${phaseLabel}: Trial ${run + 1}/${numRuns} (${config.runnerType}) ---\n`);
+      } else {
+        console.log(`\n--- ${phaseLabel}: Running Tasks (${config.runnerType}) ---\n`);
+      }
 
-    const runLogDir = numRuns > 1 ? path.join(logBaseDir, `run-${run + 1}`) : logBaseDir;
+      const runLogDir = numRuns > 1 ? path.join(logBaseDir, `run-${run + 1}`) : logBaseDir;
 
-    // Per-task execution with optional cache support, bounded by config.concurrency.
-    // Tasks with verifiers, workspace seeds, or expectFileExists bypass the cache:
-    // their success depends on filesystem state that a cached TaskResult cannot represent.
-    let cacheHits = 0;
-    const cacheConcurrent = config.concurrency ?? 1;
+      // Per-task execution with optional cache support, bounded by config.concurrency.
+      // Tasks with verifiers, workspace seeds, or expectFileExists bypass the cache:
+      // their success depends on filesystem state that a cached TaskResult cannot represent.
+      let cacheHits = 0;
+      const cacheConcurrent = config.concurrency ?? 1;
 
-    // Per-trial effective tasks (workspaceDir attached) and workspaces, indexed by task position.
-    const effectiveTasks: EvalTask[] = suiteTasks.map((lt) => lt.task);
-    const workspaces: Array<TrialWorkspace | undefined> = suiteTasks.map(() => undefined);
+      // Workspaces created this trial run, with the latest trialFailed status.
+      // Cleanup runs in `finally` so an aborted run (factory or scoreAll threw)
+      // still applies the retention policy to whatever was created; unscored
+      // trials count as failed so 'failures' keeps them for debugging.
+      const createdWorkspaces = new Map<TrialWorkspace, boolean>();
 
-    const factories = suiteTasks.map((lt, index) => async (): Promise<TaskResult> => {
-      const task = lt.task;
-      const effSkillsDir = phaseSkillsDirFor(lt, env.phaseSkills);
+      try {
+        const factories = suiteTasks.map((lt) => async (): Promise<TrialOutcome> => {
+          const task = lt.task;
+          const effSkillsDir = phaseSkillsDirFor(lt, env.phaseSkills);
 
-      // Finalize the prompt before cache-key computation so the nudge text is
-      // naturally part of the cache key (which hashes the prompt).
-      const nudgeText = await buildNudgeForSkillsDir(env.nudgeLevel, effSkillsDir);
-      const effectivePrompt = task.prompt + nudgeText;
+          // Finalize the prompt before cache-key computation so the nudge text is
+          // naturally part of the cache key (which hashes the prompt).
+          const nudgeText = await memoNudge(memo, env.nudgeLevel, effSkillsDir);
+          const effectivePrompt = task.prompt + nudgeText;
 
-      const hasVerifier = !!(lt.verifierScript || lt.verifierCommand);
-      const cacheable = cacheOptions && isTaskCacheable(task, {
-        hasVerifier,
-        hasWorkspaceSeed: !!lt.workspaceSeedDir,
-      });
+          const hasVerifier = !!(lt.verifierScript || lt.verifierCommand);
+          const cacheable = cacheOptions && isTaskCacheable(task, {
+            hasVerifier,
+            hasWorkspaceSeed: !!lt.workspaceSeedDir,
+          });
 
-      let cacheKey: string | null = null;
-      if (cacheable && cacheOptions) {
-        const skillsHash = await ResponseCache.hashSkillsDir(effSkillsDir);
-        const environmentHash = await ResponseCache.hashEnvironment(lt.workspaceSeedDir);
-        cacheKey = ResponseCache.computeCacheKey({
-          taskId: task.id,
-          prompt: effectivePrompt,
-          model: config.defaultAgentModel,
-          runnerType: config.runnerType,
-          skillsHash,
-          environmentHash,
-          taskTimeoutMs: task.timeoutMs ?? config.taskTimeoutMs,
-          allowedWriteDirs: config.allowedWriteDirs,
-          runIndex: numRuns > 1 ? run : undefined,
+          let cacheKey: string | null = null;
+          let skillsHash: string | undefined;
+          if (cacheable && cacheOptions) {
+            skillsHash = await memoHashSkillsDir(memo, effSkillsDir);
+            const environmentHash = await memoHashEnvironment(memo, lt.workspaceSeedDir);
+            cacheKey = ResponseCache.computeCacheKey({
+              taskId: task.id,
+              prompt: effectivePrompt,
+              model: config.defaultAgentModel,
+              runnerType: config.runnerType,
+              skillsHash,
+              environmentHash,
+              taskTimeoutMs: task.timeoutMs ?? config.taskTimeoutMs,
+              allowedWriteDirs: config.allowedWriteDirs,
+              runIndex: numRuns > 1 ? run : undefined,
+            });
+
+            if (!cacheOptions.skipCache) {
+              const cached = await cacheOptions.cache.get(cacheKey);
+              if (cached) {
+                console.log(`Task ${task.id}: cache hit (hash ${cacheKey.substring(0, 8)})`);
+                cacheHits++;
+                // Same effectiveTask as the miss path (nudged prompt): the
+                // cached output answered the NUDGED prompt, so scoring must
+                // evaluate against it too. No workspace on this path.
+                return { result: cached, effectiveTask: { ...task, prompt: effectivePrompt } };
+              }
+            }
+          }
+
+          // Create the per-trial workspace (seed files + skills mounted at the
+          // runner's skill discovery path).
+          const workspace = await createTrialWorkspace({
+            baseDir: env.workspaceBaseDir,
+            taskId: task.id,
+            runIndex: run,
+            seedDir: lt.workspaceSeedDir,
+            skillsDir: effSkillsDir,
+            skillsMountPath: runner.skillsMountPath,
+          });
+          createdWorkspaces.set(workspace, true);
+
+          const effectiveTask: EvalTask = { ...task, prompt: effectivePrompt, workspaceDir: workspace.dir };
+
+          console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
+          const logger = new SessionLogger(task.id, runLogDir);
+          const result = await runner.runTaskWithTimeout(effectiveTask, undefined, logger);
+
+          if (result.isError) {
+            console.error(`  Task ${task.id} ERROR: ${result.errorMessage}`);
+          } else {
+            console.log(`  Task ${task.id}: Skills loaded: ${result.skillLoads.join(', ') || 'none'} | Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
+          }
+
+          // Run the verifier when the task package has one (skipped on agent error).
+          if (hasVerifier && !result.isError) {
+            result.verifier = await runVerifier({
+              scriptPath: lt.verifierScript,
+              command: lt.verifierCommand,
+              workspaceDir: workspace.dir,
+              taskDir: lt.taskDir,
+              output: result.output,
+              toolCalls: result.toolCalls,
+              timeoutMs: lt.verifierTimeoutMs,
+              sandbox: config.sandbox,
+            });
+            console.log(`  Task ${task.id}: Verifier ${result.verifier.passed ? 'passed' : 'FAILED'} (reward ${result.verifier.reward}, status ${result.verifier.status})`);
+          }
+
+          if (cacheKey && cacheOptions && !result.isError) {
+            await cacheOptions.cache.set(cacheKey, result, {
+              taskId: task.id,
+              cacheKeyPrefix: cacheKey.substring(0, 8),
+              modelId: config.defaultAgentModel,
+              runnerType: config.runnerType,
+              // skillsHash was computed above when cacheKey was — reuse it.
+              skillsHash: skillsHash!,
+            });
+          }
+
+          return { result, effectiveTask, workspace };
         });
 
-        if (!cacheOptions.skipCache) {
-          const cached = await cacheOptions.cache.get(cacheKey);
-          if (cached) {
-            console.log(`Task ${task.id}: cache hit (hash ${cacheKey.substring(0, 8)})`);
-            cacheHits++;
-            return cached;
-          }
+        const outcomes = await withConcurrencyLimit(factories, cacheConcurrent);
+
+        if (cacheOptions && cacheHits > 0) {
+          console.log(`\n${cacheHits} of ${suiteTasks.length} task(s) served from cache`);
+        }
+
+        const results = outcomes.map((o) => o.result);
+        const effectiveTasks = outcomes.map((o) => o.effectiveTask);
+        allResults.push(results);
+
+        if (numRuns > 1) {
+          console.log(`\n--- ${phaseLabel}: Scoring Trial ${run + 1}/${numRuns} ---\n`);
+        } else {
+          console.log(`\n--- ${phaseLabel}: Scoring ---\n`);
+        }
+        const scores = await scoreAll(effectiveTasks, results, scorerOptions);
+        allScores.push(scores);
+
+        // Record the real pass/fail per workspace for the cleanup policy.
+        for (let t = 0; t < outcomes.length; t++) {
+          const workspace = outcomes[t].workspace;
+          if (workspace) createdWorkspaces.set(workspace, !scores[t].passed);
+        }
+      } finally {
+        // Apply the workspace retention policy — on success AND on abort.
+        for (const [workspace, trialFailed] of createdWorkspaces) {
+          await applyCleanupPolicy(workspace, env.keepWorkspaces, trialFailed);
         }
       }
-
-      // Create the per-trial workspace (seed files + skills mounted at the
-      // runner's skill discovery path).
-      const workspace = await createTrialWorkspace({
-        baseDir: env.workspaceBaseDir,
-        taskId: task.id,
-        runIndex: run,
-        seedDir: lt.workspaceSeedDir,
-        skillsDir: effSkillsDir,
-        skillsMountPath: runner.skillsMountPath,
-      });
-      workspaces[index] = workspace;
-
-      const effectiveTask: EvalTask = { ...task, prompt: effectivePrompt, workspaceDir: workspace.dir };
-      effectiveTasks[index] = effectiveTask;
-
-      console.log(`Running task ${task.id}: ${task.prompt.length > 60 ? task.prompt.slice(0, 60) + '...' : task.prompt}`);
-      const logger = new SessionLogger(task.id, runLogDir);
-      const result = await runner.runTaskWithTimeout(effectiveTask, undefined, logger);
-
-      if (result.isError) {
-        console.error(`  Task ${task.id} ERROR: ${result.errorMessage}`);
-      } else {
-        console.log(`  Task ${task.id}: Skills loaded: ${result.skillLoads.join(', ') || 'none'} | Duration: ${(result.durationMs / 1000).toFixed(1)}s | Cost: $${result.costUsd.toFixed(4)}`);
-      }
-
-      // Run the verifier when the task package has one (skipped on agent error).
-      if (hasVerifier && !result.isError) {
-        result.verifier = await runVerifier({
-          scriptPath: lt.verifierScript,
-          command: lt.verifierCommand,
-          workspaceDir: workspace.dir,
-          taskDir: lt.taskDir,
-          output: result.output,
-          toolCalls: result.toolCalls,
-          timeoutMs: lt.verifierTimeoutMs,
-          sandbox: config.sandbox,
-        });
-        console.log(`  Task ${task.id}: Verifier ${result.verifier.passed ? 'passed' : 'FAILED'} (reward ${result.verifier.reward}, status ${result.verifier.status})`);
-      }
-
-      if (cacheKey && cacheOptions && !result.isError) {
-        await cacheOptions.cache.set(cacheKey, result, {
-          taskId: task.id,
-          cacheKeyPrefix: cacheKey.substring(0, 8),
-          modelId: config.defaultAgentModel,
-          runnerType: config.runnerType,
-          skillsHash: await ResponseCache.hashSkillsDir(effSkillsDir),
-        });
-      }
-
-      return result;
-    });
-
-    const results = await withConcurrencyLimit(factories, cacheConcurrent);
-
-    if (cacheOptions && cacheHits > 0) {
-      console.log(`\n${cacheHits} of ${suiteTasks.length} task(s) served from cache`);
     }
-
-    allResults.push(results);
-
-    if (numRuns > 1) {
-      console.log(`\n--- ${phaseLabel}: Scoring Trial ${run + 1}/${numRuns} ---\n`);
-    } else {
-      console.log(`\n--- ${phaseLabel}: Scoring ---\n`);
-    }
-    const scores = await scoreAll(effectiveTasks, results, scorerOptions);
-    allScores.push(scores);
-
-    // Apply the workspace retention policy now that scoring is done.
-    for (let t = 0; t < suiteTasks.length; t++) {
-      const workspace = workspaces[t];
-      if (!workspace) continue;
-      const trialFailed = !scores[t].passed;
-      await applyCleanupPolicy(workspace, env.keepWorkspaces, trialFailed);
-    }
+  } finally {
+    // Dispose runner resources (e.g., child processes) even when a trial threw.
+    await runner.dispose?.();
   }
-
-  // Dispose runner resources (e.g., child processes) after all runs complete
-  await runner.dispose?.();
 
   const results = aggregateResults(allResults, allScores);
   const scores = aggregateScores(allScores);
@@ -436,7 +512,20 @@ function computeComparison(
  * Run the full evaluation pipeline.
  */
 export async function runPipeline(options: PipelineOptions): Promise<PipelineResult> {
-  const config = await loadConfig(options.configPath, options.configOverrides);
+  const loadedConfig = await loadConfig(options.configPath, options.configOverrides);
+
+  // --cwd (default: process.cwd()) is the base directory the pipeline
+  // resolves against: relative outputDir (results/, workspaces, logs) and
+  // cache dir become absolute here; tasksPath resolves against it below; and
+  // the runner receives it as the fallback cwd.
+  const baseCwd = path.resolve(options.cwd ?? process.cwd());
+  const config: EvalConfig = {
+    ...loadedConfig,
+    outputDir: path.resolve(baseCwd, loadedConfig.outputDir),
+    cache: { ...loadedConfig.cache, dir: path.resolve(baseCwd, loadedConfig.cache.dir) },
+  };
+  const tasksPath = path.resolve(baseCwd, options.tasksPath);
+
   const keepWorkspaces = options.keepWorkspaces ?? 'failures';
   const judgeEnabled = options.judge ?? config.judgeEnabled;
 
@@ -450,10 +539,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   }
 
   // 1. Load task packages
-  console.log(`Loading task packages from: ${options.tasksPath}`);
-  const suite: LoadedSuite = await loadTaskPackages(options.tasksPath, {
+  console.log(`Loading task packages from: ${tasksPath}`);
+  const suite: LoadedSuite = await loadTaskPackages(tasksPath, {
     skillsDirOverride: options.skillsDir,
-    weights: config.defaultWeights,
   });
 
   let suiteTasks = suite.tasks;
@@ -540,11 +628,12 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   const numRuns = options.numRuns ?? 3;
   const nudgeLevel: NudgeLevel = options.nudge ?? config.nudge;
   const logDir = path.join(config.outputDir, 'logs');
+  const memo = createPipelineMemo();
   const scorerOptions: ScorerOptions = {
     judgeEnabled,
     judgeOptions: { model: config.defaultJudgeModel },
     humanFeedback,
-    cwd: options.cwd,
+    cwd: baseCwd,
   };
 
   // 2. Set up response cache
@@ -578,7 +667,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     const withPhase = await runPhase(
       'With Skill', suiteTasks, config, numRuns, scorerOptions,
       path.join(logDir, 'with-skill'),
-      { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: 'task', nudgeLevel },
+      { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: 'task', nudgeLevel, runnerCwd: baseCwd },
+      memo,
       cacheOpts,
     );
 
@@ -631,7 +721,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
         // comparison applies the SAME nudge level to both arms — the nudge
         // text is built from the compare dir's skills via phaseSkillsDirFor.
         nudgeLevel: options.compareSkillPath ? nudgeLevel : 'off',
+        runnerCwd: baseCwd,
       },
+      memo,
       cacheOpts,
     );
 
@@ -649,7 +741,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     // --- Single condition ---
     primaryPhase = await runPhase(
       'Evaluation', suiteTasks, config, numRuns, scorerOptions, logDir,
-      { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: 'task', nudgeLevel },
+      { workspaceBaseDir: config.outputDir, keepWorkspaces, phaseSkills: 'task', nudgeLevel, runnerCwd: baseCwd },
+      memo,
       cacheOpts,
     );
   }

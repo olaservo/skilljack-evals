@@ -45,7 +45,7 @@ inputs:
     description: 'Path to skills directory for local setup'
     required: false
   working-directory:
-    description: 'Working directory for agent execution'
+    description: 'Base directory for task resolution and outputs (relative tasks path, output dir, and cache dir resolve against it)'
     required: false
     default: '.'
   baseline:

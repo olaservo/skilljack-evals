@@ -31,18 +31,15 @@
 import * as path from 'path';
 import type {
   EvalTask,
-  TaskResult,
   TokenUsage,
   ToolCallRecord,
 } from '../types.js';
-import { BaseRunner, buildTokenUsage, ROUGH_COST_PER_TOKEN, warnCliRunnerSecurity } from './base-runner.js';
-import { runCliJsonl, detectCli } from '../harness/subprocess.js';
-import type { RunCliJsonlOptions, CliJsonlResult, CliDetection } from '../harness/subprocess.js';
+import { buildTokenUsage, ROUGH_COST_PER_TOKEN } from './base-runner.js';
+import { CliRunner, skillNameFromToolInput } from './cli-runner.js';
+import type { CliTaskResultFields } from './cli-runner.js';
+import type { CliJsonlResult } from '../harness/subprocess.js';
 import type { SessionLogger } from '../session/session-logger.js';
 import { DEFAULT_CONFIG } from '../config.js';
-import type { EvalConfig } from '../config.js';
-import type { AgentRunnerOptions } from './agent-runner.js';
-import { skillNameFromCommand } from './codex-runner.js';
 
 export const GEMINI_CLI_INSTALL_HINT =
   'Gemini CLI not found on PATH. Install: npm install -g @google/gemini-cli';
@@ -54,8 +51,9 @@ const EXPERIMENTAL_WARNING =
 
 let warnedExperimental = false;
 
-interface ParsedGeminiTranscript {
-  output: string;
+interface GeminiFoldState {
+  /** Assistant message texts, joined at finalize. */
+  texts: string[];
   numTurns: number;
   skillLoads: string[];
   toolCalls: ToolCallRecord[];
@@ -65,217 +63,150 @@ interface ParsedGeminiTranscript {
   errorMessage?: string;
 }
 
-/** Scan a tool_use parameters object for any string referencing a SKILL.md path. */
-function skillNameFromParameters(parameters: unknown): string | undefined {
-  if (typeof parameters === 'string') return skillNameFromCommand(parameters);
-  if (typeof parameters !== 'object' || parameters === null) return undefined;
-  for (const value of Object.values(parameters as Record<string, unknown>)) {
-    if (typeof value === 'string') {
-      const name = skillNameFromCommand(value);
-      if (name) return name;
-    }
+export class GeminiRunner extends CliRunner<GeminiFoldState> {
+  get providerName(): string {
+    return 'gemini';
   }
-  return undefined;
-}
 
-export class GeminiRunner extends BaseRunner {
-  readonly providerName = 'gemini';
+  protected readonly command = 'gemini';
+  protected readonly installHint = GEMINI_CLI_INSTALL_HINT;
 
   /** Canonical documented project-level skills dir (`.agents/skills` is an alias). */
   override readonly skillsMountPath = path.join('.gemini', 'skills');
 
-  private cliDetection: Promise<CliDetection> | undefined;
-
-  constructor(options: AgentRunnerOptions = {}, config?: EvalConfig) {
-    super(options, config);
-    warnCliRunnerSecurity(this.providerName);
-  }
-
-  /** Spawn the CLI. Protected so tests can inject a fake subprocess. */
-  protected runCli(options: RunCliJsonlOptions): Promise<CliJsonlResult> {
-    return runCliJsonl(options);
-  }
-
-  /** Detect the CLI. Protected so tests can bypass the preflight. */
-  protected detect(): Promise<CliDetection> {
-    return detectCli('gemini', ['--version'], { installHint: GEMINI_CLI_INSTALL_HINT });
-  }
-
-  private async ensureCliAvailable(): Promise<void> {
-    this.cliDetection ??= this.detect();
-    const detection = await this.cliDetection;
-    if (!detection.available) {
-      throw new Error(detection.reason ?? GEMINI_CLI_INSTALL_HINT);
-    }
-  }
-
-  async runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult> {
-    const startTime = Date.now();
-
+  protected override beforeRunTask(): void {
     if (!warnedExperimental) {
       warnedExperimental = true;
       console.warn(EXPERIMENTAL_WARNING);
     }
-
-    try {
-      await this.ensureCliAvailable();
-
-      const cwd = task.workspaceDir ?? this.options.cwd ?? process.cwd();
-      const timeoutMs = task.timeoutMs ?? this.options.taskTimeoutMs ?? 300000;
-
-      const args = [
-        '-p', task.prompt,
-        '--output-format', 'stream-json',
-        // Auto-approve tool use, incl. the activate_skill consent prompt.
-        '--approval-mode', 'yolo',
-      ];
-
-      // Skip -m for the framework default ('sonnet', a Claude alias): let the
-      // Gemini CLI pick its own default model.
-      const model = this.options.model;
-      if (model && model !== DEFAULT_CONFIG.defaultAgentModel) {
-        args.push('-m', model);
-      }
-
-      const cli = await this.runCli({
-        command: 'gemini',
-        args,
-        cwd,
-        env: process.env,
-        timeoutMs,
-      });
-
-      if (cli.timedOut) {
-        return this.createErrorResult(
-          task,
-          `Task ${task.id} timed out after ${timeoutMs}ms`,
-          cli.durationMs,
-        );
-      }
-
-      const parsed = this.parseEvents(cli.events, logger);
-
-      if (cli.exitCode !== 0 || !parsed.sawResult || parsed.errorMessage) {
-        const problem = parsed.errorMessage
-          ? `reported an error: ${parsed.errorMessage}`
-          : cli.exitCode !== 0
-            ? `exited with code ${cli.exitCode}`
-            : 'exited without a result event';
-        const stderrExcerpt = cli.stderr.trim().slice(0, 500);
-        return this.createErrorResult(
-          task,
-          `gemini CLI ${problem}${stderrExcerpt ? `: ${stderrExcerpt}` : ''}`,
-          cli.durationMs,
-        );
-      }
-
-      return this.buildTaskResult(task, {
-        output: parsed.output,
-        durationMs: cli.durationMs,
-        numTurns: parsed.numTurns,
-        costUsd: parsed.tokens ? parsed.tokens.total * ROUGH_COST_PER_TOKEN : 0,
-        skillLoads: parsed.skillLoads,
-        toolCalls: parsed.toolCalls,
-        tokens: parsed.tokens,
-      });
-    } catch (error) {
-      return this.handleRunError(task, error, startTime, logger);
-    }
   }
 
-  /**
-   * Best-effort parse of Gemini stream-json events. Field names for message
-   * chunks are not fully documented, so several shapes are tolerated.
-   */
-  private parseEvents(events: unknown[], logger?: SessionLogger): ParsedGeminiTranscript {
-    const parsed: ParsedGeminiTranscript = {
-      output: '',
+  protected buildArgs(task: EvalTask): string[] {
+    const args = [
+      '-p', task.prompt,
+      '--output-format', 'stream-json',
+      // Auto-approve tool use, incl. the activate_skill consent prompt.
+      '--approval-mode', 'yolo',
+    ];
+
+    // Skip -m for the framework default ('sonnet', a Claude alias): let the
+    // Gemini CLI pick its own default model.
+    const model = this.options.model;
+    if (model && model !== DEFAULT_CONFIG.defaultAgentModel) {
+      args.push('-m', model);
+    }
+
+    return args;
+  }
+
+  protected createInitialState(): GeminiFoldState {
+    return {
+      texts: [],
       numTurns: 0,
       skillLoads: [],
       toolCalls: [],
       sawResult: false,
     };
+  }
 
-    const texts: string[] = [];
+  /**
+   * Best-effort fold of one Gemini stream-json event. Field names for message
+   * chunks are not fully documented, so several shapes are tolerated.
+   */
+  protected handleEvent(event: unknown, state: GeminiFoldState, logger?: SessionLogger): void {
+    if (typeof event !== 'object' || event === null) return;
+    const record = event as Record<string, unknown>;
 
-    for (const event of events) {
-      if (typeof event !== 'object' || event === null) continue;
-      const record = event as Record<string, unknown>;
-
-      // json (single-object) mode fallback: { response, stats, error? }.
-      if (typeof record.response === 'string' && record.type === undefined) {
-        texts.push(record.response);
-        parsed.sawResult = true;
-        continue;
-      }
-
-      switch (record.type) {
-        case 'message': {
-          // Tolerated shapes: {content: "..."} | {text: "..."} | {message:{content}}
-          const role = (record.role as string) ?? 'assistant';
-          const content = record.content ?? record.text
-            ?? (record.message as Record<string, unknown> | undefined)?.content;
-          if (role === 'assistant' && typeof content === 'string' && content) {
-            texts.push(content);
-            logger?.addTextMessage(content);
-          }
-          break;
-        }
-
-        case 'tool_use': {
-          const toolName = (record.tool_name as string) ?? (record.name as string) ?? 'unknown';
-          const parameters = record.parameters ?? record.input;
-          parsed.toolCalls.push({
-            tool: toolName,
-            toolUseId: (record.tool_id as string) ?? '',
-            timestamp: Date.now(),
-            input: parameters,
-          });
-          logger?.addToolUse(toolName, parameters);
-
-          // Primary surface: the native activate_skill tool.
-          if (toolName === 'activate_skill') {
-            const params = parameters as Record<string, unknown> | undefined;
-            const skillName = (params?.skill as string) ?? (params?.name as string);
-            if (skillName) parsed.skillLoads.push(skillName);
-          } else {
-            // Fallback surface: read-style tool touching a SKILL.md path.
-            const skillName = skillNameFromParameters(parameters);
-            if (skillName) parsed.skillLoads.push(skillName);
-          }
-          break;
-        }
-
-        case 'error': {
-          const message = (record.message as string) ?? (record.error as string);
-          parsed.errorMessage = message ? String(message) : 'unknown error event';
-          break;
-        }
-
-        case 'result': {
-          parsed.sawResult = true;
-          if (typeof record.response === 'string' && record.response) {
-            texts.push(record.response);
-          }
-          const stats = record.stats as {
-            input_tokens?: number;
-            output_tokens?: number;
-            total_tokens?: number;
-            tool_calls?: number;
-          } | undefined;
-          if (stats && (stats.input_tokens !== undefined || stats.output_tokens !== undefined)) {
-            parsed.tokens = buildTokenUsage({
-              input: stats.input_tokens,
-              output: stats.output_tokens,
-            });
-          }
-          parsed.numTurns = 1;
-          break;
-        }
-      }
+    // json (single-object) mode fallback: { response, stats, error? }.
+    if (typeof record.response === 'string' && record.type === undefined) {
+      state.texts.push(record.response);
+      state.sawResult = true;
+      return;
     }
 
-    parsed.output = texts.join('\n\n');
-    return parsed;
+    switch (record.type) {
+      case 'message': {
+        // Tolerated shapes: {content: "..."} | {text: "..."} | {message:{content}}
+        const role = (record.role as string) ?? 'assistant';
+        const content = record.content ?? record.text
+          ?? (record.message as Record<string, unknown> | undefined)?.content;
+        if (role === 'assistant' && typeof content === 'string' && content) {
+          state.texts.push(content);
+          logger?.addTextMessage(content);
+        }
+        break;
+      }
+
+      case 'tool_use': {
+        const toolName = (record.tool_name as string) ?? (record.name as string) ?? 'unknown';
+        const parameters = record.parameters ?? record.input;
+        state.toolCalls.push({
+          tool: toolName,
+          toolUseId: (record.tool_id as string) ?? '',
+          timestamp: Date.now(),
+          input: parameters,
+        });
+        logger?.addToolUse(toolName, parameters);
+
+        // Primary surface: the native activate_skill tool.
+        if (toolName === 'activate_skill') {
+          const params = parameters as Record<string, unknown> | undefined;
+          const skillName = (params?.skill as string) ?? (params?.name as string);
+          if (skillName) state.skillLoads.push(skillName);
+        } else {
+          // Fallback surface: read-style tool touching a SKILL.md path.
+          const skillName = skillNameFromToolInput(parameters);
+          if (skillName) state.skillLoads.push(skillName);
+        }
+        break;
+      }
+
+      case 'error': {
+        const message = (record.message as string) ?? (record.error as string);
+        state.errorMessage = message ? String(message) : 'unknown error event';
+        break;
+      }
+
+      case 'result': {
+        state.sawResult = true;
+        if (typeof record.response === 'string' && record.response) {
+          state.texts.push(record.response);
+        }
+        const stats = record.stats as {
+          input_tokens?: number;
+          output_tokens?: number;
+          total_tokens?: number;
+          tool_calls?: number;
+        } | undefined;
+        if (stats && (stats.input_tokens !== undefined || stats.output_tokens !== undefined)) {
+          state.tokens = buildTokenUsage({
+            input: stats.input_tokens,
+            output: stats.output_tokens,
+          });
+        }
+        state.numTurns = 1;
+        break;
+      }
+    }
+  }
+
+  protected detectFailure(cli: CliJsonlResult, state: GeminiFoldState): string | null {
+    if (state.errorMessage) return `reported an error: ${state.errorMessage}`;
+    if (cli.exitCode !== 0) return `exited with code ${cli.exitCode}`;
+    if (!state.sawResult) return 'exited without a result event';
+    return null;
+  }
+
+  protected finalize(state: GeminiFoldState, cli: CliJsonlResult): CliTaskResultFields {
+    const tokens = state.tokens;
+    return {
+      output: state.texts.join('\n\n'),
+      durationMs: cli.durationMs,
+      numTurns: state.numTurns,
+      costUsd: tokens ? tokens.total * ROUGH_COST_PER_TOKEN : 0,
+      skillLoads: state.skillLoads,
+      toolCalls: state.toolCalls,
+      tokens,
+    };
   }
 }
