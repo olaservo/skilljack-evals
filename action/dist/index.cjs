@@ -1,3 +1,4 @@
+var __IMPORT_META_URL = require('node:url').pathToFileURL(__filename).toString();
 "use strict";
 var __create = Object.create;
 var __defProp = Object.defineProperty;
@@ -22856,7 +22857,6 @@ var import_path5 = require("path");
 var import_promises6 = require("fs/promises");
 var import_os4 = require("os");
 var import_path6 = require("path");
-var import_meta = {};
 var e1 = Object.create;
 var { getPrototypeOf: t1, defineProperty: uh, getOwnPropertyNames: r1 } = Object;
 var n1 = Object.prototype.hasOwnProperty;
@@ -22885,7 +22885,7 @@ function c1(e, t) {
 var Tr = (e, t) => {
   for (var r in t) uh(e, r, { get: t[r], enumerable: true, configurable: true, set: c1.bind(t, r) });
 };
-var Ut = (0, import_node_module.createRequire)(import_meta.url);
+var Ut = (0, import_node_module.createRequire)(__IMPORT_META_URL);
 var u1 = Symbol.dispose || /* @__PURE__ */ Symbol.for("Symbol.dispose");
 var d1 = Symbol.asyncDispose || /* @__PURE__ */ Symbol.for("Symbol.asyncDispose");
 var ke = (e, t, r) => {
@@ -42434,7 +42434,7 @@ function Jw(e, t, r, o) {
   JO(!!x, nk, b);
   let sh = u.pathToClaudeCodeExecutable;
   if (!sh) {
-    let Nt = (0, import_url.fileURLToPath)(import_meta.url), cr = (0, import_module.createRequire)(Nt), lo = dI((ci) => cr.resolve(ci));
+    let Nt = (0, import_url.fileURLToPath)(__IMPORT_META_URL), cr = (0, import_module.createRequire)(Nt), lo = dI((ci) => cr.resolve(ci));
     if (!lo) throw Error(`Native CLI binary for ${process.platform}-${process.arch} not found. Reinstall @anthropic-ai/claude-agent-sdk without --omit=optional, or set options.pathToClaudeCodeExecutable.`);
     sh = lo;
   }
