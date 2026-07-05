@@ -43698,6 +43698,17 @@ var CliRunner = class extends BaseRunner {
   beforeRunTask() {
   }
   /**
+   * Environment for the spawned CLI. Default: inherit the full process env.
+   * Runners whose CLI only offers env-based isolation (no --ignore-user-config
+   * style flag) override this to layer isolation vars on top of process.env;
+   * `workspaceDir` is the resolved per-trial cwd the CLI will run in.
+   */
+  buildEnv(task, workspaceDir) {
+    void task;
+    void workspaceDir;
+    return process.env;
+  }
+  /**
    * Execute a single evaluation task via the CLI.
    */
   async runTask(task, logger) {
@@ -43724,7 +43735,7 @@ var CliRunner = class extends BaseRunner {
         command: this.command,
         args: this.buildArgs(task),
         cwd,
-        env: process.env,
+        env: this.buildEnv(task, cwd),
         timeoutMs,
         onEvent: foldEvent
       });
@@ -44107,21 +44118,52 @@ var GeminiRunner = class extends CliRunner {
 // dist/src/runner/opencode-runner.js
 var path9 = __toESM(require("path"), 1);
 var OPENCODE_CLI_INSTALL_HINT = "OpenCode CLI not found on PATH. Install: npm install -g opencode-ai";
-var EXPERIMENTAL_WARNING2 = "Warning: the opencode runner is EXPERIMENTAL \u2014 built from documented output formats; not yet verified against a live CLI. Captured transcripts wanted (see src/__tests__/fixtures/transcripts/README.md).";
-var warnedExperimental2 = false;
+function extractErrorMessage(error) {
+  if (typeof error === "string")
+    return error || void 0;
+  if (typeof error !== "object" || error === null)
+    return void 0;
+  const record = error;
+  const data = record.data;
+  const message = data?.message ?? record.message ?? record.name;
+  if (typeof message === "string" && message)
+    return message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return void 0;
+  }
+}
 var OpenCodeRunner = class extends CliRunner {
   get providerName() {
     return "opencode";
   }
   command = "opencode";
   installHint = OPENCODE_CLI_INSTALL_HINT;
-  /** OpenCode's native project-level skills dir (docs: plural `skills`). */
+  /** OpenCode's native project-level skills dir (source: `{skill,skills}/`). */
   skillsMountPath = path9.join(".opencode", "skills");
-  beforeRunTask() {
-    if (!warnedExperimental2) {
-      warnedExperimental2 = true;
-      console.warn(EXPERIMENTAL_WARNING2);
-    }
+  /**
+   * Per-trial isolation env (see the header's Isolation section). All dirs
+   * live under the workspace so retention/cleanup follows the workspace
+   * policy; opencode creates them on demand.
+   */
+  buildEnv(_task, workspaceDir) {
+    const xdgRoot = path9.join(workspaceDir, ".opencode-xdg");
+    return {
+      ...process.env,
+      // opencode (Bun) trusts env.PWD over the real spawn cwd. A stale PWD
+      // inherited from the launching shell (e.g. Git Bash at the repo root)
+      // silently re-anchors opencode there, hiding the workspace's
+      // .opencode/skills mount. Found live; must match the spawn cwd.
+      PWD: workspaceDir,
+      XDG_CONFIG_HOME: path9.join(xdgRoot, "config"),
+      XDG_DATA_HOME: path9.join(xdgRoot, "data"),
+      XDG_CACHE_HOME: path9.join(xdgRoot, "cache"),
+      XDG_STATE_HOME: path9.join(xdgRoot, "state"),
+      OPENCODE_TEST_HOME: path9.join(xdgRoot, "home"),
+      OPENCODE_DISABLE_EXTERNAL_SKILLS: "1",
+      OPENCODE_PURE: "1"
+    };
   }
   buildArgs(task) {
     const args = [
@@ -44182,7 +44224,7 @@ var OpenCodeRunner = class extends CliRunner {
         logger?.addToolUse(toolName, input);
         if (toolName === "skill") {
           const skillName = input?.name;
-          if (typeof skillName === "string" && skillName) {
+          if (typeof skillName === "string" && skillName && skillName !== "customize-opencode") {
             state.skillLoads.push(skillName);
           }
         } else {
@@ -44200,18 +44242,16 @@ var OpenCodeRunner = class extends CliRunner {
           state.costUsd += cost;
         const tokens = part.tokens ?? record.tokens;
         if (tokens) {
-          state.tokens = buildTokenUsage({
-            input: tokens.input,
-            output: tokens.output,
-            cacheRead: tokens.cache?.read,
-            cacheCreation: tokens.cache?.write
-          });
+          state.tokenTotals ??= { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
+          state.tokenTotals.input += tokens.input ?? 0;
+          state.tokenTotals.output += tokens.output ?? 0;
+          state.tokenTotals.cacheRead += tokens.cache?.read ?? 0;
+          state.tokenTotals.cacheCreation += tokens.cache?.write ?? 0;
         }
         break;
       }
       case "error": {
-        const message = part.message ?? record.error;
-        state.errorMessage = message ? String(message) : "unknown error event";
+        state.errorMessage = extractErrorMessage(record.error ?? part) ?? "unknown error event";
         break;
       }
     }
@@ -44233,7 +44273,7 @@ var OpenCodeRunner = class extends CliRunner {
       costUsd: state.costUsd,
       skillLoads: state.skillLoads,
       toolCalls: state.toolCalls,
-      tokens: state.tokens
+      tokens: buildTokenUsage(state.tokenTotals)
     };
   }
 };

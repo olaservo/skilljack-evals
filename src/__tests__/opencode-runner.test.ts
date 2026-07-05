@@ -163,6 +163,9 @@ describe('OpenCodeRunner with the captured transcript', () => {
 
     const env = runner.lastCliOptions!.env!;
     const xdgRoot = path.join('/tmp/trial-ws', '.opencode-xdg');
+    // opencode (Bun) trusts env.PWD over the spawn cwd — a stale PWD from
+    // the launching shell re-anchors opencode away from the workspace.
+    expect(env.PWD).toBe('/tmp/trial-ws');
     expect(env.XDG_CONFIG_HOME).toBe(path.join(xdgRoot, 'config'));
     expect(env.XDG_DATA_HOME).toBe(path.join(xdgRoot, 'data'));
     expect(env.XDG_CACHE_HOME).toBe(path.join(xdgRoot, 'cache'));

@@ -95,15 +95,15 @@ A task must define at least one of `checks:`, a `verifier/` script, or `assertio
 | `claude-code` | stable | `claude -p --output-format stream-json --setting-sources project` | `.claude/skills` | `npm i -g @anthropic-ai/claude-code` |
 | `codex` | stable (e2e-verified) | `codex exec --json --skip-git-repo-check --ignore-user-config --ephemeral` | `.agents/skills` | `npm i -g @openai/codex` + `codex login` |
 | `gemini` | **experimental** | `gemini -p --output-format stream-json --approval-mode yolo` | `.gemini/skills` | `npm i -g @google/gemini-cli` |
-| `opencode` | **experimental** | `opencode run --format json --auto` | `.opencode/skills` | `npm i -g opencode-ai` |
+| `opencode` | stable (e2e-verified) | `opencode run --format json --auto` + isolation env | `.opencode/skills` | `npm i -g opencode-ai` |
 
 Notes:
 
 - CLI runners spawn the real agent CLI per trial with cwd = the trial workspace; timeouts kill the entire process tree. Each runner preflights with a version check and fails with an install hint when the CLI is missing.
 - `--model` semantics differ per runner: `claude-sdk`/`claude-code` take Claude aliases (`sonnet`, `haiku`, `opus`); `codex`/`gemini`/`opencode` only forward `--model` when you set one explicitly (otherwise each CLI uses its own default — Claude aliases are never forwarded to non-Claude CLIs). OpenCode expects `provider/model` form.
 - Skill invocation detection: Claude runners see the native `Skill` tool; `codex` detects shell reads of `SKILL.md` (its native discovery mechanism, verified in captured transcripts); `gemini`/`opencode` look for their native `activate_skill`/`skill` tools plus SKILL.md reads as fallback.
-- Isolation: `claude-code` passes `--setting-sources project` and `codex` passes `--ignore-user-config --ephemeral` so your global config doesn't leak into trials (auth still works). The experimental runners have **no verified isolation story yet** — global gemini/opencode config and skills may leak into trials; see the JSDoc in `src/runner/gemini-runner.ts` / `opencode-runner.ts`.
-- `gemini` and `opencode` were built from official docs but have not been verified against a live CLI — they warn on first use, and captured transcripts are wanted (see `src/__tests__/fixtures/transcripts/README.md`).
+- Isolation: `claude-code` passes `--setting-sources project`, `codex` passes `--ignore-user-config --ephemeral`, and `opencode` sets per-trial env (`XDG_*` + `OPENCODE_TEST_HOME` redirected under the workspace, `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`, `OPENCODE_PURE=1` — opencode has no ignore-user-config flag) so your global config and skills don't leak into trials (auth still works via `ANTHROPIC_API_KEY` etc.). The `gemini` runner has **no verified isolation story yet** — global gemini config and skills may leak into trials; see the JSDoc in `src/runner/gemini-runner.ts`.
+- `gemini` was built from official docs but has not been verified against a live CLI — it warns on first use, and a captured transcript is wanted (see `src/__tests__/fixtures/transcripts/README.md`). `opencode` was verified live against opencode 1.17.13 (real captured transcript, isolation probe, error-shape capture).
 
 ### Security model
 

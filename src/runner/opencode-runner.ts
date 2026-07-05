@@ -1,11 +1,11 @@
 /**
- * OpenCode CLI Runner — EXPERIMENTAL (source-verified, live capture pending).
+ * OpenCode CLI Runner.
  *
- * Every contract below was verified against the vendored opencode source
- * (v1.17.13, packages/opencode/src/cli/cmd/run.ts + packages/schema
- * session.ts + packages/opencode/src/skill,tool,config) — but not yet against
- * a live CLI run; unit tests still replay a SYNTHETIC fixture
- * (src/__tests__/fixtures/transcripts/opencode/synthetic-*.jsonl).
+ * Contract verified two ways against opencode v1.17.13: source-read of the
+ * vendored repo (packages/opencode/src/cli/cmd/run.ts + packages/schema
+ * session.ts + skill/tool/config modules) AND a live capture on 2026-07-05
+ * (see src/__tests__/fixtures/transcripts/README.md; unit tests replay the
+ * captured transcript fixtures/transcripts/opencode/greeting-with-skill.jsonl).
  *
  * Verified contract (opencode v1.17.13):
  * - Non-interactive: `opencode run --format json --auto "<prompt>"` emits a
@@ -42,8 +42,11 @@
  * scans at home AND project level), and OPENCODE_PURE=1 (no external
  * plugins). OPENCODE_DISABLE_PROJECT_CONFIG is deliberately NOT set — it
  * would also disable discovery of the workspace's own .opencode skill mount.
- * Auth survives isolation via provider env keys (e.g. ANTHROPIC_API_KEY),
- * which auto-enable the matching provider.
+ * PWD is pinned to the workspace because opencode (Bun) trusts env.PWD over
+ * the real spawn cwd — a stale PWD from the launching shell re-anchors the
+ * whole session (and skill discovery) to that directory. Auth survives
+ * isolation via provider env keys (e.g. ANTHROPIC_API_KEY), which
+ * auto-enable the matching provider.
  */
 
 import * as path from 'path';
@@ -60,13 +63,6 @@ import { DEFAULT_CONFIG } from '../config.js';
 
 export const OPENCODE_CLI_INSTALL_HINT =
   'OpenCode CLI not found on PATH. Install: npm install -g opencode-ai';
-
-const EXPERIMENTAL_WARNING =
-  'Warning: the opencode runner is EXPERIMENTAL — built from documented output formats; ' +
-  'not yet verified against a live CLI. Captured transcripts wanted ' +
-  '(see src/__tests__/fixtures/transcripts/README.md).';
-
-let warnedExperimental = false;
 
 /**
  * Extract a human-readable message from an opencode error payload: a plain
@@ -112,13 +108,6 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
   /** OpenCode's native project-level skills dir (source: `{skill,skills}/`). */
   override readonly skillsMountPath = path.join('.opencode', 'skills');
 
-  protected override beforeRunTask(): void {
-    if (!warnedExperimental) {
-      warnedExperimental = true;
-      console.warn(EXPERIMENTAL_WARNING);
-    }
-  }
-
   /**
    * Per-trial isolation env (see the header's Isolation section). All dirs
    * live under the workspace so retention/cleanup follows the workspace
@@ -128,6 +117,11 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
     const xdgRoot = path.join(workspaceDir, '.opencode-xdg');
     return {
       ...process.env,
+      // opencode (Bun) trusts env.PWD over the real spawn cwd. A stale PWD
+      // inherited from the launching shell (e.g. Git Bash at the repo root)
+      // silently re-anchors opencode there, hiding the workspace's
+      // .opencode/skills mount. Found live; must match the spawn cwd.
+      PWD: workspaceDir,
       XDG_CONFIG_HOME: path.join(xdgRoot, 'config'),
       XDG_DATA_HOME: path.join(xdgRoot, 'data'),
       XDG_CACHE_HOME: path.join(xdgRoot, 'cache'),
