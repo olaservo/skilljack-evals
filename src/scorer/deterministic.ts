@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vm from 'vm';
+import { BUILTIN_AGENT_SKILLS } from '../types.js';
 import type {
   EvalTask,
   TaskResult,
@@ -24,16 +25,6 @@ export interface DeterministicOptions {
    */
   ignoreActivation?: boolean;
 }
-
-/**
- * Skills that ship built into an agent CLI and are always registered
- * regardless of what the harness mounts (opencode's `customize-opencode`).
- * Loading one is agent housekeeping, not a skill invocation — without this
- * exclusion an anti-trigger task fails as a false positive and a with-skill
- * task can report "wrong skill activated" when the built-in fires first.
- * Runners also filter these from skillLoads; this guards the toolCalls scan.
- */
-const BUILTIN_AGENT_SKILLS = new Set(['customize-opencode']);
 
 /**
  * Check if a tool name is a skill activation tool.

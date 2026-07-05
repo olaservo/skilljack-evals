@@ -52,7 +52,10 @@
  * Auth: provider env keys (e.g. ANTHROPIC_API_KEY) auto-enable the matching
  * provider; for `opencode auth login` (OAuth) users the real auth.json would
  * be hidden by the XDG_DATA_HOME redirect, so buildEnv forwards it via
- * OPENCODE_AUTH_CONTENT.
+ * OPENCODE_AUTH_CONTENT — re-read per trial, scoped to the requested
+ * provider when -m is set, and rotated tokens are merged back into the real
+ * auth.json after each trial (afterCliRun) so rotating OAuth providers keep
+ * working across trials and the user's real login survives.
  */
 
 import * as fs from 'fs';
@@ -61,9 +64,9 @@ import * as os from 'os';
 import * as path from 'path';
 import type {
   EvalTask,
-  TaskResult,
   ToolCallRecord,
 } from '../types.js';
+import { BUILTIN_AGENT_SKILLS } from '../types.js';
 import { buildTokenUsage, extractErrorMessage } from './base-runner.js';
 import { CliRunner, skillNameFromToolInput } from './cli-runner.js';
 import type { CliTaskResultFields } from './cli-runner.js';
@@ -75,11 +78,18 @@ export const OPENCODE_CLI_INSTALL_HINT =
   'OpenCode CLI not found on PATH. Install: npm install -g opencode-ai';
 
 /**
- * The CLI ships this skill built-in (always registered, even with zero
- * skills mounted); loading it must never count as a skill invocation.
- * The deterministic scorer excludes it independently (BUILTIN_AGENT_SKILLS).
+ * Files opencode's config bootstrap deposits into the workspace's .opencode/
+ * dir every run (ensureGitignore + a background npm install of
+ * @opencode-ai/plugin). Pruned after each trial so verifiers, docker mounts,
+ * and workspace retention only see task state, never harness/CLI droppings.
  */
-const OPENCODE_BUILTIN_SKILLS = new Set(['customize-opencode']);
+const OPENCODE_WORKSPACE_DROPPINGS = [
+  'node_modules',
+  'package.json',
+  'package-lock.json',
+  'bun.lock',
+  '.gitignore',
+];
 
 interface OpenCodeFoldState {
   /** Assistant text events, joined at finalize. */
@@ -106,67 +116,114 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
   /** OpenCode's native project-level skills dir (source: `{skill,skills}/`). */
   override readonly skillsMountPath = path.join('.opencode', 'skills');
 
-  /** Per-trial temp XDG root, created in runTask and removed after the trial. */
-  private readonly xdgRoots = new WeakMap<EvalTask, string>();
-
-  /** Memoized real auth.json content (null = probed, absent). */
-  private cachedAuthContent: string | null | undefined;
-
   /**
-   * Wrap the base runTask with the per-trial isolation dir lifecycle: a fresh
-   * OS temp dir per trial (concurrency-safe via the task-keyed WeakMap),
-   * removed best-effort afterwards. Kept OUTSIDE the workspace so verifiers,
-   * docker mounts, retention, and files_exist checks never see opencode's
-   * internal db/logs/snapshots — and so nothing lands in a user's real
-   * project when task.workspaceDir is unset (direct API use).
+   * CliRunner owns the per-invocation scratch dir (creation, buildEnv/
+   * afterCliRun plumbing, removal with retries) — kept OUTSIDE the workspace
+   * so verifiers, docker mounts, retention, and files_exist checks never see
+   * opencode's internal db/logs/snapshots, and nothing lands in a user's
+   * real project when task.workspaceDir is unset (direct API use).
    */
-  override async runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult> {
-    const xdgRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'skilljack-opencode-'));
-    this.xdgRoots.set(task, xdgRoot);
-    try {
-      return await super.runTask(task, logger);
-    } finally {
-      this.xdgRoots.delete(task);
-      await fsp.rm(xdgRoot, { recursive: true, force: true }).catch(() => {});
-    }
+  protected override readonly needsScratchDir = true;
+
+  /** The real opencode data dir (where `opencode auth login` stores auth.json). */
+  private realDataDir(): string {
+    // XDG spec (and opencode's xdg-basedir): empty XDG_DATA_HOME means unset.
+    const dataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share');
+    return path.join(dataHome, 'opencode');
   }
 
   /**
    * The user's real opencode auth.json (OAuth logins: Claude subscription,
    * Copilot, ...), forwarded via OPENCODE_AUTH_CONTENT because the
-   * XDG_DATA_HOME redirect hides the file itself. Read once per runner.
+   * XDG_DATA_HOME redirect hides the file itself. Read fresh per trial —
+   * memoizing would replay tokens that a previous trial already rotated
+   * (afterCliRun writes rotations back), and would turn a transient read
+   * error into a whole-suite auth outage. When the trial pins a
+   * provider/model, only that provider's entry is forwarded, keeping other
+   * providers' refresh tokens out of the (fully auto-approved) agent's env.
    */
-  private realAuthContent(): string | undefined {
-    if (this.cachedAuthContent === undefined) {
-      const dataHome = process.env.XDG_DATA_HOME ?? path.join(os.homedir(), '.local', 'share');
-      try {
-        this.cachedAuthContent = fs.readFileSync(path.join(dataHome, 'opencode', 'auth.json'), 'utf8');
-      } catch {
-        this.cachedAuthContent = null;
-      }
+  private trialAuthContent(): string | undefined {
+    let raw: string;
+    try {
+      raw = fs.readFileSync(path.join(this.realDataDir(), 'auth.json'), 'utf8');
+    } catch {
+      return undefined;
     }
-    return this.cachedAuthContent ?? undefined;
+    const model = this.options.model;
+    const provider = model && model.includes('/') ? model.split('/')[0] : undefined;
+    if (!provider) return raw;
+    try {
+      const all = JSON.parse(raw) as Record<string, unknown>;
+      const entry = all[provider];
+      return entry === undefined ? undefined : JSON.stringify({ [provider]: entry });
+    } catch {
+      return raw;
+    }
   }
 
   /** Per-trial isolation env (see the header's Isolation section). */
-  protected override buildEnv(task: EvalTask, _workspaceDir: string): NodeJS.ProcessEnv {
-    // Fallback only for direct buildEnv calls outside runTask (tests).
-    const xdgRoot = this.xdgRoots.get(task) ?? path.join(os.tmpdir(), 'skilljack-opencode-fallback');
+  protected override buildEnv(_task: EvalTask, _workspaceDir: string, scratchDir?: string): NodeJS.ProcessEnv {
+    if (!scratchDir) {
+      throw new Error('opencode runner requires a per-trial scratch dir (needsScratchDir)');
+    }
     const env: NodeJS.ProcessEnv = {
       ...process.env,
-      XDG_CONFIG_HOME: path.join(xdgRoot, 'config'),
-      XDG_DATA_HOME: path.join(xdgRoot, 'data'),
-      XDG_CACHE_HOME: path.join(xdgRoot, 'cache'),
-      XDG_STATE_HOME: path.join(xdgRoot, 'state'),
-      OPENCODE_TEST_HOME: path.join(xdgRoot, 'home'),
+      XDG_CONFIG_HOME: path.join(scratchDir, 'config'),
+      XDG_DATA_HOME: path.join(scratchDir, 'data'),
+      XDG_CACHE_HOME: path.join(scratchDir, 'cache'),
+      XDG_STATE_HOME: path.join(scratchDir, 'state'),
+      OPENCODE_TEST_HOME: path.join(scratchDir, 'home'),
       OPENCODE_DISABLE_EXTERNAL_SKILLS: '1',
       OPENCODE_PURE: '1',
     };
-    if (!env.OPENCODE_AUTH_CONTENT) {
-      const auth = this.realAuthContent();
+    // `=== undefined` so an explicitly-empty value stays an opt-out.
+    if (env.OPENCODE_AUTH_CONTENT === undefined) {
+      const auth = this.trialAuthContent();
       if (auth) env.OPENCODE_AUTH_CONTENT = auth;
     }
     return env;
+  }
+
+  /**
+   * Post-trial, pre-scratch-removal housekeeping (best-effort):
+   * 1. Prune opencode's config-bootstrap droppings from the workspace
+   *    .opencode/ dir (skills mount is untouched) so verifiers/retention see
+   *    only task state. Only for pipeline-managed throwaway workspaces —
+   *    never a user's own cwd, where .opencode may hold their real files.
+   * 2. Persist rotated OAuth tokens: opencode writes refreshed tokens to the
+   *    trial's redirected data dir, which is about to be deleted. Merging
+   *    them back into the real auth.json keeps rotating providers working
+   *    across trials (and preserves the user's real login). Skipped when the
+   *    auth came from a caller-provided OPENCODE_AUTH_CONTENT.
+   */
+  protected override async afterCliRun(task: EvalTask, _workspaceDir: string, scratchDir?: string): Promise<void> {
+    if (task.workspaceDir) {
+      const dotOpencode = path.join(task.workspaceDir, '.opencode');
+      await Promise.all(
+        OPENCODE_WORKSPACE_DROPPINGS.map((name) =>
+          fsp.rm(path.join(dotOpencode, name), { recursive: true, force: true, maxRetries: 2, retryDelay: 250 }).catch(() => {}),
+        ),
+      );
+    }
+
+    if (!scratchDir || process.env.OPENCODE_AUTH_CONTENT !== undefined) return;
+    const trialAuthPath = path.join(scratchDir, 'data', 'opencode', 'auth.json');
+    const trialRaw = await fsp.readFile(trialAuthPath, 'utf8').catch(() => undefined);
+    if (!trialRaw) return;
+    try {
+      const trial = JSON.parse(trialRaw) as Record<string, unknown>;
+      const realPath = path.join(this.realDataDir(), 'auth.json');
+      const realRaw = await fsp.readFile(realPath, 'utf8').catch(() => undefined);
+      const real = realRaw ? (JSON.parse(realRaw) as Record<string, unknown>) : {};
+      const merged = { ...real, ...trial };
+      const mergedJson = JSON.stringify(merged, null, 2);
+      if (mergedJson !== realRaw) {
+        await fsp.mkdir(path.dirname(realPath), { recursive: true });
+        await fsp.writeFile(realPath, mergedJson, { encoding: 'utf8', mode: 0o600 });
+      }
+    } catch {
+      // unparseable trial or real auth — leave the real file untouched
+    }
   }
 
   protected buildArgs(task: EvalTask): string[] {
@@ -245,16 +302,18 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
         });
         logger?.addToolUse(toolName, input);
 
-        // Primary surface: the native `skill` tool (built-ins excluded).
+        // Primary surface: the native `skill` tool. Fallback surface:
+        // read-style tool touching a SKILL.md path (matched on the tool
+        // INPUT, so even a failed probe of a guessed path counts — filter
+        // built-ins on both surfaces or baselines report phantom loads).
         if (toolName === 'skill') {
           const skillName = (input as Record<string, unknown> | undefined)?.name;
-          if (typeof skillName === 'string' && skillName && !OPENCODE_BUILTIN_SKILLS.has(skillName)) {
+          if (typeof skillName === 'string' && skillName && !BUILTIN_AGENT_SKILLS.has(skillName)) {
             state.skillLoads.push(skillName);
           }
         } else {
-          // Fallback surface: read-style tool touching a SKILL.md path.
           const skillName = skillNameFromToolInput(input);
-          if (skillName) state.skillLoads.push(skillName);
+          if (skillName && !BUILTIN_AGENT_SKILLS.has(skillName)) state.skillLoads.push(skillName);
         }
         break;
       }

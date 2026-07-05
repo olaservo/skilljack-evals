@@ -3,6 +3,21 @@
  */
 
 // ============================================
+// Shared Constants
+// ============================================
+
+/**
+ * Skills that ship built into an agent CLI and are always registered
+ * regardless of what the harness mounts (opencode's `customize-opencode`).
+ * Loading one is agent housekeeping, never a skill invocation — the runners
+ * filter these from skillLoads AND the deterministic scorer excludes them
+ * from activation scans, both from this single source so the two layers
+ * cannot drift. Consequence: these names are effectively reserved — a user
+ * skill with one of these names will never register as activated.
+ */
+export const BUILTIN_AGENT_SKILLS: ReadonlySet<string> = new Set(['customize-opencode']);
+
+// ============================================
 // Parser Types
 // ============================================
 

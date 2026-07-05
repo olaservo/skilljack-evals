@@ -22,6 +22,8 @@
  * identical TaskResults.
  */
 
+import * as fsp from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 import type {
   EvalTask,
@@ -68,6 +70,35 @@ export function skillNameFromToolInput(input: unknown): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Best-effort, once-per-process sweep of stale `skilljack-*` scratch dirs in
+ * the OS temp dir. Crashes, SIGKILL, and plain Ctrl+C skip the in-run finally
+ * cleanup, and Windows never auto-cleans %TEMP% — without this, orphaned
+ * per-trial dirs (opencode XDG state, verifier scratch, ...) accumulate
+ * forever. The 24h age gate keeps concurrently running skilljack processes
+ * safe.
+ */
+const SCRATCH_STALE_MS = 24 * 60 * 60 * 1000;
+let sweptStaleScratch = false;
+async function sweepStaleScratchDirs(): Promise<void> {
+  if (sweptStaleScratch) return;
+  sweptStaleScratch = true;
+  try {
+    const tmp = os.tmpdir();
+    const entries = await fsp.readdir(tmp, { withFileTypes: true });
+    const now = Date.now();
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !entry.name.startsWith('skilljack-')) continue;
+      const full = path.join(tmp, entry.name);
+      const stat = await fsp.stat(full).catch(() => undefined);
+      if (!stat || now - stat.mtimeMs < SCRATCH_STALE_MS) continue;
+      await fsp.rm(full, { recursive: true, force: true }).catch(() => {});
+    }
+  } catch {
+    // sweeping is opportunistic; never fail a run over it
+  }
 }
 
 /** Fields a CLI runner's finalize() produces for BaseRunner.buildTaskResult. */
@@ -133,15 +164,33 @@ export abstract class CliRunner<TState> extends BaseRunner {
   protected abstract buildArgs(task: EvalTask): string[];
 
   /**
+   * Set true by subclasses whose CLI needs a per-invocation scratch dir for
+   * env-based isolation (e.g. opencode's XDG redirect). CliRunner then owns
+   * the full lifecycle: a fresh OS temp dir per runTask invocation (safe for
+   * concurrent calls, even ones sharing a task object), passed to buildEnv
+   * and afterCliRun, removed afterwards with retries (Windows file locks).
+   */
+  protected readonly needsScratchDir: boolean = false;
+
+  /**
    * Environment for the spawned CLI. Default: inherit the full process env.
    * Runners whose CLI only offers env-based isolation (no --ignore-user-config
    * style flag) override this to layer isolation vars on top of process.env;
-   * `workspaceDir` is the resolved per-trial cwd the CLI will run in.
+   * `workspaceDir` is the resolved per-trial cwd the CLI will run in and
+   * `scratchDir` is this invocation's scratch dir (set iff needsScratchDir).
    * runTask pins PWD to the spawn cwd on top of whatever this returns.
    */
-  protected buildEnv(_task: EvalTask, _workspaceDir: string): NodeJS.ProcessEnv {
+  protected buildEnv(_task: EvalTask, _workspaceDir: string, _scratchDir?: string): NodeJS.ProcessEnv {
     return process.env;
   }
+
+  /**
+   * Hook invoked in runTask's finally — after the CLI settled (or failed),
+   * before the scratch dir is removed. For per-trial cleanup/propagation
+   * (e.g. pruning CLI droppings from the workspace, persisting rotated
+   * credentials). Errors are swallowed; keep it best-effort.
+   */
+  protected async afterCliRun(_task: EvalTask, _workspaceDir: string, _scratchDir?: string): Promise<void> {}
 
   /**
    * Final spawn env: buildEnv output with PWD pinned to the spawn cwd.
@@ -151,8 +200,8 @@ export abstract class CliRunner<TState> extends BaseRunner {
    * Case-variant keys (Windows env is case-insensitive, JS spread is not) are
    * dropped so a parent-provided 'Pwd'/'pwd' cannot shadow the pin.
    */
-  private spawnEnv(task: EvalTask, cwd: string): NodeJS.ProcessEnv {
-    const env: NodeJS.ProcessEnv = { ...this.buildEnv(task, cwd) };
+  private spawnEnv(task: EvalTask, cwd: string, scratchDir?: string): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = { ...this.buildEnv(task, cwd, scratchDir) };
     for (const key of Object.keys(env)) {
       if (key !== 'PWD' && key.toUpperCase() === 'PWD') delete env[key];
     }
@@ -188,11 +237,46 @@ export abstract class CliRunner<TState> extends BaseRunner {
 
     this.beforeRunTask();
 
+    // Per-trial workspace (when set) becomes the CLI cwd.
+    const cwd = task.workspaceDir ?? this.options.cwd ?? process.cwd();
+
+    let scratchDir: string | undefined;
+    if (this.needsScratchDir) {
+      void sweepStaleScratchDirs();
+      scratchDir = await fsp
+        .mkdtemp(path.join(os.tmpdir(), `skilljack-${(this as { providerName: string }).providerName}-`))
+        .catch(() => undefined);
+    }
+
+    try {
+      return await this.runTaskInner(task, cwd, scratchDir, startTime, logger);
+    } finally {
+      try {
+        await this.afterCliRun(task, cwd, scratchDir);
+      } catch {
+        // best-effort hook; never let cleanup break the result path
+      }
+      if (scratchDir) {
+        // Retries cover Windows EBUSY when a killed CLI's descendants still
+        // hold files briefly; a stubborn orphan is collected by the next
+        // process's stale sweep.
+        await fsp
+          .rm(scratchDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 500 })
+          .catch(() => {});
+      }
+    }
+  }
+
+  private async runTaskInner(
+    task: EvalTask,
+    cwd: string,
+    scratchDir: string | undefined,
+    startTime: number,
+    logger?: SessionLogger,
+  ): Promise<TaskResult> {
     try {
       await this.ensureCliAvailable();
 
-      // Per-trial workspace (when set) becomes the CLI cwd.
-      const cwd = task.workspaceDir ?? this.options.cwd ?? process.cwd();
       const timeoutMs = task.timeoutMs ?? this.options.taskTimeoutMs ?? 300000;
 
       const state = this.createInitialState();
@@ -216,7 +300,7 @@ export abstract class CliRunner<TState> extends BaseRunner {
         command: this.command,
         args: this.buildArgs(task),
         cwd,
-        env: this.spawnEnv(task, cwd),
+        env: this.spawnEnv(task, cwd, scratchDir),
         timeoutMs,
         onEvent: foldEvent,
       });

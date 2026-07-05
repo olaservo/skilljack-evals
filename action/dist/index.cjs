@@ -95,11 +95,11 @@ var require_command = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.issue = exports2.issueCommand = void 0;
-    var os5 = __importStar(require("os"));
+    var os6 = __importStar(require("os"));
     var utils_1 = require_utils();
     function issueCommand(command, properties, message) {
       const cmd = new Command(command, properties, message);
-      process.stdout.write(cmd.toString() + os5.EOL);
+      process.stdout.write(cmd.toString() + os6.EOL);
     }
     exports2.issueCommand = issueCommand;
     function issue(name, message = "") {
@@ -183,7 +183,7 @@ var require_file_command = __commonJS({
     exports2.prepareKeyValueMessage = exports2.issueFileCommand = void 0;
     var crypto2 = __importStar(require("crypto"));
     var fs21 = __importStar(require("fs"));
-    var os5 = __importStar(require("os"));
+    var os6 = __importStar(require("os"));
     var utils_1 = require_utils();
     function issueFileCommand(command, message) {
       const filePath = process.env[`GITHUB_${command}`];
@@ -193,7 +193,7 @@ var require_file_command = __commonJS({
       if (!fs21.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
       }
-      fs21.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os5.EOL}`, {
+      fs21.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os6.EOL}`, {
         encoding: "utf8"
       });
     }
@@ -207,7 +207,7 @@ var require_file_command = __commonJS({
       if (convertedValue.includes(delimiter)) {
         throw new Error(`Unexpected input: value should not contain the delimiter "${delimiter}"`);
       }
-      return `${key}<<${delimiter}${os5.EOL}${convertedValue}${os5.EOL}${delimiter}`;
+      return `${key}<<${delimiter}${os6.EOL}${convertedValue}${os6.EOL}${delimiter}`;
     }
     exports2.prepareKeyValueMessage = prepareKeyValueMessage;
   }
@@ -18145,7 +18145,7 @@ var require_summary = __commonJS({
     exports2.summary = exports2.markdownSummary = exports2.SUMMARY_DOCS_URL = exports2.SUMMARY_ENV_VAR = void 0;
     var os_1 = require("os");
     var fs_1 = require("fs");
-    var { access, appendFile: appendFile2, writeFile: writeFile9 } = fs_1.promises;
+    var { access, appendFile: appendFile2, writeFile: writeFile10 } = fs_1.promises;
     exports2.SUMMARY_ENV_VAR = "GITHUB_STEP_SUMMARY";
     exports2.SUMMARY_DOCS_URL = "https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary";
     var Summary = class {
@@ -18203,7 +18203,7 @@ var require_summary = __commonJS({
         return __awaiter(this, void 0, void 0, function* () {
           const overwrite = !!(options === null || options === void 0 ? void 0 : options.overwrite);
           const filePath = yield this.filePath();
-          const writeFunc = overwrite ? writeFile9 : appendFile2;
+          const writeFunc = overwrite ? writeFile10 : appendFile2;
           yield writeFunc(filePath, this._buffer, { encoding: "utf8" });
           return this.emptyBuffer();
         });
@@ -18930,7 +18930,7 @@ var require_toolrunner = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.argStringToArray = exports2.ToolRunner = void 0;
-    var os5 = __importStar(require("os"));
+    var os6 = __importStar(require("os"));
     var events = __importStar(require("events"));
     var child = __importStar(require("child_process"));
     var path22 = __importStar(require("path"));
@@ -18985,12 +18985,12 @@ var require_toolrunner = __commonJS({
       _processLineBuffer(data, strBuffer, onLine) {
         try {
           let s = strBuffer + data.toString();
-          let n = s.indexOf(os5.EOL);
+          let n = s.indexOf(os6.EOL);
           while (n > -1) {
             const line = s.substring(0, n);
             onLine(line);
-            s = s.substring(n + os5.EOL.length);
-            n = s.indexOf(os5.EOL);
+            s = s.substring(n + os6.EOL.length);
+            n = s.indexOf(os6.EOL);
           }
           return s;
         } catch (err) {
@@ -19159,7 +19159,7 @@ var require_toolrunner = __commonJS({
             }
             const optionsNonNull = this._cloneExecOptions(this.options);
             if (!optionsNonNull.silent && optionsNonNull.outStream) {
-              optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + os5.EOL);
+              optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + os6.EOL);
             }
             const state = new ExecState(optionsNonNull, this.toolPath);
             state.on("debug", (message) => {
@@ -19647,7 +19647,7 @@ var require_core = __commonJS({
     var command_1 = require_command();
     var file_command_1 = require_file_command();
     var utils_1 = require_utils();
-    var os5 = __importStar(require("os"));
+    var os6 = __importStar(require("os"));
     var path22 = __importStar(require("path"));
     var oidc_utils_1 = require_oidc_utils();
     var ExitCode;
@@ -19715,7 +19715,7 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       if (filePath) {
         return (0, file_command_1.issueFileCommand)("OUTPUT", (0, file_command_1.prepareKeyValueMessage)(name, value));
       }
-      process.stdout.write(os5.EOL);
+      process.stdout.write(os6.EOL);
       (0, command_1.issueCommand)("set-output", { name }, (0, utils_1.toCommandValue)(value));
     }
     exports2.setOutput = setOutput2;
@@ -19749,7 +19749,7 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
     }
     exports2.notice = notice;
     function info(message) {
-      process.stdout.write(message + os5.EOL);
+      process.stdout.write(message + os6.EOL);
     }
     exports2.info = info;
     function startGroup(name) {
@@ -19836,15 +19836,15 @@ var require_windows = __commonJS({
       }
       return false;
     }
-    function checkStat(stat4, path22, options) {
-      if (!stat4.isSymbolicLink() && !stat4.isFile()) {
+    function checkStat(stat6, path22, options) {
+      if (!stat6.isSymbolicLink() && !stat6.isFile()) {
         return false;
       }
       return checkPathExt(path22, options);
     }
     function isexe(path22, options, cb2) {
-      fs21.stat(path22, function(er2, stat4) {
-        cb2(er2, er2 ? false : checkStat(stat4, path22, options));
+      fs21.stat(path22, function(er2, stat6) {
+        cb2(er2, er2 ? false : checkStat(stat6, path22, options));
       });
     }
     function sync(path22, options) {
@@ -19860,20 +19860,20 @@ var require_mode = __commonJS({
     isexe.sync = sync;
     var fs21 = require("fs");
     function isexe(path22, options, cb2) {
-      fs21.stat(path22, function(er2, stat4) {
-        cb2(er2, er2 ? false : checkStat(stat4, options));
+      fs21.stat(path22, function(er2, stat6) {
+        cb2(er2, er2 ? false : checkStat(stat6, options));
       });
     }
     function sync(path22, options) {
       return checkStat(fs21.statSync(path22), options);
     }
-    function checkStat(stat4, options) {
-      return stat4.isFile() && checkMode(stat4, options);
+    function checkStat(stat6, options) {
+      return stat6.isFile() && checkMode(stat6, options);
     }
-    function checkMode(stat4, options) {
-      var mod = stat4.mode;
-      var uid = stat4.uid;
-      var gid = stat4.gid;
+    function checkMode(stat6, options) {
+      var mod = stat6.mode;
+      var uid = stat6.uid;
+      var gid = stat6.gid;
       var myUid = options.uid !== void 0 ? options.uid : process.getuid && process.getuid();
       var myGid = options.gid !== void 0 ? options.gid : process.getgid && process.getgid();
       var u = parseInt("100", 8);
@@ -42772,6 +42772,7 @@ function Az(e, t) {
 }
 
 // dist/src/types.js
+var BUILTIN_AGENT_SKILLS = /* @__PURE__ */ new Set(["customize-opencode"]);
 function isAssistantMessage(msg) {
   return typeof msg === "object" && msg !== null && msg.type === "assistant";
 }
@@ -43214,6 +43215,11 @@ function buildTokenUsage(raw) {
     total: input + output + cacheRead + cacheCreation
   };
 }
+function errorToMessage(error) {
+  if (error instanceof Error)
+    return error.message;
+  return extractErrorMessage(error) ?? String(error);
+}
 function extractErrorMessage(error) {
   if (typeof error === "string")
     return error || void 0;
@@ -43308,7 +43314,7 @@ var BaseRunner = class {
    * Handle a caught error inside runTask: log it and build an error TaskResult.
    */
   handleRunError(task, error, startTime, logger) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = errorToMessage(error);
     logger?.markAsError(errorMessage);
     return this.createErrorResult(task, errorMessage, Date.now() - startTime);
   }
@@ -43341,7 +43347,7 @@ var BaseRunner = class {
         })
       ]);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = errorToMessage(error);
       logger?.markAsError(errorMessage);
       return this.createErrorResult(task, errorMessage, timeout);
     } finally {
@@ -43463,6 +43469,8 @@ var ClaudeSdkRunner = class extends BaseRunner {
 };
 
 // dist/src/runner/cli-runner.js
+var fsp = __toESM(require("fs/promises"), 1);
+var os2 = __toESM(require("os"), 1);
 var path7 = __toESM(require("path"), 1);
 
 // dist/src/harness/subprocess.js
@@ -43685,6 +43693,29 @@ function skillNameFromToolInput(input) {
   }
   return void 0;
 }
+var SCRATCH_STALE_MS = 24 * 60 * 60 * 1e3;
+var sweptStaleScratch = false;
+async function sweepStaleScratchDirs() {
+  if (sweptStaleScratch)
+    return;
+  sweptStaleScratch = true;
+  try {
+    const tmp = os2.tmpdir();
+    const entries = await fsp.readdir(tmp, { withFileTypes: true });
+    const now = Date.now();
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !entry.name.startsWith("skilljack-"))
+        continue;
+      const full = path7.join(tmp, entry.name);
+      const stat6 = await fsp.stat(full).catch(() => void 0);
+      if (!stat6 || now - stat6.mtimeMs < SCRATCH_STALE_MS)
+        continue;
+      await fsp.rm(full, { recursive: true, force: true }).catch(() => {
+      });
+    }
+  } catch {
+  }
+}
 var CliRunner = class extends BaseRunner {
   /** Args for the version preflight. */
   versionArgs = ["--version"];
@@ -43717,14 +43748,31 @@ var CliRunner = class extends BaseRunner {
   beforeRunTask() {
   }
   /**
+   * Set true by subclasses whose CLI needs a per-invocation scratch dir for
+   * env-based isolation (e.g. opencode's XDG redirect). CliRunner then owns
+   * the full lifecycle: a fresh OS temp dir per runTask invocation (safe for
+   * concurrent calls, even ones sharing a task object), passed to buildEnv
+   * and afterCliRun, removed afterwards with retries (Windows file locks).
+   */
+  needsScratchDir = false;
+  /**
    * Environment for the spawned CLI. Default: inherit the full process env.
    * Runners whose CLI only offers env-based isolation (no --ignore-user-config
    * style flag) override this to layer isolation vars on top of process.env;
-   * `workspaceDir` is the resolved per-trial cwd the CLI will run in.
+   * `workspaceDir` is the resolved per-trial cwd the CLI will run in and
+   * `scratchDir` is this invocation's scratch dir (set iff needsScratchDir).
    * runTask pins PWD to the spawn cwd on top of whatever this returns.
    */
-  buildEnv(_task, _workspaceDir) {
+  buildEnv(_task, _workspaceDir, _scratchDir) {
     return process.env;
+  }
+  /**
+   * Hook invoked in runTask's finally — after the CLI settled (or failed),
+   * before the scratch dir is removed. For per-trial cleanup/propagation
+   * (e.g. pruning CLI droppings from the workspace, persisting rotated
+   * credentials). Errors are swallowed; keep it best-effort.
+   */
+  async afterCliRun(_task, _workspaceDir, _scratchDir) {
   }
   /**
    * Final spawn env: buildEnv output with PWD pinned to the spawn cwd.
@@ -43734,8 +43782,8 @@ var CliRunner = class extends BaseRunner {
    * Case-variant keys (Windows env is case-insensitive, JS spread is not) are
    * dropped so a parent-provided 'Pwd'/'pwd' cannot shadow the pin.
    */
-  spawnEnv(task, cwd) {
-    const env = { ...this.buildEnv(task, cwd) };
+  spawnEnv(task, cwd, scratchDir) {
+    const env = { ...this.buildEnv(task, cwd, scratchDir) };
     for (const key of Object.keys(env)) {
       if (key !== "PWD" && key.toUpperCase() === "PWD")
         delete env[key];
@@ -43749,9 +43797,28 @@ var CliRunner = class extends BaseRunner {
   async runTask(task, logger) {
     const startTime = Date.now();
     this.beforeRunTask();
+    const cwd = task.workspaceDir ?? this.options.cwd ?? process.cwd();
+    let scratchDir;
+    if (this.needsScratchDir) {
+      void sweepStaleScratchDirs();
+      scratchDir = await fsp.mkdtemp(path7.join(os2.tmpdir(), `skilljack-${this.providerName}-`)).catch(() => void 0);
+    }
+    try {
+      return await this.runTaskInner(task, cwd, scratchDir, startTime, logger);
+    } finally {
+      try {
+        await this.afterCliRun(task, cwd, scratchDir);
+      } catch {
+      }
+      if (scratchDir) {
+        await fsp.rm(scratchDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 500 }).catch(() => {
+        });
+      }
+    }
+  }
+  async runTaskInner(task, cwd, scratchDir, startTime, logger) {
     try {
       await this.ensureCliAvailable();
-      const cwd = task.workspaceDir ?? this.options.cwd ?? process.cwd();
       const timeoutMs = task.timeoutMs ?? this.options.taskTimeoutMs ?? 3e5;
       const state = this.createInitialState();
       let reducerError;
@@ -43770,7 +43837,7 @@ var CliRunner = class extends BaseRunner {
         command: this.command,
         args: this.buildArgs(task),
         cwd,
-        env: this.spawnEnv(task, cwd),
+        env: this.spawnEnv(task, cwd, scratchDir),
         timeoutMs,
         onEvent: foldEvent
       });
@@ -44151,11 +44218,17 @@ var GeminiRunner = class extends CliRunner {
 
 // dist/src/runner/opencode-runner.js
 var fs8 = __toESM(require("fs"), 1);
-var fsp = __toESM(require("fs/promises"), 1);
-var os2 = __toESM(require("os"), 1);
+var fsp2 = __toESM(require("fs/promises"), 1);
+var os3 = __toESM(require("os"), 1);
 var path10 = __toESM(require("path"), 1);
 var OPENCODE_CLI_INSTALL_HINT = "OpenCode CLI not found on PATH. Install: npm install -g opencode-ai";
-var OPENCODE_BUILTIN_SKILLS = /* @__PURE__ */ new Set(["customize-opencode"]);
+var OPENCODE_WORKSPACE_DROPPINGS = [
+  "node_modules",
+  "package.json",
+  "package-lock.json",
+  "bun.lock",
+  ".gitignore"
+];
 var OpenCodeRunner = class extends CliRunner {
   get providerName() {
     return "opencode";
@@ -44164,64 +44237,107 @@ var OpenCodeRunner = class extends CliRunner {
   installHint = OPENCODE_CLI_INSTALL_HINT;
   /** OpenCode's native project-level skills dir (source: `{skill,skills}/`). */
   skillsMountPath = path10.join(".opencode", "skills");
-  /** Per-trial temp XDG root, created in runTask and removed after the trial. */
-  xdgRoots = /* @__PURE__ */ new WeakMap();
-  /** Memoized real auth.json content (null = probed, absent). */
-  cachedAuthContent;
   /**
-   * Wrap the base runTask with the per-trial isolation dir lifecycle: a fresh
-   * OS temp dir per trial (concurrency-safe via the task-keyed WeakMap),
-   * removed best-effort afterwards. Kept OUTSIDE the workspace so verifiers,
-   * docker mounts, retention, and files_exist checks never see opencode's
-   * internal db/logs/snapshots — and so nothing lands in a user's real
-   * project when task.workspaceDir is unset (direct API use).
+   * CliRunner owns the per-invocation scratch dir (creation, buildEnv/
+   * afterCliRun plumbing, removal with retries) — kept OUTSIDE the workspace
+   * so verifiers, docker mounts, retention, and files_exist checks never see
+   * opencode's internal db/logs/snapshots, and nothing lands in a user's
+   * real project when task.workspaceDir is unset (direct API use).
    */
-  async runTask(task, logger) {
-    const xdgRoot = await fsp.mkdtemp(path10.join(os2.tmpdir(), "skilljack-opencode-"));
-    this.xdgRoots.set(task, xdgRoot);
-    try {
-      return await super.runTask(task, logger);
-    } finally {
-      this.xdgRoots.delete(task);
-      await fsp.rm(xdgRoot, { recursive: true, force: true }).catch(() => {
-      });
-    }
+  needsScratchDir = true;
+  /** The real opencode data dir (where `opencode auth login` stores auth.json). */
+  realDataDir() {
+    const dataHome = process.env.XDG_DATA_HOME || path10.join(os3.homedir(), ".local", "share");
+    return path10.join(dataHome, "opencode");
   }
   /**
    * The user's real opencode auth.json (OAuth logins: Claude subscription,
    * Copilot, ...), forwarded via OPENCODE_AUTH_CONTENT because the
-   * XDG_DATA_HOME redirect hides the file itself. Read once per runner.
+   * XDG_DATA_HOME redirect hides the file itself. Read fresh per trial —
+   * memoizing would replay tokens that a previous trial already rotated
+   * (afterCliRun writes rotations back), and would turn a transient read
+   * error into a whole-suite auth outage. When the trial pins a
+   * provider/model, only that provider's entry is forwarded, keeping other
+   * providers' refresh tokens out of the (fully auto-approved) agent's env.
    */
-  realAuthContent() {
-    if (this.cachedAuthContent === void 0) {
-      const dataHome = process.env.XDG_DATA_HOME ?? path10.join(os2.homedir(), ".local", "share");
-      try {
-        this.cachedAuthContent = fs8.readFileSync(path10.join(dataHome, "opencode", "auth.json"), "utf8");
-      } catch {
-        this.cachedAuthContent = null;
-      }
+  trialAuthContent() {
+    let raw;
+    try {
+      raw = fs8.readFileSync(path10.join(this.realDataDir(), "auth.json"), "utf8");
+    } catch {
+      return void 0;
     }
-    return this.cachedAuthContent ?? void 0;
+    const model = this.options.model;
+    const provider = model && model.includes("/") ? model.split("/")[0] : void 0;
+    if (!provider)
+      return raw;
+    try {
+      const all = JSON.parse(raw);
+      const entry = all[provider];
+      return entry === void 0 ? void 0 : JSON.stringify({ [provider]: entry });
+    } catch {
+      return raw;
+    }
   }
   /** Per-trial isolation env (see the header's Isolation section). */
-  buildEnv(task, _workspaceDir) {
-    const xdgRoot = this.xdgRoots.get(task) ?? path10.join(os2.tmpdir(), "skilljack-opencode-fallback");
+  buildEnv(_task, _workspaceDir, scratchDir) {
+    if (!scratchDir) {
+      throw new Error("opencode runner requires a per-trial scratch dir (needsScratchDir)");
+    }
     const env = {
       ...process.env,
-      XDG_CONFIG_HOME: path10.join(xdgRoot, "config"),
-      XDG_DATA_HOME: path10.join(xdgRoot, "data"),
-      XDG_CACHE_HOME: path10.join(xdgRoot, "cache"),
-      XDG_STATE_HOME: path10.join(xdgRoot, "state"),
-      OPENCODE_TEST_HOME: path10.join(xdgRoot, "home"),
+      XDG_CONFIG_HOME: path10.join(scratchDir, "config"),
+      XDG_DATA_HOME: path10.join(scratchDir, "data"),
+      XDG_CACHE_HOME: path10.join(scratchDir, "cache"),
+      XDG_STATE_HOME: path10.join(scratchDir, "state"),
+      OPENCODE_TEST_HOME: path10.join(scratchDir, "home"),
       OPENCODE_DISABLE_EXTERNAL_SKILLS: "1",
       OPENCODE_PURE: "1"
     };
-    if (!env.OPENCODE_AUTH_CONTENT) {
-      const auth = this.realAuthContent();
+    if (env.OPENCODE_AUTH_CONTENT === void 0) {
+      const auth = this.trialAuthContent();
       if (auth)
         env.OPENCODE_AUTH_CONTENT = auth;
     }
     return env;
+  }
+  /**
+   * Post-trial, pre-scratch-removal housekeeping (best-effort):
+   * 1. Prune opencode's config-bootstrap droppings from the workspace
+   *    .opencode/ dir (skills mount is untouched) so verifiers/retention see
+   *    only task state. Only for pipeline-managed throwaway workspaces —
+   *    never a user's own cwd, where .opencode may hold their real files.
+   * 2. Persist rotated OAuth tokens: opencode writes refreshed tokens to the
+   *    trial's redirected data dir, which is about to be deleted. Merging
+   *    them back into the real auth.json keeps rotating providers working
+   *    across trials (and preserves the user's real login). Skipped when the
+   *    auth came from a caller-provided OPENCODE_AUTH_CONTENT.
+   */
+  async afterCliRun(task, _workspaceDir, scratchDir) {
+    if (task.workspaceDir) {
+      const dotOpencode = path10.join(task.workspaceDir, ".opencode");
+      await Promise.all(OPENCODE_WORKSPACE_DROPPINGS.map((name) => fsp2.rm(path10.join(dotOpencode, name), { recursive: true, force: true, maxRetries: 2, retryDelay: 250 }).catch(() => {
+      })));
+    }
+    if (!scratchDir || process.env.OPENCODE_AUTH_CONTENT !== void 0)
+      return;
+    const trialAuthPath = path10.join(scratchDir, "data", "opencode", "auth.json");
+    const trialRaw = await fsp2.readFile(trialAuthPath, "utf8").catch(() => void 0);
+    if (!trialRaw)
+      return;
+    try {
+      const trial = JSON.parse(trialRaw);
+      const realPath = path10.join(this.realDataDir(), "auth.json");
+      const realRaw = await fsp2.readFile(realPath, "utf8").catch(() => void 0);
+      const real = realRaw ? JSON.parse(realRaw) : {};
+      const merged = { ...real, ...trial };
+      const mergedJson = JSON.stringify(merged, null, 2);
+      if (mergedJson !== realRaw) {
+        await fsp2.mkdir(path10.dirname(realPath), { recursive: true });
+        await fsp2.writeFile(realPath, mergedJson, { encoding: "utf8", mode: 384 });
+      }
+    } catch {
+    }
   }
   buildArgs(task) {
     const args = [
@@ -44288,12 +44404,12 @@ var OpenCodeRunner = class extends CliRunner {
         logger?.addToolUse(toolName, input);
         if (toolName === "skill") {
           const skillName = input?.name;
-          if (typeof skillName === "string" && skillName && !OPENCODE_BUILTIN_SKILLS.has(skillName)) {
+          if (typeof skillName === "string" && skillName && !BUILTIN_AGENT_SKILLS.has(skillName)) {
             state.skillLoads.push(skillName);
           }
         } else {
           const skillName = skillNameFromToolInput(input);
-          if (skillName)
+          if (skillName && !BUILTIN_AGENT_SKILLS.has(skillName))
             state.skillLoads.push(skillName);
         }
         break;
@@ -44367,7 +44483,6 @@ async function createRunner(type, options, config) {
 var fs9 = __toESM(require("fs"), 1);
 var path12 = __toESM(require("path"), 1);
 var vm2 = __toESM(require("vm"), 1);
-var BUILTIN_AGENT_SKILLS = /* @__PURE__ */ new Set(["customize-opencode"]);
 function isSkillTool(toolName) {
   return toolName === "Skill" || toolName.includes("skill") && !toolName.includes("skill-resource");
 }
@@ -47416,14 +47531,14 @@ async function writeRunSummary(summary2, outputDir) {
 // dist/src/score/verifier.js
 var import_child_process6 = require("child_process");
 var fs18 = __toESM(require("fs/promises"), 1);
-var os4 = __toESM(require("os"), 1);
+var os5 = __toESM(require("os"), 1);
 var path19 = __toESM(require("path"), 1);
 
 // dist/src/sandbox/docker.js
 var import_child_process5 = require("child_process");
 var import_crypto7 = require("crypto");
 var fs17 = __toESM(require("fs/promises"), 1);
-var os3 = __toESM(require("os"), 1);
+var os4 = __toESM(require("os"), 1);
 var path18 = __toESM(require("path"), 1);
 var DEFAULT_DOCKER_IMAGE = "node:20-slim";
 var DOCKER_UNAVAILABLE_HINT = "Docker is required for --sandbox docker but the `docker` CLI could not be run. Install Docker (https://docs.docker.com/get-docker/), make sure the daemon is running, or drop --sandbox docker to run verifiers on the host.";
@@ -47516,7 +47631,7 @@ async function runVerifierInDocker(options) {
   }
   let logsTmp;
   try {
-    logsTmp = await fs17.mkdtemp(path18.join(os3.tmpdir(), "skilljack-docker-"));
+    logsTmp = await fs17.mkdtemp(path18.join(os4.tmpdir(), "skilljack-docker-"));
   } catch (err) {
     return outcome({
       status: "error",
@@ -47754,7 +47869,7 @@ async function runVerifier(options) {
   }
   let contractDir;
   try {
-    contractDir = await fs18.mkdtemp(path19.join(os4.tmpdir(), "skilljack-verifier-"));
+    contractDir = await fs18.mkdtemp(path19.join(os5.tmpdir(), "skilljack-verifier-"));
   } catch (err) {
     return {
       reward: 0,
@@ -47828,11 +47943,40 @@ var ResponseCache = class _ResponseCache {
       }
       const age = Date.now() - new Date(entry.cachedAt).getTime();
       if (age > this.config.ttlHours * 3600 * 1e3) {
+        await fs19.unlink(filePath).catch(() => {
+        });
         return null;
       }
       return entry.taskResult;
     } catch {
       return null;
+    }
+  }
+  /**
+   * Best-effort prune of stale cache files: anything older than the TTL by
+   * mtime, which also collects entries orphaned by execution-version bumps
+   * (their keys are never recomputed, so get() can never reach them). Runs
+   * once per instance, fire-and-forget from the first set().
+   */
+  prunedStale = false;
+  async pruneStaleFiles() {
+    if (this.prunedStale)
+      return;
+    this.prunedStale = true;
+    try {
+      const entries = await fs19.readdir(this.config.dir);
+      const cutoff = Date.now() - this.config.ttlHours * 3600 * 1e3;
+      for (const name of entries) {
+        if (!/^[a-f0-9]{64}\.json$/.test(name))
+          continue;
+        const filePath = path20.join(this.config.dir, name);
+        const stat6 = await fs19.stat(filePath).catch(() => void 0);
+        if (stat6 && stat6.mtimeMs < cutoff) {
+          await fs19.unlink(filePath).catch(() => {
+          });
+        }
+      }
+    } catch {
     }
   }
   /**
@@ -47846,6 +47990,7 @@ var ResponseCache = class _ResponseCache {
     }
     try {
       await fs19.mkdir(this.config.dir, { recursive: true });
+      void this.pruneStaleFiles();
       const entry = {
         taskResult: result,
         cachedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -47876,19 +48021,22 @@ var ResponseCache = class _ResponseCache {
     }
   }
   /**
-   * Execution-semantics version salt. Bump whenever a runner's execution
-   * behavior changes in a way that makes previously cached TaskResults
-   * unrepresentative (e.g. v2: opencode gained per-trial isolation env and
-   * builtin-skill filtering) — otherwise stale pre-change results replay as
-   * fresh until the TTL expires.
+   * Per-runner execution-semantics version salts. Bump a runner's entry
+   * whenever ITS execution behavior changes in a way that makes previously
+   * cached TaskResults unrepresentative (e.g. opencode v2: per-trial
+   * isolation env + builtin-skill filtering) — otherwise stale pre-change
+   * results replay as fresh until the TTL expires. Per-runner (not global)
+   * so a fix in one runner doesn't discard every other runner's warm cache.
    */
-  static EXECUTION_SCHEMA_VERSION = 2;
+  static RUNNER_EXECUTION_VERSIONS = {
+    opencode: 2
+  };
   /**
    * Compute a deterministic SHA-256 cache key from execution-affecting params.
    */
   static computeCacheKey(params) {
     const canonical = {
-      v: _ResponseCache.EXECUTION_SCHEMA_VERSION,
+      v: _ResponseCache.RUNNER_EXECUTION_VERSIONS[params.runnerType] ?? 1,
       taskId: params.taskId,
       prompt: params.prompt,
       model: params.model,
@@ -48263,16 +48411,16 @@ async function runPipeline(options) {
   }
   let compareSkillNames;
   if (options.compareSkillPath) {
-    let stat4;
+    let stat6;
     try {
-      stat4 = await fs20.stat(options.compareSkillPath);
+      stat6 = await fs20.stat(options.compareSkillPath);
     } catch (err) {
       if (err.code === "ENOENT") {
         throw new Error(`--compare-skill path not found: ${options.compareSkillPath}`);
       }
       throw err;
     }
-    if (!stat4.isDirectory()) {
+    if (!stat6.isDirectory()) {
       throw new Error(`--compare-skill path is not a directory: ${options.compareSkillPath}`);
     }
     compareSkillNames = (await resolveSkillsDirLayout(options.compareSkillPath)).names;

@@ -5,7 +5,7 @@
  * fixtures/transcripts/README.md for the capture procedure and the verified
  * contract.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as os from 'os';
@@ -205,6 +205,45 @@ describe('OpenCodeRunner with the captured transcript', () => {
 
   it('mounts skills at .opencode/skills (plural, per current docs)', () => {
     expect(new TestableOpenCodeRunner({}).skillsMountPath).toBe(path.join('.opencode', 'skills'));
+  });
+
+  it('prunes opencode config-bootstrap droppings from the workspace after the trial', async () => {
+    // opencode's bootstrap writes a .gitignore and npm-installs
+    // @opencode-ai/plugin into the workspace .opencode/ during every run —
+    // the runner must remove them so verifiers/retention see only task state.
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), 'skilljack-test-ws-'));
+    try {
+      const dotOpencode = path.join(ws, '.opencode');
+      await fs.mkdir(path.join(dotOpencode, 'node_modules', 'pkg'), { recursive: true });
+      await fs.mkdir(path.join(dotOpencode, 'skills', 'greeting'), { recursive: true });
+      await fs.writeFile(path.join(dotOpencode, 'package.json'), '{}');
+      await fs.writeFile(path.join(dotOpencode, '.gitignore'), 'node_modules');
+      await fs.writeFile(path.join(dotOpencode, 'skills', 'greeting', 'SKILL.md'), '---\nname: greeting\n---\n');
+
+      const runner = makeRunner();
+      await runner.runTask(makeTask({ workspaceDir: ws }));
+
+      expect(fsSync.existsSync(path.join(dotOpencode, 'node_modules'))).toBe(false);
+      expect(fsSync.existsSync(path.join(dotOpencode, 'package.json'))).toBe(false);
+      expect(fsSync.existsSync(path.join(dotOpencode, '.gitignore'))).toBe(false);
+      // The skills mount itself must survive the prune.
+      expect(fsSync.existsSync(path.join(dotOpencode, 'skills', 'greeting', 'SKILL.md'))).toBe(true);
+    } finally {
+      await fs.rm(ws, { recursive: true, force: true });
+    }
+  });
+
+  it('respects an explicitly-empty OPENCODE_AUTH_CONTENT opt-out', async () => {
+    vi.stubEnv('OPENCODE_AUTH_CONTENT', '');
+    try {
+      const runner = makeRunner();
+      await runner.runTask(makeTask({ workspaceDir: '/tmp/trial-ws' }));
+      // '' means the user opted out of auth forwarding — must NOT be
+      // replaced with the real auth.json content.
+      expect(runner.lastCliOptions!.env!.OPENCODE_AUTH_CONTENT).toBe('');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 

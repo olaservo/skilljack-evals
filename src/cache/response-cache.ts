@@ -94,15 +94,44 @@ export class ResponseCache {
         return null;
       }
 
-      // TTL check
+      // TTL check — expired entries are pruned on read so the cache dir
+      // doesn't accumulate dead files (nothing else ever deletes entries
+      // short of an explicit `cache clear`).
       const age = Date.now() - new Date(entry.cachedAt).getTime();
       if (age > this.config.ttlHours * 3600 * 1000) {
+        await fs.unlink(filePath).catch(() => {});
         return null;
       }
 
       return entry.taskResult;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Best-effort prune of stale cache files: anything older than the TTL by
+   * mtime, which also collects entries orphaned by execution-version bumps
+   * (their keys are never recomputed, so get() can never reach them). Runs
+   * once per instance, fire-and-forget from the first set().
+   */
+  private prunedStale = false;
+  private async pruneStaleFiles(): Promise<void> {
+    if (this.prunedStale) return;
+    this.prunedStale = true;
+    try {
+      const entries = await fs.readdir(this.config.dir);
+      const cutoff = Date.now() - this.config.ttlHours * 3600 * 1000;
+      for (const name of entries) {
+        if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
+        const filePath = path.join(this.config.dir, name);
+        const stat = await fs.stat(filePath).catch(() => undefined);
+        if (stat && stat.mtimeMs < cutoff) {
+          await fs.unlink(filePath).catch(() => {});
+        }
+      }
+    } catch {
+      // pruning is opportunistic
     }
   }
 
@@ -116,6 +145,7 @@ export class ResponseCache {
     }
     try {
       await fs.mkdir(this.config.dir, { recursive: true });
+      void this.pruneStaleFiles();
 
       const entry: CacheEntry = {
         taskResult: result,
@@ -153,20 +183,23 @@ export class ResponseCache {
   }
 
   /**
-   * Execution-semantics version salt. Bump whenever a runner's execution
-   * behavior changes in a way that makes previously cached TaskResults
-   * unrepresentative (e.g. v2: opencode gained per-trial isolation env and
-   * builtin-skill filtering) — otherwise stale pre-change results replay as
-   * fresh until the TTL expires.
+   * Per-runner execution-semantics version salts. Bump a runner's entry
+   * whenever ITS execution behavior changes in a way that makes previously
+   * cached TaskResults unrepresentative (e.g. opencode v2: per-trial
+   * isolation env + builtin-skill filtering) — otherwise stale pre-change
+   * results replay as fresh until the TTL expires. Per-runner (not global)
+   * so a fix in one runner doesn't discard every other runner's warm cache.
    */
-  private static readonly EXECUTION_SCHEMA_VERSION = 2;
+  private static readonly RUNNER_EXECUTION_VERSIONS: Record<string, number> = {
+    opencode: 2,
+  };
 
   /**
    * Compute a deterministic SHA-256 cache key from execution-affecting params.
    */
   static computeCacheKey(params: CacheKeyParams): string {
     const canonical: Record<string, unknown> = {
-      v: ResponseCache.EXECUTION_SCHEMA_VERSION,
+      v: ResponseCache.RUNNER_EXECUTION_VERSIONS[params.runnerType] ?? 1,
       taskId: params.taskId,
       prompt: params.prompt,
       model: params.model,

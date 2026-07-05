@@ -75,6 +75,12 @@ export function buildTokenUsage(
  * `{name}` — else a JSON dump so nothing degrades to "[object Object]".
  * Shared by the CLI runners' error-event handlers.
  */
+/** Stringify a caught value without degrading objects to "[object Object]". */
+export function errorToMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return extractErrorMessage(error) ?? String(error);
+}
+
 export function extractErrorMessage(error: unknown): string | undefined {
   if (typeof error === 'string') return error || undefined;
   if (typeof error !== 'object' || error === null) return undefined;
@@ -201,7 +207,7 @@ export abstract class BaseRunner implements AgentRunner {
     startTime: number,
     logger?: SessionLogger,
   ): TaskResult {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = errorToMessage(error);
     logger?.markAsError(errorMessage);
     return this.createErrorResult(task, errorMessage, Date.now() - startTime);
   }
@@ -246,7 +252,7 @@ export abstract class BaseRunner implements AgentRunner {
         }),
       ]);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = errorToMessage(error);
       logger?.markAsError(errorMessage);
       return this.createErrorResult(task, errorMessage, timeout);
     } finally {
