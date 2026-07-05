@@ -22,6 +22,7 @@
  * identical TaskResults.
  */
 
+import * as path from 'path';
 import type {
   EvalTask,
   TaskResult,
@@ -136,11 +137,27 @@ export abstract class CliRunner<TState> extends BaseRunner {
    * Runners whose CLI only offers env-based isolation (no --ignore-user-config
    * style flag) override this to layer isolation vars on top of process.env;
    * `workspaceDir` is the resolved per-trial cwd the CLI will run in.
+   * runTask pins PWD to the spawn cwd on top of whatever this returns.
    */
-  protected buildEnv(task: EvalTask, workspaceDir: string): NodeJS.ProcessEnv {
-    void task;
-    void workspaceDir;
+  protected buildEnv(_task: EvalTask, _workspaceDir: string): NodeJS.ProcessEnv {
     return process.env;
+  }
+
+  /**
+   * Final spawn env: buildEnv output with PWD pinned to the spawn cwd.
+   * Some CLI runtimes (Bun-based CLIs like opencode; shell scripts reading
+   * $PWD) trust env.PWD over the real cwd, so a stale PWD inherited from the
+   * launching shell silently re-anchors them away from the trial workspace.
+   * Case-variant keys (Windows env is case-insensitive, JS spread is not) are
+   * dropped so a parent-provided 'Pwd'/'pwd' cannot shadow the pin.
+   */
+  private spawnEnv(task: EvalTask, cwd: string): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = { ...this.buildEnv(task, cwd) };
+    for (const key of Object.keys(env)) {
+      if (key !== 'PWD' && key.toUpperCase() === 'PWD') delete env[key];
+    }
+    env.PWD = path.resolve(cwd);
+    return env;
   }
 
   /** Create the empty fold state a fresh task starts from. */
@@ -199,7 +216,7 @@ export abstract class CliRunner<TState> extends BaseRunner {
         command: this.command,
         args: this.buildArgs(task),
         cwd,
-        env: this.buildEnv(task, cwd),
+        env: this.spawnEnv(task, cwd),
         timeoutMs,
         onEvent: foldEvent,
       });

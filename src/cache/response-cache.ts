@@ -153,10 +153,20 @@ export class ResponseCache {
   }
 
   /**
+   * Execution-semantics version salt. Bump whenever a runner's execution
+   * behavior changes in a way that makes previously cached TaskResults
+   * unrepresentative (e.g. v2: opencode gained per-trial isolation env and
+   * builtin-skill filtering) — otherwise stale pre-change results replay as
+   * fresh until the TTL expires.
+   */
+  private static readonly EXECUTION_SCHEMA_VERSION = 2;
+
+  /**
    * Compute a deterministic SHA-256 cache key from execution-affecting params.
    */
   static computeCacheKey(params: CacheKeyParams): string {
     const canonical: Record<string, unknown> = {
+      v: ResponseCache.EXECUTION_SCHEMA_VERSION,
       taskId: params.taskId,
       prompt: params.prompt,
       model: params.model,

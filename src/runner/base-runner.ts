@@ -70,6 +70,26 @@ export function buildTokenUsage(
 }
 
 /**
+ * Extract a human-readable message from a CLI error payload: a plain string,
+ * `{data: {message}}` (opencode NamedError serialization), `{message}`, or
+ * `{name}` — else a JSON dump so nothing degrades to "[object Object]".
+ * Shared by the CLI runners' error-event handlers.
+ */
+export function extractErrorMessage(error: unknown): string | undefined {
+  if (typeof error === 'string') return error || undefined;
+  if (typeof error !== 'object' || error === null) return undefined;
+  const record = error as Record<string, unknown>;
+  const data = record.data as Record<string, unknown> | undefined;
+  const message = data?.message ?? record.message ?? record.name;
+  if (typeof message === 'string' && message) return message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Extract a skill name from a Read tool file path when it points inside a
  * skills directory (the SKILL.md read fallback used when countReadAsFallback
  * is set). Handles both / and \ separators. Returns undefined when the path
@@ -89,7 +109,7 @@ export abstract class BaseRunner implements AgentRunner {
   /**
    * Workspace-relative skill discovery path for this harness. Claude runners
    * use '.claude/skills'; CLI harnesses with a different convention (Codex:
-   * '.agents/skills', OpenCode: '.opencode/skill') override this.
+   * '.agents/skills', OpenCode: '.opencode/skills') override this.
    */
   readonly skillsMountPath: string = DEFAULT_SKILLS_MOUNT_PATH;
 

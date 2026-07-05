@@ -7,6 +7,8 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { OpenCodeRunner, OPENCODE_CLI_INSTALL_HINT } from '../runner/opencode-runner.js';
@@ -94,7 +96,23 @@ describe('OpenCodeRunner with the captured transcript', () => {
       cacheCreation: 8489,
       total: 8 + 90 + 8162 + 8489,
     });
-    expect(result.numTurns).toBe(2);
+    // Two step_finish events, but only the reason:'stop' one ends the
+    // assistant turn (tool-calls steps don't) — comparable to codex/claude.
+    expect(result.numTurns).toBe(1);
+  });
+
+  it('folds reasoning tokens into output (TokenUsage has no reasoning field)', async () => {
+    const runner = new TestableOpenCodeRunner({});
+    runner.cliResult = {
+      ...emptyCliResult(),
+      events: [
+        { type: 'text', part: { type: 'text', text: 'thought hard', time: { start: 1, end: 2 } } },
+        { type: 'step_finish', part: { type: 'step-finish', reason: 'stop', cost: 0.01, tokens: { input: 10, output: 20, reasoning: 5, cache: { read: 0, write: 0 } } } },
+      ],
+    };
+
+    const result = await runner.runTask(makeTask());
+    expect(result.tokens).toEqual({ input: 10, output: 25, cacheRead: 0, cacheCreation: 0, total: 35 });
   });
 
   it('spawns opencode run with json format, --auto, prompt, and workspace cwd', async () => {
@@ -162,10 +180,11 @@ describe('OpenCodeRunner with the captured transcript', () => {
     await runner.runTask(makeTask({ workspaceDir: '/tmp/trial-ws' }));
 
     const env = runner.lastCliOptions!.env!;
-    const xdgRoot = path.join('/tmp/trial-ws', '.opencode-xdg');
-    // opencode (Bun) trusts env.PWD over the spawn cwd — a stale PWD from
-    // the launching shell re-anchors opencode away from the workspace.
-    expect(env.PWD).toBe('/tmp/trial-ws');
+    // The XDG root is a per-trial OS temp dir OUTSIDE the workspace (so
+    // verifiers, docker mounts, and retention never see opencode's state).
+    const xdgRoot = path.dirname(env.XDG_CONFIG_HOME!);
+    expect(path.basename(xdgRoot)).toMatch(/^skilljack-opencode-/);
+    expect(xdgRoot.startsWith(os.tmpdir())).toBe(true);
     expect(env.XDG_CONFIG_HOME).toBe(path.join(xdgRoot, 'config'));
     expect(env.XDG_DATA_HOME).toBe(path.join(xdgRoot, 'data'));
     expect(env.XDG_CACHE_HOME).toBe(path.join(xdgRoot, 'cache'));
@@ -173,10 +192,15 @@ describe('OpenCodeRunner with the captured transcript', () => {
     expect(env.OPENCODE_TEST_HOME).toBe(path.join(xdgRoot, 'home'));
     expect(env.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBe('1');
     expect(env.OPENCODE_PURE).toBe('1');
+    // opencode (Bun) trusts env.PWD over the spawn cwd — CliRunner pins it
+    // to the resolved workspace for every CLI runner.
+    expect(env.PWD).toBe(path.resolve('/tmp/trial-ws'));
     // The workspace .opencode mount must stay discoverable.
     expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBeUndefined();
     // Provider auth (and PATH etc.) still inherited from the process env.
     expect(env.PATH ?? env.Path).toBeDefined();
+    // The per-trial temp dir is removed after the trial.
+    expect(fsSync.existsSync(xdgRoot)).toBe(false);
   });
 
   it('mounts skills at .opencode/skills (plural, per current docs)', () => {

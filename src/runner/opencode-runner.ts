@@ -26,7 +26,9 @@
  *   part.tool === "skill") → primary. Read-style tools touching a SKILL.md
  *   path are the fallback surface (always counted).
  * - step_finish parts carry `{reason, cost, tokens: {input, output,
- *   reasoning, cache: {read, write}}}` per step; we sum across steps.
+ *   reasoning, cache: {read, write}}}` per step; we sum across steps
+ *   (reasoning folds into output — codex-consistent) and count a turn only
+ *   for non-`tool-calls` reasons (one step_finish per LLM API step).
  * - Model: `-m` takes `provider/model` (e.g. anthropic/claude-haiku-4-5);
  *   there are no aliases, so the framework-default alias is never forwarded.
  * - Install: npm install -g opencode-ai; version via `opencode --version`.
@@ -36,25 +38,33 @@
  * ~/.claude/skills and ~/.agents/skills, and walks UP from cwd to the git
  * worktree root (which reaches this repo's own .claude/ when workspaces live
  * under <output>/workspaces). We isolate per trial with env vars: XDG_* dirs
- * redirected under the workspace (global config/data/cache/state),
+ * redirected to a per-trial OS temp dir created in runTask and deleted after
+ * the trial (NOT inside the workspace — verifiers enumerate the workspace,
+ * docker bind-mounts it, and retention would persist opencode's db/logs),
  * OPENCODE_TEST_HOME (redirects the ~/.opencode and ~/.claude|~/.agents
  * home-dir scans), OPENCODE_DISABLE_EXTERNAL_SKILLS=1 (kills .claude/.agents
  * scans at home AND project level), and OPENCODE_PURE=1 (no external
  * plugins). OPENCODE_DISABLE_PROJECT_CONFIG is deliberately NOT set — it
  * would also disable discovery of the workspace's own .opencode skill mount.
- * PWD is pinned to the workspace because opencode (Bun) trusts env.PWD over
- * the real spawn cwd — a stale PWD from the launching shell re-anchors the
- * whole session (and skill discovery) to that directory. Auth survives
- * isolation via provider env keys (e.g. ANTHROPIC_API_KEY), which
- * auto-enable the matching provider.
+ * PWD is pinned to the spawn cwd by CliRunner for all CLI runners because
+ * opencode (Bun) trusts env.PWD over the real cwd — a stale PWD from the
+ * launching shell re-anchors the whole session (and skill discovery).
+ * Auth: provider env keys (e.g. ANTHROPIC_API_KEY) auto-enable the matching
+ * provider; for `opencode auth login` (OAuth) users the real auth.json would
+ * be hidden by the XDG_DATA_HOME redirect, so buildEnv forwards it via
+ * OPENCODE_AUTH_CONTENT.
  */
 
+import * as fs from 'fs';
+import * as fsp from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 import type {
   EvalTask,
+  TaskResult,
   ToolCallRecord,
 } from '../types.js';
-import { buildTokenUsage } from './base-runner.js';
+import { buildTokenUsage, extractErrorMessage } from './base-runner.js';
 import { CliRunner, skillNameFromToolInput } from './cli-runner.js';
 import type { CliTaskResultFields } from './cli-runner.js';
 import type { CliJsonlResult } from '../harness/subprocess.js';
@@ -65,23 +75,11 @@ export const OPENCODE_CLI_INSTALL_HINT =
   'OpenCode CLI not found on PATH. Install: npm install -g opencode-ai';
 
 /**
- * Extract a human-readable message from an opencode error payload: a plain
- * string, `{data: {message}}` (NamedError serialization), `{message}`, or
- * `{name}` — else a JSON dump so nothing degrades to "[object Object]".
+ * The CLI ships this skill built-in (always registered, even with zero
+ * skills mounted); loading it must never count as a skill invocation.
+ * The deterministic scorer excludes it independently (BUILTIN_AGENT_SKILLS).
  */
-function extractErrorMessage(error: unknown): string | undefined {
-  if (typeof error === 'string') return error || undefined;
-  if (typeof error !== 'object' || error === null) return undefined;
-  const record = error as Record<string, unknown>;
-  const data = record.data as Record<string, unknown> | undefined;
-  const message = data?.message ?? record.message ?? record.name;
-  if (typeof message === 'string' && message) return message;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return undefined;
-  }
-}
+const OPENCODE_BUILTIN_SKILLS = new Set(['customize-opencode']);
 
 interface OpenCodeFoldState {
   /** Assistant text events, joined at finalize. */
@@ -108,20 +106,54 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
   /** OpenCode's native project-level skills dir (source: `{skill,skills}/`). */
   override readonly skillsMountPath = path.join('.opencode', 'skills');
 
+  /** Per-trial temp XDG root, created in runTask and removed after the trial. */
+  private readonly xdgRoots = new WeakMap<EvalTask, string>();
+
+  /** Memoized real auth.json content (null = probed, absent). */
+  private cachedAuthContent: string | null | undefined;
+
   /**
-   * Per-trial isolation env (see the header's Isolation section). All dirs
-   * live under the workspace so retention/cleanup follows the workspace
-   * policy; opencode creates them on demand.
+   * Wrap the base runTask with the per-trial isolation dir lifecycle: a fresh
+   * OS temp dir per trial (concurrency-safe via the task-keyed WeakMap),
+   * removed best-effort afterwards. Kept OUTSIDE the workspace so verifiers,
+   * docker mounts, retention, and files_exist checks never see opencode's
+   * internal db/logs/snapshots — and so nothing lands in a user's real
+   * project when task.workspaceDir is unset (direct API use).
    */
-  protected override buildEnv(_task: EvalTask, workspaceDir: string): NodeJS.ProcessEnv {
-    const xdgRoot = path.join(workspaceDir, '.opencode-xdg');
-    return {
+  override async runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult> {
+    const xdgRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'skilljack-opencode-'));
+    this.xdgRoots.set(task, xdgRoot);
+    try {
+      return await super.runTask(task, logger);
+    } finally {
+      this.xdgRoots.delete(task);
+      await fsp.rm(xdgRoot, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+
+  /**
+   * The user's real opencode auth.json (OAuth logins: Claude subscription,
+   * Copilot, ...), forwarded via OPENCODE_AUTH_CONTENT because the
+   * XDG_DATA_HOME redirect hides the file itself. Read once per runner.
+   */
+  private realAuthContent(): string | undefined {
+    if (this.cachedAuthContent === undefined) {
+      const dataHome = process.env.XDG_DATA_HOME ?? path.join(os.homedir(), '.local', 'share');
+      try {
+        this.cachedAuthContent = fs.readFileSync(path.join(dataHome, 'opencode', 'auth.json'), 'utf8');
+      } catch {
+        this.cachedAuthContent = null;
+      }
+    }
+    return this.cachedAuthContent ?? undefined;
+  }
+
+  /** Per-trial isolation env (see the header's Isolation section). */
+  protected override buildEnv(task: EvalTask, _workspaceDir: string): NodeJS.ProcessEnv {
+    // Fallback only for direct buildEnv calls outside runTask (tests).
+    const xdgRoot = this.xdgRoots.get(task) ?? path.join(os.tmpdir(), 'skilljack-opencode-fallback');
+    const env: NodeJS.ProcessEnv = {
       ...process.env,
-      // opencode (Bun) trusts env.PWD over the real spawn cwd. A stale PWD
-      // inherited from the launching shell (e.g. Git Bash at the repo root)
-      // silently re-anchors opencode there, hiding the workspace's
-      // .opencode/skills mount. Found live; must match the spawn cwd.
-      PWD: workspaceDir,
       XDG_CONFIG_HOME: path.join(xdgRoot, 'config'),
       XDG_DATA_HOME: path.join(xdgRoot, 'data'),
       XDG_CACHE_HOME: path.join(xdgRoot, 'cache'),
@@ -130,6 +162,11 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
       OPENCODE_DISABLE_EXTERNAL_SKILLS: '1',
       OPENCODE_PURE: '1',
     };
+    if (!env.OPENCODE_AUTH_CONTENT) {
+      const auth = this.realAuthContent();
+      if (auth) env.OPENCODE_AUTH_CONTENT = auth;
+    }
+    return env;
   }
 
   protected buildArgs(task: EvalTask): string[] {
@@ -165,18 +202,29 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
   }
 
   /**
-   * Best-effort fold of one OpenCode --format json event. Events are the
-   * message parts spread into `{type, timestamp, sessionID, ...part}`; a
-   * nested `part` object is also tolerated.
+   * Fold one OpenCode --format json event. Verified serialization (run.ts
+   * emit()): the message part nests under `part` — `{type, timestamp,
+   * sessionID, part: {...}}` — and `error` events nest under `error` instead.
    */
   protected handleEvent(event: unknown, state: OpenCodeFoldState, logger?: SessionLogger): void {
     if (typeof event !== 'object' || event === null) return;
     const record = event as Record<string, unknown>;
-    const part = (record.part as Record<string, unknown> | undefined) ?? record;
+
+    if (record.type === 'error') {
+      // Tolerate strings and the NamedError serializations ({data:
+      // {message}}, {message}, {name}); `?? record.part` keeps the legacy
+      // part-nested message shape working.
+      state.errorMessage =
+        extractErrorMessage(record.error ?? record.part) ?? 'unknown error event';
+      return;
+    }
+
+    const part = record.part as Record<string, unknown> | undefined;
+    if (!part) return;
 
     switch (record.type) {
       case 'text': {
-        const text = (part.text as string) ?? (record.text as string);
+        const text = part.text;
         if (typeof text === 'string' && text) {
           state.texts.push(text);
           logger?.addTextMessage(text);
@@ -186,7 +234,7 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
       }
 
       case 'tool_use': {
-        const toolName = (part.tool as string) ?? (record.tool as string) ?? 'unknown';
+        const toolName = (part.tool as string) ?? 'unknown';
         const toolState = part.state as Record<string, unknown> | undefined;
         const input = toolState?.input ?? part.input;
         state.toolCalls.push({
@@ -197,12 +245,10 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
         });
         logger?.addToolUse(toolName, input);
 
-        // Primary surface: the native `skill` tool. The built-in
-        // `customize-opencode` skill ships with the CLI and is always
-        // registered, so loading it must not count as a skill invocation.
+        // Primary surface: the native `skill` tool (built-ins excluded).
         if (toolName === 'skill') {
           const skillName = (input as Record<string, unknown> | undefined)?.name;
-          if (typeof skillName === 'string' && skillName && skillName !== 'customize-opencode') {
+          if (typeof skillName === 'string' && skillName && !OPENCODE_BUILTIN_SKILLS.has(skillName)) {
             state.skillLoads.push(skillName);
           }
         } else {
@@ -215,11 +261,13 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
 
       case 'step_finish': {
         state.sawCompletion = true;
-        state.numTurns++;
-        const cost = (part.cost as number) ?? (record.cost as number);
-        if (typeof cost === 'number') state.costUsd += cost;
+        // One step_finish per LLM API step; only non-tool-call steps end an
+        // assistant turn, keeping numTurns comparable to the other runners
+        // (codex: turn.completed, claude: the CLI's num_turns).
+        if (part.reason !== 'tool-calls') state.numTurns++;
+        if (typeof part.cost === 'number') state.costUsd += part.cost;
 
-        const tokens = (part.tokens ?? record.tokens) as {
+        const tokens = part.tokens as {
           input?: number;
           output?: number;
           reasoning?: number;
@@ -228,18 +276,14 @@ export class OpenCodeRunner extends CliRunner<OpenCodeFoldState> {
         if (tokens) {
           state.tokenTotals ??= { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
           state.tokenTotals.input += tokens.input ?? 0;
-          state.tokenTotals.output += tokens.output ?? 0;
+          // opencode reports reasoning separately from output (session.ts
+          // getUsage subtracts it); TokenUsage has no reasoning field, so
+          // fold it into output — matching codex, whose output_tokens
+          // already include reasoning.
+          state.tokenTotals.output += (tokens.output ?? 0) + (tokens.reasoning ?? 0);
           state.tokenTotals.cacheRead += tokens.cache?.read ?? 0;
           state.tokenTotals.cacheCreation += tokens.cache?.write ?? 0;
         }
-        break;
-      }
-
-      case 'error': {
-        // Real shape: {type: "error", error: <session error object>} — the
-        // payload nests under `error`, not `part`. Tolerate strings and the
-        // various NamedError serializations ({data: {message}}, {message}).
-        state.errorMessage = extractErrorMessage(record.error ?? part) ?? 'unknown error event';
         break;
       }
     }

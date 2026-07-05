@@ -34,7 +34,7 @@ import type {
   TokenUsage,
   ToolCallRecord,
 } from '../types.js';
-import { buildTokenUsage, ROUGH_COST_PER_TOKEN } from './base-runner.js';
+import { buildTokenUsage, extractErrorMessage, ROUGH_COST_PER_TOKEN } from './base-runner.js';
 import { CliRunner, skillNameFromToolInput } from './cli-runner.js';
 import type { CliTaskResultFields } from './cli-runner.js';
 import type { CliJsonlResult } from '../harness/subprocess.js';
@@ -162,8 +162,8 @@ export class GeminiRunner extends CliRunner<GeminiFoldState> {
       }
 
       case 'error': {
-        const message = (record.message as string) ?? (record.error as string);
-        state.errorMessage = message ? String(message) : 'unknown error event';
+        state.errorMessage =
+          extractErrorMessage(record.message ?? record.error) ?? 'unknown error event';
         break;
       }
 

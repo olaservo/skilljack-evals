@@ -26,6 +26,16 @@ export interface DeterministicOptions {
 }
 
 /**
+ * Skills that ship built into an agent CLI and are always registered
+ * regardless of what the harness mounts (opencode's `customize-opencode`).
+ * Loading one is agent housekeeping, not a skill invocation — without this
+ * exclusion an anti-trigger task fails as a false positive and a with-skill
+ * task can report "wrong skill activated" when the built-in fires first.
+ * Runners also filter these from skillLoads; this guards the toolCalls scan.
+ */
+const BUILTIN_AGENT_SKILLS = new Set(['customize-opencode']);
+
+/**
  * Check if a tool name is a skill activation tool.
  */
 function isSkillTool(toolName: string): boolean {
@@ -65,11 +75,13 @@ export function scoreDeterministic(
   if (result.isError) {
     details.push('Task errored — treating as no activation');
   } else {
-    // Check tool calls for skill invocations
+    // Check tool calls for skill invocations (built-in agent skills are
+    // housekeeping, not activations — skip, don't break, so a real skill
+    // call after a built-in one is still found)
     for (const call of result.toolCalls) {
       if (isSkillTool(call.tool)) {
         const name = extractSkillName(call.input);
-        if (name) {
+        if (name && !BUILTIN_AGENT_SKILLS.has(name)) {
           skillActivated = true;
           activatedSkillName = name;
           break;
@@ -78,9 +90,12 @@ export function scoreDeterministic(
     }
 
     // Also check skillLoads array (may be populated by runner)
-    if (!skillActivated && result.skillLoads.length > 0) {
-      skillActivated = true;
-      activatedSkillName = result.skillLoads[0];
+    if (!skillActivated) {
+      const loaded = result.skillLoads.find((name) => !BUILTIN_AGENT_SKILLS.has(name));
+      if (loaded) {
+        skillActivated = true;
+        activatedSkillName = loaded;
+      }
     }
   }
 
