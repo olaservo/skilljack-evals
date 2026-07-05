@@ -2,11 +2,15 @@
  * Report generation for skill evaluation results.
  *
  * Generates markdown and JSON reports from combined evaluation scores.
+ * Headline metrics are reward-authoritative: resolution rate (with CI),
+ * pass@k, skill lift, and skill invocation rate. Judge output renders in a
+ * clearly-labeled Diagnostics section only when the judge ran.
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { formatDelta, formatCategory, formatTokens, pct } from '../utils/format.js';
+import { binomialCI, passAtK, resolutionRate } from '../score/metrics.js';
 import type {
   SkillEvaluation,
   TaskResult,
@@ -41,6 +45,22 @@ export interface ReportOptions {
   config?: EvalConfig;
 }
 
+/** Per-task trial pass flags: aggregated trials when present, else the single trial. */
+export function trialFlags(score: CombinedScore): boolean[] {
+  return score.trials?.passed ?? [score.passed];
+}
+
+/** Format a resolution CI as "low–high %" for display. */
+function formatCI(summary: EvaluationSummary): string {
+  const { low, high } = summary.resolutionCI;
+  return `${(low * 100).toFixed(0)}–${(high * 100).toFixed(0)}%`;
+}
+
+function passedRatio(score: CombinedScore): string {
+  const flags = trialFlags(score);
+  return `${flags.filter(Boolean).length}/${flags.length}`;
+}
+
 /**
  * Generate a markdown report from evaluation results.
  */
@@ -51,7 +71,9 @@ export async function generateReport(options: ReportOptions): Promise<string> {
   const totalTasks = evaluation.tasks.length;
   const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-  const { discoveryPassed, adherencePassed, outputQualityPassed, passed } = evaluatePassFail(summary, config);
+  const skillLift = comparison?.summary.delta.resolutionRateDelta;
+  const { resolutionPassed, liftPassed, passed } = evaluatePassFail(summary, config, skillLift);
+  const judgeRan = scores.some((s) => s.judge);
 
   // Build metadata section
   let metaSection = '';
@@ -62,14 +84,21 @@ export async function generateReport(options: ReportOptions): Promise<string> {
     }
     if (metadata.version) metaLines.push(`**Version:** ${metadata.version}`);
     metaLines.push(`**Agent Model:** ${metadata.agentModel}`);
-    metaLines.push(`**Judge Model:** ${metadata.judgeModel}`);
+    if (judgeRan) metaLines.push(`**Judge Model:** ${metadata.judgeModel}`);
     metaSection = metaLines.join('\n') + '\n';
   }
 
   // Build report
-  const runsLine = numRuns > 1 ? `**Runs per Task:** ${numRuns}\n` : '';
+  const runsLine = numRuns > 1 ? `**Trials per Task:** ${numRuns}\n` : '';
   const compareLine = comparison
-    ? `**Mode:** Comparison (vs ${comparison.summary.baselineLabel})\n`
+    ? `**Mode:** Paired baseline (vs ${comparison.summary.baselineLabel})\n`
+    : '';
+
+  const liftRow = skillLift !== undefined
+    ? `| **Skill Lift** | ${formatDelta(skillLift * 100, 1)}% | ${config.liftThreshold !== undefined ? formatDelta(config.liftThreshold * 100, 1) + '%' : ''} | ${liftPassed === undefined ? '' : liftPassed ? 'PASS' : 'FAIL'} |\n`
+    : '';
+  const invocationRow = summary.invocationRate !== undefined
+    ? `| **Skill Invocation Rate** | ${(summary.invocationRate * 100).toFixed(1)}% | | |\n`
     : '';
 
   let report = `# Skill Evaluation Report: ${evaluation.skillName}
@@ -84,11 +113,9 @@ ${metaSection}
 
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
-| **Discovery Accuracy** | ${(summary.discoveryAccuracy * 100).toFixed(1)}%${summary.stddev ? ` \u00B1 ${(summary.stddev.discovery * 100).toFixed(1)}%` : ''} | ${(config.discoveryThreshold * 100).toFixed(0)}% | ${discoveryPassed ? 'PASS' : 'FAIL'} |
-| **Avg Adherence Score** | ${summary.avgAdherence.toFixed(2)}/5.0${summary.stddev ? ` \u00B1 ${summary.stddev.adherence.toFixed(2)}` : ''} | ${config.scoreThreshold.toFixed(1)} | ${adherencePassed ? 'PASS' : 'FAIL'} |
-| **Avg Output Quality** | ${summary.avgOutputQuality.toFixed(2)}/5.0${summary.stddev ? ` \u00B1 ${summary.stddev.outputQuality.toFixed(2)}` : ''} | ${config.scoreThreshold.toFixed(1)} | ${outputQualityPassed ? 'PASS' : 'FAIL'} |
-| **Avg Weighted Score** | ${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` \u00B1 ${summary.stddev.weightedScore.toFixed(2)}` : ''} | | |
-| **Total Duration** | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |
+| **Resolution Rate** | ${(summary.resolutionRate * 100).toFixed(1)}% (CI ${formatCI(summary)}) | ${(config.resolutionThreshold * 100).toFixed(0)}% | ${resolutionPassed ? 'PASS' : 'FAIL'} |
+| **Pass@${numRuns}** | ${(summary.passAtK * 100).toFixed(1)}% | | |
+${liftRow}${invocationRow}| **Total Duration** | ${(summary.totalDurationMs / 1000).toFixed(1)}s | | |
 | **Total Cost** | $${summary.totalCostUsd.toFixed(4)} | | |
 | **Total Tokens** | ${formatTokens(summary.totalTokens)} | | |
 
@@ -154,17 +181,9 @@ ${metaSection}
 **Expected Skill:** \`${task.expectedSkillLoad}\`
 **Loaded Skills:** ${loadedSkills}
 
-#### Scores
-
-| Dimension | Score | Status |
-|-----------|-------|--------|
-| Discovery | ${score.stddev ? `${(score.discovery * 100).toFixed(0)}% \u00B1 ${(score.stddev.discovery * 100).toFixed(0)}%` : `${Math.round(score.discovery)}`} | ${score.discovery >= 1 ? 'PASS' : 'FAIL'} |
-| Adherence | ${score.adherence.toFixed(1)}/5${score.stddev ? ` \u00B1 ${score.stddev.adherence.toFixed(1)}` : ''} | ${score.adherence >= 4 ? 'PASS' : 'FAIL'} |
-| Output Quality | ${score.outputQuality.toFixed(1)}/5${score.stddev ? ` \u00B1 ${score.stddev.outputQuality.toFixed(1)}` : ''} | ${score.outputQuality >= 4 ? 'PASS' : 'FAIL'} |
-| **Weighted** | **${score.weightedScore.toFixed(2)}${score.stddev ? ` \u00B1 ${score.stddev.weightedScore.toFixed(2)}` : ''}** | |
-${isFlaky(score.stddev) ? `\n> **Warning: Potentially Flaky** \u2014 High variance across runs (adherence \u03C3=${score.stddev!.adherence.toFixed(2)}, output \u03C3=${score.stddev!.outputQuality.toFixed(2)})
-> _Only adherence and output quality are checked: discovery (0/1) and weighted score (0-1) cannot exceed the threshold._\n` : ''}
-**Failure Category:** ${formatCategory(score.failureCategory)}
+**Passed:** ${passedRatio(score)} trial(s)${score.stddev && isFlaky(score.stddev) ? ' — **potentially flaky** (trials disagree)' : ''}
+**Reward:** ${score.reward.toFixed(2)}
+${score.invocation !== undefined ? `**Skill Invoked:** ${(score.invocation * 100).toFixed(0)}% of trials\n` : ''}**Failure Category:** ${formatCategory(score.failureCategory)}
 `;
 
     // Show deterministic results if available
@@ -175,16 +194,26 @@ ${isFlaky(score.stddev) ? `\n> **Warning: Potentially Flaky** \u2014 High varian
       }
     }
 
-    // Show checklist results if available
-    if ((score.checklistResults ?? []).length > 0) {
-      const checklistPassed = (score.checklistResults ?? []).filter((cr) => cr.passed).length;
-      report += `\n**Checklist:** ${checklistPassed}/${(score.checklistResults ?? []).length} passed\n\n`;
-      for (const cr of score.checklistResults ?? []) {
-        const safeItem = cr.item.replace(/[|_*`]/g, '\\$&');
-        report += `- ${cr.passed ? 'PASS' : 'FAIL'}: **${safeItem}**\n`;
-        if (cr.evidence?.trim()) {
-          const safeEvidence = cr.evidence.trim().replace(/[|_*`]/g, '\\$&');
-          report += `  - _${safeEvidence}_\n`;
+    // Judge diagnostics — clearly labeled, only when the judge ran.
+    if (score.judge) {
+      report += `\n#### Diagnostics (LLM judge — does not affect pass/fail)\n\n`;
+      if (score.adherence !== undefined && score.outputQuality !== undefined) {
+        report += `| Dimension | Rating |\n|-----------|--------|\n`;
+        report += `| Adherence | ${score.adherence.toFixed(1)}/5${score.stddev?.adherence !== undefined ? ` ± ${score.stddev.adherence.toFixed(1)}` : ''} |\n`;
+        report += `| Output Quality | ${score.outputQuality.toFixed(1)}/5${score.stddev?.outputQuality !== undefined ? ` ± ${score.stddev.outputQuality.toFixed(1)}` : ''} |\n`;
+      }
+
+      // Show assertion grading if available
+      if ((score.checklistResults ?? []).length > 0) {
+        const checklistPassed = (score.checklistResults ?? []).filter((cr) => cr.passed).length;
+        report += `\n**Assertions:** ${checklistPassed}/${(score.checklistResults ?? []).length} passed\n\n`;
+        for (const cr of score.checklistResults ?? []) {
+          const safeItem = cr.item.replace(/[|_*`]/g, '\\$&');
+          report += `- ${cr.passed ? 'PASS' : 'FAIL'}: **${safeItem}**\n`;
+          if (cr.evidence?.trim()) {
+            const safeEvidence = cr.evidence.trim().replace(/[|_*`]/g, '\\$&');
+            report += `  - _${safeEvidence}_\n`;
+          }
         }
       }
     }
@@ -215,15 +244,15 @@ ${result.output.slice(0, config.reportOutputTruncation) || '(no output)'}
     if (runDetails && runDetails[i] && runDetails[i].length > 1) {
       report += `
 <details>
-<summary>Per-run breakdown (${runDetails[i].length} runs)</summary>
+<summary>Per-trial breakdown (${runDetails[i].length} trials)</summary>
 
-| Run | Discovery | Adherence | Output | Weighted | Tokens | Skills Loaded |
-|-----|-----------|-----------|--------|----------|--------|---------------|
+| Trial | Passed | Reward | Tokens | Skills Loaded |
+|-------|--------|--------|--------|---------------|
 `;
       for (let r = 0; r < runDetails[i].length; r++) {
         const rd = runDetails[i][r];
         const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(', ') : 'none';
-        report += `| ${r + 1} | ${rd.score.discovery} | ${rd.score.adherence}/5 | ${rd.score.outputQuality}/5 | ${rd.score.weightedScore.toFixed(2)} | ${formatTokens(rd.result.tokens?.total)} | ${skills} |\n`;
+        report += `| ${r + 1} | ${rd.score.passed ? 'PASS' : 'FAIL'} | ${rd.score.reward.toFixed(2)} | ${formatTokens(rd.result.tokens?.total)} | ${skills} |\n`;
       }
       report += `\n</details>\n`;
     }
@@ -249,8 +278,9 @@ export async function generateJsonResults(options: ReportOptions): Promise<Evalu
   const config = options.config ?? loadConfigSync();
   const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-  const { passed } = evaluatePassFail(summary, config);
-  const failureReasons = computeFailureReasons(summary, config);
+  const skillLift = comparison?.summary.delta.resolutionRateDelta;
+  const { passed } = evaluatePassFail(summary, config, skillLift);
+  const failureReasons = computeFailureReasons(summary, config, skillLift);
 
   const report: EvaluationReport = {
     skillName: evaluation.skillName,
@@ -295,27 +325,36 @@ export async function generateJsonResults(options: ReportOptions): Promise<Evalu
  * Pass/fail evaluation against configured thresholds.
  */
 export interface PassFailResult {
-  discoveryPassed: boolean;
-  adherencePassed: boolean;
-  outputQualityPassed: boolean;
+  resolutionPassed: boolean;
+  /**
+   * Undefined when lift is not gated (no threshold configured). When a
+   * threshold IS configured but no baseline ran (lift unavailable), the gate
+   * fails CLOSED: liftPassed is false.
+   */
+  liftPassed?: boolean;
   passed: boolean;
 }
 
 /**
  * Evaluate whether a summary passes the configured thresholds.
+ *
+ * @param skillLift - Macro skill lift from a paired baseline run. When a lift
+ *                    threshold is configured but no lift is available (no
+ *                    baseline ran), the gate fails closed.
  */
 export function evaluatePassFail(
   summary: EvaluationSummary,
   config: EvalConfig,
+  skillLift?: number,
 ): PassFailResult {
-  const discoveryPassed = summary.discoveryAccuracy >= config.discoveryThreshold;
-  const adherencePassed = summary.avgAdherence >= config.scoreThreshold;
-  const outputQualityPassed = summary.avgOutputQuality >= config.scoreThreshold;
+  const resolutionPassed = summary.resolutionRate >= config.resolutionThreshold;
+  const liftPassed = config.liftThreshold !== undefined
+    ? (skillLift !== undefined ? skillLift >= config.liftThreshold : false)
+    : undefined;
   return {
-    discoveryPassed,
-    adherencePassed,
-    outputQualityPassed,
-    passed: discoveryPassed && adherencePassed && outputQualityPassed,
+    resolutionPassed,
+    liftPassed,
+    passed: resolutionPassed && liftPassed !== false,
   };
 }
 
@@ -325,22 +364,24 @@ export function evaluatePassFail(
 export function computeFailureReasons(
   summary: EvaluationSummary,
   config: EvalConfig,
+  skillLift?: number,
 ): string[] {
   const reasons: string[] = [];
-  if (summary.discoveryAccuracy < config.discoveryThreshold) {
+  if (summary.resolutionRate < config.resolutionThreshold) {
     reasons.push(
-      `Discovery rate ${(summary.discoveryAccuracy * 100).toFixed(1)}% below threshold ${(config.discoveryThreshold * 100).toFixed(0)}%`,
+      `Resolution rate ${(summary.resolutionRate * 100).toFixed(1)}% below threshold ${(config.resolutionThreshold * 100).toFixed(0)}%`,
     );
   }
-  if (summary.avgAdherence < config.scoreThreshold) {
-    reasons.push(
-      `Avg adherence ${summary.avgAdherence.toFixed(2)} below threshold ${config.scoreThreshold}`,
-    );
-  }
-  if (summary.avgOutputQuality < config.scoreThreshold) {
-    reasons.push(
-      `Avg output quality ${summary.avgOutputQuality.toFixed(2)} below threshold ${config.scoreThreshold}`,
-    );
+  if (config.liftThreshold !== undefined) {
+    if (skillLift === undefined) {
+      reasons.push(
+        'min_lift threshold is configured but no baseline ran (lift unavailable) — run with baseline enabled or remove the threshold',
+      );
+    } else if (skillLift < config.liftThreshold) {
+      reasons.push(
+        `Skill lift ${formatDelta(skillLift * 100, 1)}% below threshold ${formatDelta(config.liftThreshold * 100, 1)}%`,
+      );
+    }
   }
   return reasons;
 }
@@ -355,21 +396,26 @@ export function computeSummary(
 ): EvaluationSummary {
   const totalTasks = scores.length;
 
-  // With multi-run, discovery is a float (0-1) per task representing the rate.
-  // Average across tasks to get overall discovery accuracy.
-  const avgDiscovery = totalTasks > 0
-    ? scores.reduce((sum, s) => sum + s.discovery, 0) / totalTasks
+  // Per-task trial flags (aggregated scores carry per-trial arrays).
+  const perTaskFlags = scores.map(trialFlags);
+  const perTaskRates = perTaskFlags.map(resolutionRate);
+  const avgResolution = totalTasks > 0
+    ? perTaskRates.reduce((sum, v) => sum + v, 0) / totalTasks
+    : 0;
+  const totalTrials = perTaskFlags.reduce((sum, flags) => sum + flags.length, 0);
+  const passAtKRate = totalTasks > 0
+    ? perTaskFlags.filter(passAtK).length / totalTasks
     : 0;
 
-  const avgAdherence = totalTasks > 0
-    ? scores.reduce((sum, s) => sum + s.adherence, 0) / totalTasks
-    : 0;
-  const avgOutputQuality = totalTasks > 0
-    ? scores.reduce((sum, s) => sum + s.outputQuality, 0) / totalTasks
-    : 0;
-  const avgWeightedScore = totalTasks > 0
-    ? scores.reduce((sum, s) => sum + s.weightedScore, 0) / totalTasks
-    : 0;
+  const invocations = scores
+    .map((s) => s.invocation)
+    .filter((v): v is number => v !== undefined);
+  const invocationRate = invocations.length > 0
+    ? invocations.reduce((sum, v) => sum + v, 0) / invocations.length
+    : undefined;
+
+  const adherences = scores.map((s) => s.adherence).filter((v): v is number => v !== undefined);
+  const outputs = scores.map((s) => s.outputQuality).filter((v): v is number => v !== undefined);
 
   let totalDurationMs = 0;
   let totalCostUsd = 0;
@@ -385,10 +431,16 @@ export function computeSummary(
   const summary: EvaluationSummary = {
     totalTasks,
     numRuns,
-    discoveryAccuracy: avgDiscovery,
-    avgAdherence,
-    avgOutputQuality,
-    avgWeightedScore,
+    resolutionRate: avgResolution,
+    resolutionCI: binomialCI(avgResolution, totalTrials),
+    passAtK: passAtKRate,
+    invocationRate,
+    avgAdherence: adherences.length > 0
+      ? adherences.reduce((sum, v) => sum + v, 0) / adherences.length
+      : undefined,
+    avgOutputQuality: outputs.length > 0
+      ? outputs.reduce((sum, v) => sum + v, 0) / outputs.length
+      : undefined,
     totalDurationMs,
     totalCostUsd,
     totalTokens: hasAllTokens ? tokenSum : undefined,
@@ -400,11 +452,15 @@ export function computeSummary(
   if (numRuns >= 2) {
     const tasksWithStddev = scores.filter(s => s.stddev);
     if (tasksWithStddev.length > 0) {
+      const meanOf = (values: Array<number | undefined>): number | undefined => {
+        const defined = values.filter((v): v is number => v !== undefined);
+        return defined.length > 0 ? defined.reduce((sum, v) => sum + v, 0) / defined.length : undefined;
+      };
       summary.stddev = {
+        reward: tasksWithStddev.reduce((sum, s) => sum + s.stddev!.reward, 0) / tasksWithStddev.length,
         discovery: tasksWithStddev.reduce((sum, s) => sum + s.stddev!.discovery, 0) / tasksWithStddev.length,
-        adherence: tasksWithStddev.reduce((sum, s) => sum + s.stddev!.adherence, 0) / tasksWithStddev.length,
-        outputQuality: tasksWithStddev.reduce((sum, s) => sum + s.stddev!.outputQuality, 0) / tasksWithStddev.length,
-        weightedScore: tasksWithStddev.reduce((sum, s) => sum + s.stddev!.weightedScore, 0) / tasksWithStddev.length,
+        adherence: meanOf(tasksWithStddev.map((s) => s.stddev!.adherence)),
+        outputQuality: meanOf(tasksWithStddev.map((s) => s.stddev!.outputQuality)),
       };
     }
   }
@@ -452,34 +508,29 @@ function generateComparisonSection(comparison: ComparisonData): string {
 
 | Metric | With Skill | Baseline | Delta | Impact |
 |--------|-----------|----------|-------|--------|
-| Discovery | ${(ws.discoveryAccuracy * 100).toFixed(0)}% | ${(bs.discoveryAccuracy * 100).toFixed(0)}% | ${formatDelta(d.discoveryAccuracyDelta * 100, 0)}% | ${qualityImpact(d.discoveryAccuracyDelta, DISCOVERY_IMPACT_THRESHOLD)} |
-| Avg Adherence | ${ws.avgAdherence.toFixed(2)}/5 | ${bs.avgAdherence.toFixed(2)}/5 | ${formatDelta(d.avgAdherenceDelta)} | ${qualityImpact(d.avgAdherenceDelta, ADHERENCE_IMPACT_THRESHOLD)} |
-| Avg Output Quality | ${ws.avgOutputQuality.toFixed(2)}/5 | ${bs.avgOutputQuality.toFixed(2)}/5 | ${formatDelta(d.avgOutputQualityDelta)} | ${qualityImpact(d.avgOutputQualityDelta, OUTPUT_QUALITY_IMPACT_THRESHOLD)} |
-| Weighted Score | ${ws.avgWeightedScore.toFixed(2)} | ${bs.avgWeightedScore.toFixed(2)} | ${formatDelta(d.avgWeightedScoreDelta)} | ${qualityImpact(d.avgWeightedScoreDelta, WEIGHTED_SCORE_IMPACT_THRESHOLD)} |
+| Resolution Rate | ${(ws.resolutionRate * 100).toFixed(0)}% | ${(bs.resolutionRate * 100).toFixed(0)}% | ${formatDelta(d.resolutionRateDelta * 100, 0)}% | ${qualityImpact(d.resolutionRateDelta, RESOLUTION_IMPACT_THRESHOLD)} |
+| Pass@k | ${(ws.passAtK * 100).toFixed(0)}% | ${(bs.passAtK * 100).toFixed(0)}% | ${formatDelta(d.passAtKDelta * 100, 0)}% | ${qualityImpact(d.passAtKDelta, RESOLUTION_IMPACT_THRESHOLD)} |
 | Duration | ${(ws.totalDurationMs / 1000).toFixed(1)}s | ${(bs.totalDurationMs / 1000).toFixed(1)}s | ${formatDelta(d.totalDurationDeltaMs / 1000, 1)}s | ${durationImpact(d.totalDurationDeltaMs)} |
 | Cost | $${ws.totalCostUsd.toFixed(4)} | $${bs.totalCostUsd.toFixed(4)} | $${formatDelta(d.totalCostDeltaUsd, 4)} | ${costImpact(d.totalCostDeltaUsd)} |
 | Tokens | ${formatTokens(ws.totalTokens)} | ${formatTokens(bs.totalTokens)} | ${d.totalTokensDelta !== undefined ? formatDelta(d.totalTokensDelta, 0) : 'n/a'} | ${d.totalTokensDelta !== undefined ? tokenImpact(d.totalTokensDelta) : ''} |
 
 ### Per-Task Comparison
 
-| Task | Adherence (W / B / Delta) | Output (W / B / Delta) | Weighted (W / B / Delta) |
-|------|--------------------------|----------------------|------------------------|
+| Task | With Skill Passed | Baseline Passed | Lift |
+|------|-------------------|-----------------|------|
 `;
 
   for (const t of tasks) {
     const w = t.withSkill.score;
     const b = t.withoutSkill.score;
-    section += `| ${t.taskId} | ${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / ${formatDelta(t.delta.adherenceDelta, 1)} | ${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / ${formatDelta(t.delta.outputQualityDelta, 1)} | ${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / ${formatDelta(t.delta.weightedScoreDelta)} |\n`;
+    section += `| ${t.taskId} | ${passedRatio(w)} | ${passedRatio(b)} | ${formatDelta(t.delta.lift * 100, 0)}% |\n`;
   }
 
   return section;
 }
 
-/** Minimum delta to classify as positive/negative impact, calibrated to ~5% of each metric's range. */
-export const DISCOVERY_IMPACT_THRESHOLD = 0.05;       // 5% of 0-1 range
-export const ADHERENCE_IMPACT_THRESHOLD = 0.20;       // 5% of 1-5 range (range = 4)
-export const OUTPUT_QUALITY_IMPACT_THRESHOLD = 0.20;  // 5% of 1-5 range (range = 4)
-export const WEIGHTED_SCORE_IMPACT_THRESHOLD = 0.05;  // 5% of 0-1 range
+/** Minimum resolution-rate/lift delta to classify as positive/negative impact. */
+export const RESOLUTION_IMPACT_THRESHOLD = 0.05; // 5% of 0-1 range
 /** Minimum duration delta (ms) to classify as slower/faster. */
 const DURATION_IMPACT_THRESHOLD_MS = 1000;
 /** Minimum cost delta (USD) to classify as higher/lower. */

@@ -1,30 +1,30 @@
 /**
  * Cross-iteration comparison for skill evaluation results.
  *
- * Loads a previous JSON result file, matches tasks by ID,
- * computes per-task deltas, and formats comparison output.
+ * Loads a previous run's summary.json, matches tasks by ID, computes
+ * per-task resolution-rate deltas, and formats comparison output.
  */
 
 import * as fs from 'fs/promises';
 import type {
-  EvaluationReport,
-  EvaluationSummary,
-  CombinedScore,
   ComparisonResult,
   TaskDelta,
   SummaryDelta,
   ScoreSnapshot,
   SummarySnapshot,
 } from '../types.js';
+import type { RunSummary } from '../results/types.js';
 import { formatDelta, ARROW_DIRECTION_EPSILON } from '../utils/format.js';
 
-export const SIGNIFICANCE_THRESHOLD_ADHERENCE = 1;
-export const SIGNIFICANCE_THRESHOLD_WEIGHTED = 0.15;
+/** Per-task resolution-rate delta at or above this magnitude is significant. */
+export const SIGNIFICANCE_THRESHOLD_RESOLUTION = 0.2;
 
 /**
- * Load and validate a previous evaluation report from a JSON file.
+ * Load and validate a previous run summary (summary.json).
+ *
+ * Old-format results.json files (pre-2.0) are rejected with a clear error.
  */
-export async function loadPreviousReport(filePath: string): Promise<EvaluationReport> {
+export async function loadPreviousRunSummary(filePath: string): Promise<RunSummary> {
   let raw: string;
   try {
     raw = await fs.readFile(filePath, 'utf-8');
@@ -42,113 +42,82 @@ export async function loadPreviousReport(filePath: string): Promise<EvaluationRe
     throw new Error(`Failed to parse comparison file as JSON: ${(err as Error).message}`);
   }
 
-  const report = data as Record<string, unknown>;
+  const summary = data as Record<string, unknown>;
 
-  if (typeof report.skillName !== 'string') {
-    throw new Error('Comparison file is not a valid EvaluationReport: missing "skillName"');
-  }
-  if (!report.summary || typeof report.summary !== 'object') {
-    throw new Error('Comparison file is not a valid EvaluationReport: missing "summary"');
-  }
-  const summary = report.summary as Record<string, unknown>;
-  if (
-    typeof summary.discoveryAccuracy !== 'number' ||
-    typeof summary.avgAdherence !== 'number' ||
-    typeof summary.avgOutputQuality !== 'number' ||
-    typeof summary.avgWeightedScore !== 'number'
-  ) {
-    throw new Error('Comparison file summary is missing required numeric fields');
-  }
-  if (!Array.isArray(report.tasks)) {
-    throw new Error('Comparison file is not a valid EvaluationReport: missing "tasks" array');
+  // Detect the pre-2.0 results.json shape and fail with guidance.
+  const oldSummary = summary.summary as Record<string, unknown> | undefined;
+  if (typeof summary.skillName === 'string' && oldSummary && typeof oldSummary.avgWeightedScore === 'number') {
+    throw new Error(
+      `Comparison file looks like a pre-2.0 results.json (weighted-score format): ${filePath}. ` +
+      `--compare-results now reads the summary.json written by a 2.x run — re-run the previous iteration to produce one.`,
+    );
   }
 
-  for (const task of report.tasks) {
-    if (!task.score || typeof task.score.taskId !== 'string') {
-      throw new Error('Comparison file has task entries without score.taskId');
-    }
-    if (
-      typeof task.score.weightedScore !== 'number' ||
-      typeof task.score.discovery !== 'number' ||
-      typeof task.score.adherence !== 'number' ||
-      typeof task.score.outputQuality !== 'number'
-    ) {
-      throw new Error(`Comparison file task "${task.score.taskId}" is missing numeric score fields`);
+  const metrics = summary.metrics as Record<string, unknown> | undefined;
+  if (!metrics || typeof metrics.resolutionRate !== 'number' || typeof metrics.passAtK !== 'number') {
+    throw new Error('Comparison file is not a valid run summary: missing numeric "metrics.resolutionRate"/"metrics.passAtK"');
+  }
+  if (!Array.isArray(summary.tasks)) {
+    throw new Error('Comparison file is not a valid run summary: missing "tasks" array');
+  }
+  for (const task of summary.tasks) {
+    if (typeof task?.id !== 'string' || typeof task?.withSkill?.resolutionRate !== 'number') {
+      throw new Error('Comparison file has task entries without "id" and numeric "withSkill.resolutionRate"');
     }
   }
+  if (!summary.run || typeof (summary.run as Record<string, unknown>).timestamp !== 'string') {
+    throw new Error('Comparison file is not a valid run summary: missing "run.timestamp"');
+  }
 
-  return data as EvaluationReport;
+  return data as RunSummary;
 }
 
 /**
- * Compare current scores against a previous evaluation report.
+ * Compare a current run summary against a previous one.
  */
-export function compareResults(
-  currentScores: CombinedScore[],
-  currentSummary: EvaluationSummary,
-  previous: EvaluationReport
+export function compareRunSummaries(
+  current: RunSummary,
+  previous: RunSummary
 ): ComparisonResult {
   // Build lookup from previous tasks
   const previousMap = new Map<string, ScoreSnapshot>();
-  for (const entry of previous.tasks) {
-    const s = entry.score;
-    previousMap.set(s.taskId, {
-      discovery: s.discovery,
-      adherence: s.adherence,
-      outputQuality: s.outputQuality,
-      weightedScore: s.weightedScore,
+  for (const task of previous.tasks) {
+    previousMap.set(task.id, {
+      resolutionRate: task.withSkill.resolutionRate,
+      lift: task.lift,
     });
   }
 
-  // Build lookup of current task IDs
-  const currentIds = new Set(currentScores.map((s) => s.taskId));
+  const currentIds = new Set(current.tasks.map((t) => t.id));
 
   // Compute per-task deltas
   const taskDeltas: TaskDelta[] = [];
   const tasksOnlyInCurrent: string[] = [];
 
-  for (const score of currentScores) {
-    const prev = previousMap.get(score.taskId);
+  const round3 = (v: number) => Math.round(v * 1000) / 1000;
+
+  for (const task of current.tasks) {
+    const prev = previousMap.get(task.id);
     if (!prev) {
-      tasksOnlyInCurrent.push(score.taskId);
+      tasksOnlyInCurrent.push(task.id);
       continue;
     }
 
-    const current: ScoreSnapshot = {
-      discovery: score.discovery,
-      adherence: score.adherence,
-      outputQuality: score.outputQuality,
-      weightedScore: score.weightedScore,
+    const currentSnapshot: ScoreSnapshot = {
+      resolutionRate: task.withSkill.resolutionRate,
+      lift: task.lift,
     };
-
-    const round3 = (v: number) => Math.round(v * 1000) / 1000;
-    const delta: ScoreSnapshot = {
-      discovery: round3(current.discovery - prev.discovery),
-      adherence: round3(current.adherence - prev.adherence),
-      outputQuality: round3(current.outputQuality - prev.outputQuality),
-      weightedScore: round3(current.weightedScore - prev.weightedScore),
-    };
-
-    const roundedWeighted = Math.round(delta.weightedScore * 1000) / 1000;
-    const isSignificant =
-      Math.abs(delta.adherence) >= SIGNIFICANCE_THRESHOLD_ADHERENCE ||
-      Math.abs(roundedWeighted) >= SIGNIFICANCE_THRESHOLD_WEIGHTED;
+    const delta = round3(currentSnapshot.resolutionRate - prev.resolutionRate);
 
     let significantChange: TaskDelta['significantChange'] = 'unchanged';
-    if (isSignificant) {
-      // Use weighted score as primary signal, fall back to adherence for tie-breaking
-      if (delta.weightedScore > 0 || (delta.weightedScore === 0 && delta.adherence > 0)) {
-        significantChange = 'improved';
-      } else if (delta.weightedScore < 0 || (delta.weightedScore === 0 && delta.adherence < 0)) {
-        significantChange = 'regressed';
-      }
-      // else stays 'unchanged' when both deltas are exactly zero
+    if (Math.abs(delta) >= SIGNIFICANCE_THRESHOLD_RESOLUTION) {
+      significantChange = delta > 0 ? 'improved' : 'regressed';
     }
 
     taskDeltas.push({
-      taskId: score.taskId,
+      taskId: task.id,
       previous: prev,
-      current,
+      current: currentSnapshot,
       delta,
       significantChange,
     });
@@ -156,41 +125,39 @@ export function compareResults(
 
   // Find tasks only in previous
   const tasksOnlyInPrevious: string[] = [];
-  for (const entry of previous.tasks) {
-    if (!currentIds.has(entry.score.taskId)) {
-      tasksOnlyInPrevious.push(entry.score.taskId);
+  for (const task of previous.tasks) {
+    if (!currentIds.has(task.id)) {
+      tasksOnlyInPrevious.push(task.id);
     }
   }
 
   // Compute summary delta
   const prevSummary: SummarySnapshot = {
-    discoveryAccuracy: previous.summary.discoveryAccuracy,
-    avgAdherence: previous.summary.avgAdherence,
-    avgOutputQuality: previous.summary.avgOutputQuality,
-    avgWeightedScore: previous.summary.avgWeightedScore,
+    resolutionRate: previous.metrics.resolutionRate,
+    passAtK: previous.metrics.passAtK,
+    skillLift: previous.metrics.skillLift,
   };
-
   const currSummary: SummarySnapshot = {
-    discoveryAccuracy: currentSummary.discoveryAccuracy,
-    avgAdherence: currentSummary.avgAdherence,
-    avgOutputQuality: currentSummary.avgOutputQuality,
-    avgWeightedScore: currentSummary.avgWeightedScore,
+    resolutionRate: current.metrics.resolutionRate,
+    passAtK: current.metrics.passAtK,
+    skillLift: current.metrics.skillLift,
   };
 
   const summaryDelta: SummaryDelta = {
     previous: prevSummary,
     current: currSummary,
     delta: {
-      discoveryAccuracy: Math.round((currSummary.discoveryAccuracy - prevSummary.discoveryAccuracy) * 1000) / 1000,
-      avgAdherence: Math.round((currSummary.avgAdherence - prevSummary.avgAdherence) * 1000) / 1000,
-      avgOutputQuality: Math.round((currSummary.avgOutputQuality - prevSummary.avgOutputQuality) * 1000) / 1000,
-      avgWeightedScore: Math.round((currSummary.avgWeightedScore - prevSummary.avgWeightedScore) * 1000) / 1000,
+      resolutionRate: round3(currSummary.resolutionRate - prevSummary.resolutionRate),
+      passAtK: round3(currSummary.passAtK - prevSummary.passAtK),
+      skillLift: currSummary.skillLift !== undefined && prevSummary.skillLift !== undefined
+        ? round3(currSummary.skillLift - prevSummary.skillLift)
+        : undefined,
     },
   };
 
   return {
-    previousTimestamp: previous.timestamp,
-    previousSkillName: previous.skillName,
+    previousTimestamp: previous.run.timestamp,
+    previousSkillName: previous.run.skillName,
     summaryDelta,
     taskDeltas,
     tasksOnlyInCurrent,
@@ -215,45 +182,41 @@ export function formatComparisonMarkdown(comparison: ComparisonResult): string {
   lines.push('');
   lines.push('| Metric | Previous | Current | Delta | |');
   lines.push('|--------|----------|---------|-------|-|');
-  lines.push(summaryRow('Discovery Accuracy',
-    `${(d.previous.discoveryAccuracy * 100).toFixed(1)}%`,
-    `${(d.current.discoveryAccuracy * 100).toFixed(1)}%`,
-    formatDelta(d.delta.discoveryAccuracy * 100) + '%',
-    d.delta.discoveryAccuracy
+  lines.push(summaryRow('Resolution Rate',
+    `${(d.previous.resolutionRate * 100).toFixed(1)}%`,
+    `${(d.current.resolutionRate * 100).toFixed(1)}%`,
+    formatDelta(d.delta.resolutionRate * 100) + '%',
+    d.delta.resolutionRate
   ));
-  lines.push(summaryRow('Avg Adherence',
-    `${d.previous.avgAdherence.toFixed(2)}/5`,
-    `${d.current.avgAdherence.toFixed(2)}/5`,
-    formatDelta(d.delta.avgAdherence),
-    d.delta.avgAdherence
+  lines.push(summaryRow('Pass@k',
+    `${(d.previous.passAtK * 100).toFixed(1)}%`,
+    `${(d.current.passAtK * 100).toFixed(1)}%`,
+    formatDelta(d.delta.passAtK * 100) + '%',
+    d.delta.passAtK
   ));
-  lines.push(summaryRow('Avg Output Quality',
-    `${d.previous.avgOutputQuality.toFixed(2)}/5`,
-    `${d.current.avgOutputQuality.toFixed(2)}/5`,
-    formatDelta(d.delta.avgOutputQuality),
-    d.delta.avgOutputQuality
-  ));
-  lines.push(summaryRow('Weighted Score',
-    d.previous.avgWeightedScore.toFixed(2),
-    d.current.avgWeightedScore.toFixed(2),
-    formatDelta(d.delta.avgWeightedScore),
-    d.delta.avgWeightedScore
-  ));
+  if (d.delta.skillLift !== undefined && d.previous.skillLift !== undefined && d.current.skillLift !== undefined) {
+    lines.push(summaryRow('Skill Lift',
+      formatDelta(d.previous.skillLift * 100, 1) + '%',
+      formatDelta(d.current.skillLift * 100, 1) + '%',
+      formatDelta(d.delta.skillLift * 100) + '%',
+      d.delta.skillLift
+    ));
+  }
   lines.push('');
 
   // Per-task changes table
   if (comparison.taskDeltas.length > 0) {
     lines.push('### Per-Task Changes');
     lines.push('');
-    lines.push('| Task | Discovery | Adherence | Output | Weighted | Status |');
-    lines.push('|------|-----------|-----------|--------|----------|--------|');
+    lines.push('| Task | Resolution Rate | Delta | Status |');
+    lines.push('|------|-----------------|-------|--------|');
     for (const t of comparison.taskDeltas) {
       const status = t.significantChange === 'improved'
         ? ':arrow_up: Improved'
         : t.significantChange === 'regressed'
           ? ':arrow_down: Regressed'
           : 'Unchanged';
-      lines.push(`| ${t.taskId} | ${formatTransition(t.previous.discovery, t.current.discovery)} | ${formatTransition(t.previous.adherence, t.current.adherence)} | ${formatTransition(t.previous.outputQuality, t.current.outputQuality)} | ${formatTransitionDecimal(t.previous.weightedScore, t.current.weightedScore)} | ${status} |`);
+      lines.push(`| ${t.taskId} | ${formatTransitionPct(t.previous.resolutionRate, t.current.resolutionRate)} | ${formatDelta(t.delta * 100)}% | ${status} |`);
     }
     lines.push('');
   }
@@ -285,10 +248,11 @@ export function formatComparisonConsole(comparison: ComparisonResult): string {
   lines.push('-'.repeat(50));
   lines.push('  Comparison vs. Previous');
   lines.push('-'.repeat(50));
-  lines.push(`  Discovery:    ${formatDelta(d.discoveryAccuracy * 100)}%`);
-  lines.push(`  Adherence:    ${formatDelta(d.avgAdherence)}`);
-  lines.push(`  Output:       ${formatDelta(d.avgOutputQuality)}`);
-  lines.push(`  Weighted:     ${formatDelta(d.avgWeightedScore)}`);
+  lines.push(`  Resolution:   ${formatDelta(d.resolutionRate * 100)}%`);
+  lines.push(`  Pass@k:       ${formatDelta(d.passAtK * 100)}%`);
+  if (d.skillLift !== undefined) {
+    lines.push(`  Skill Lift:   ${formatDelta(d.skillLift * 100)}%`);
+  }
 
   const improved = comparison.taskDeltas.filter((t) => t.significantChange === 'improved');
   const regressed = comparison.taskDeltas.filter((t) => t.significantChange === 'regressed');
@@ -315,15 +279,6 @@ function summaryRow(label: string, prev: string, curr: string, delta: string, va
   return `| **${label}** | ${prev} | ${curr} | ${delta} | ${arrow} |`;
 }
 
-function formatTransition(prev: number, curr: number): string {
-  const delta = curr - prev;
-  const sign = delta > 0 ? '+' : '';
-  const fmt = (v: number) => v.toFixed(1);
-  return `${fmt(prev)} → ${fmt(curr)} (${sign}${fmt(delta)})`;
-}
-
-function formatTransitionDecimal(prev: number, curr: number): string {
-  const delta = curr - prev;
-  const sign = delta > 0 ? '+' : '';
-  return `${prev.toFixed(2)} → ${curr.toFixed(2)} (${sign}${delta.toFixed(2)})`;
+function formatTransitionPct(prev: number, curr: number): string {
+  return `${(prev * 100).toFixed(0)}% → ${(curr * 100).toFixed(0)}%`;
 }

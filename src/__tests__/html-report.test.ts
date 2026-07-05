@@ -3,7 +3,7 @@ import * as path from 'path';
 import { generateHtmlReport } from '../report/html-report.js';
 import { DEFAULT_CONFIG } from '../config.js';
 import type { ReportOptions } from '../report/report.js';
-import type { SkillEvaluation, ComparisonData, BlindComparisonData, ComparisonResult } from '../types.js';
+import type { SkillEvaluation, ComparisonData, BlindComparisonData, ComparisonResult, JudgeScore } from '../types.js';
 import { makeScore, makeResult } from './fixtures/test-helpers.js';
 
 const mockMkdir = vi.fn().mockResolvedValue(undefined);
@@ -12,6 +12,19 @@ vi.mock('fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs/promises')>();
   return { ...actual, mkdir: (...args: unknown[]) => mockMkdir(...args), writeFile: (...args: unknown[]) => mockWriteFile(...args) };
 });
+
+function makeJudge(overrides: Partial<JudgeScore> = {}): JudgeScore {
+  return {
+    taskId: 'task-1',
+    discovery: 1,
+    adherence: 5,
+    outputQuality: 4,
+    failureCategory: 'none',
+    reasoning: 'Good',
+    checklistResults: [],
+    ...overrides,
+  };
+}
 
 function makeReportOptions(overrides: Partial<ReportOptions> = {}): ReportOptions {
   const evaluation: SkillEvaluation = {
@@ -28,8 +41,18 @@ function makeReportOptions(overrides: Partial<ReportOptions> = {}): ReportOption
       makeResult({ taskId: 'task-2', skillLoads: [], output: 'Output for task 2', durationMs: 2000, costUsd: 0.02 }),
     ],
     scores: [
-      makeScore({ taskId: 'task-1', discovery: 1, adherence: 5, outputQuality: 4, weightedScore: 0.9, checklistResults: [{ item: 'Check A', passed: true, evidence: 'Found it' }] }),
-      makeScore({ taskId: 'task-2', discovery: 0, adherence: 2, outputQuality: 3, weightedScore: 0.4, failureCategory: 'discovery_failure' }),
+      makeScore({
+        taskId: 'task-1',
+        passed: true,
+        reward: 1,
+        discovery: 1,
+        invocation: 1,
+        adherence: 5,
+        outputQuality: 4,
+        judge: makeJudge(),
+        checklistResults: [{ item: 'Check A', passed: true, evidence: 'Found it' }],
+      }),
+      makeScore({ taskId: 'task-2', passed: false, reward: 0, discovery: 0, invocation: 0, failureCategory: 'discovery_failure' }),
     ],
     config: DEFAULT_CONFIG,
     ...overrides,
@@ -63,8 +86,8 @@ describe('generateHtmlReport', () => {
   it('renders PASS badge when evaluation passes', async () => {
     const opts = makeReportOptions({
       scores: [
-        makeScore({ taskId: 'task-1', discovery: 1, adherence: 5, outputQuality: 5, weightedScore: 1.0 }),
-        makeScore({ taskId: 'task-2', discovery: 1, adherence: 5, outputQuality: 5, weightedScore: 1.0 }),
+        makeScore({ taskId: 'task-1', passed: true, reward: 1 }),
+        makeScore({ taskId: 'task-2', passed: true, reward: 1 }),
       ],
     });
     const html = await generateHtmlReport(opts);
@@ -80,17 +103,32 @@ describe('generateHtmlReport', () => {
     expect(html).toContain('>FAIL<');
   });
 
-  it('renders dashboard with summary values', async () => {
+  it('renders dashboard with resolution rate and pass@k gauges', async () => {
     const html = await generateHtmlReport(makeReportOptions());
 
-    // Discovery accuracy: (1+0)/2 = 50%
+    // Resolution rate: (1+0)/2 = 50%
     expect(html).toContain('50.0%');
-    // Adherence: (5+2)/2 = 3.50
-    expect(html).toContain('3.50/5');
-    // Output quality: (4+3)/2 = 3.50
-    expect(html).toContain('3.50/5');
+    expect(html).toContain('Resolution Rate');
+    expect(html).toContain('Pass@1');
+    expect(html).toContain('Invocation Rate');
     // Tasks count
     expect(html).toContain('>2<');
+  });
+
+  it('renders a Skill Lift stat when a comparison ran', async () => {
+    const comparison: ComparisonData = {
+      summary: {
+        withSkill: { totalTasks: 2, numRuns: 1, resolutionRate: 0.5, resolutionCI: { low: 0, high: 1 }, passAtK: 0.5, totalDurationMs: 5000, totalCostUsd: 0.01 },
+        withoutSkill: { totalTasks: 2, numRuns: 1, resolutionRate: 0.25, resolutionCI: { low: 0, high: 1 }, passAtK: 0.25, totalDurationMs: 4000, totalCostUsd: 0.008 },
+        delta: { resolutionRateDelta: 0.25, passAtKDelta: 0.25, totalDurationDeltaMs: 1000, totalCostDeltaUsd: 0.002 },
+        baselineLabel: 'No Skill',
+      },
+      tasks: [],
+    };
+    const html = await generateHtmlReport(makeReportOptions({ comparison }));
+
+    expect(html).toContain('Skill Lift');
+    expect(html).toContain('+25.0%');
   });
 
   it('renders Tokens stat card with summed value when results report tokens', async () => {
@@ -129,12 +167,25 @@ describe('generateHtmlReport', () => {
     expect(html).toContain('Discovery Failure');
   });
 
-  it('renders checklist results when present', async () => {
+  it('renders judge assertions under a diagnostics section when the judge ran', async () => {
     const html = await generateHtmlReport(makeReportOptions());
 
+    expect(html).toContain('Diagnostics (LLM judge');
     expect(html).toContain('Check A');
     expect(html).toContain('Found it');
-    expect(html).toContain('1/1');
+    expect(html).toContain('Assertions (1/1)');
+  });
+
+  it('omits the diagnostics section when the judge did not run', async () => {
+    const opts = makeReportOptions({
+      scores: [
+        makeScore({ taskId: 'task-1' }),
+        makeScore({ taskId: 'task-2', passed: false, reward: 0 }),
+      ],
+    });
+    const html = await generateHtmlReport(opts);
+
+    expect(html).not.toContain('Diagnostics (LLM judge');
   });
 
   it('renders agent output in detail panels', async () => {
@@ -182,8 +233,8 @@ describe('generateHtmlReport', () => {
     const html = await generateHtmlReport(makeReportOptions());
 
     expect(html).toContain('data-col="taskId"');
-    expect(html).toContain('data-col="adherence"');
-    expect(html).toContain('data-col="weightedScore"');
+    expect(html).toContain('data-col="reward"');
+    expect(html).toContain('data-col="tokens"');
   });
 
   // --- XSS escaping ---
@@ -231,7 +282,9 @@ describe('generateHtmlReport', () => {
     expect(data).toHaveLength(2);
     expect(data[0].taskId).toBe('task-1');
     expect(data[1].taskId).toBe('task-2');
-    expect(data[0].adherence).toBe(5);
+    expect(data[0].passed).toBe(true);
+    expect(data[0].reward).toBe(1);
+    expect(data[1].passed).toBe(false);
     expect(data[1].failureCategory).toBe('discovery_failure');
   });
 
@@ -258,9 +311,9 @@ describe('generateHtmlReport', () => {
   it('renders comparison section when comparison data is present', async () => {
     const comparison: ComparisonData = {
       summary: {
-        withSkill: { totalTasks: 2, numRuns: 1, discoveryAccuracy: 0.8, avgAdherence: 4.0, avgOutputQuality: 4.0, avgWeightedScore: 0.75, totalDurationMs: 5000, totalCostUsd: 0.01 },
-        withoutSkill: { totalTasks: 2, numRuns: 1, discoveryAccuracy: 0.5, avgAdherence: 3.0, avgOutputQuality: 3.0, avgWeightedScore: 0.5, totalDurationMs: 4000, totalCostUsd: 0.008 },
-        delta: { discoveryAccuracyDelta: 0.3, avgAdherenceDelta: 1.0, avgOutputQualityDelta: 1.0, avgWeightedScoreDelta: 0.25, totalDurationDeltaMs: 1000, totalCostDeltaUsd: 0.002 },
+        withSkill: { totalTasks: 2, numRuns: 1, resolutionRate: 0.8, resolutionCI: { low: 0.4, high: 1 }, passAtK: 0.8, totalDurationMs: 5000, totalCostUsd: 0.01 },
+        withoutSkill: { totalTasks: 2, numRuns: 1, resolutionRate: 0.5, resolutionCI: { low: 0.1, high: 0.9 }, passAtK: 0.5, totalDurationMs: 4000, totalCostUsd: 0.008 },
+        delta: { resolutionRateDelta: 0.3, passAtKDelta: 0.3, totalDurationDeltaMs: 1000, totalCostDeltaUsd: 0.002 },
         baselineLabel: 'No Skill',
       },
       tasks: [],
@@ -300,16 +353,16 @@ describe('generateHtmlReport', () => {
       previousTimestamp: '2026-01-01T00:00:00Z',
       previousSkillName: 'test-skill',
       summaryDelta: {
-        previous: { discoveryAccuracy: 0.9, avgAdherence: 4.5, avgOutputQuality: 4.5, avgWeightedScore: 0.85 },
-        current: { discoveryAccuracy: 0.5, avgAdherence: 3.5, avgOutputQuality: 3.5, avgWeightedScore: 0.65 },
-        delta: { discoveryAccuracy: -0.4, avgAdherence: -1.0, avgOutputQuality: -1.0, avgWeightedScore: -0.2 },
+        previous: { resolutionRate: 0.9, passAtK: 1 },
+        current: { resolutionRate: 0.5, passAtK: 0.5 },
+        delta: { resolutionRate: -0.4, passAtK: -0.5 },
       },
       taskDeltas: [
         {
           taskId: 'task-1',
-          previous: { discovery: 1, adherence: 5, outputQuality: 5, weightedScore: 0.9 },
-          current: { discovery: 0, adherence: 2, outputQuality: 2, weightedScore: 0.3 },
-          delta: { discovery: -1, adherence: -3, outputQuality: -3, weightedScore: -0.6 },
+          previous: { resolutionRate: 1 },
+          current: { resolutionRate: 0 },
+          delta: -1,
           significantChange: 'regressed',
         },
       ],
@@ -346,13 +399,13 @@ describe('generateHtmlReport', () => {
       numRuns: 3,
       runDetails: [
         [
-          { result: makeResult({ taskId: 'task-1' }), score: makeScore({ taskId: 'task-1', adherence: 5 }) },
-          { result: makeResult({ taskId: 'task-1' }), score: makeScore({ taskId: 'task-1', adherence: 4 }) },
-          { result: makeResult({ taskId: 'task-1' }), score: makeScore({ taskId: 'task-1', adherence: 3 }) },
+          { result: makeResult({ taskId: 'task-1' }), score: makeScore({ taskId: 'task-1', passed: true, reward: 1 }) },
+          { result: makeResult({ taskId: 'task-1' }), score: makeScore({ taskId: 'task-1', passed: true, reward: 1 }) },
+          { result: makeResult({ taskId: 'task-1' }), score: makeScore({ taskId: 'task-1', passed: false, reward: 0 }) },
         ],
         [
-          { result: makeResult({ taskId: 'task-2' }), score: makeScore({ taskId: 'task-2', adherence: 2 }) },
-          { result: makeResult({ taskId: 'task-2' }), score: makeScore({ taskId: 'task-2', adherence: 3 }) },
+          { result: makeResult({ taskId: 'task-2' }), score: makeScore({ taskId: 'task-2', passed: false, reward: 0 }) },
+          { result: makeResult({ taskId: 'task-2' }), score: makeScore({ taskId: 'task-2', passed: true, reward: 1 }) },
         ],
       ],
     });
@@ -407,21 +460,21 @@ describe('generateHtmlReport', () => {
 
   // --- Gauge edge cases ---
 
-  it('does not produce NaN when all scores are zero', async () => {
+  it('does not produce NaN when all trials fail', async () => {
     const opts = makeReportOptions({
       results: [
         makeResult({ taskId: 'task-1', output: 'out' }),
         makeResult({ taskId: 'task-2', output: 'out' }),
       ],
       scores: [
-        makeScore({ taskId: 'task-1', discovery: 0, adherence: 0, outputQuality: 0, weightedScore: 0 }),
-        makeScore({ taskId: 'task-2', discovery: 0, adherence: 0, outputQuality: 0, weightedScore: 0 }),
+        makeScore({ taskId: 'task-1', passed: false, reward: 0, discovery: 0 }),
+        makeScore({ taskId: 'task-2', passed: false, reward: 0, discovery: 0 }),
       ],
     });
     const html = await generateHtmlReport(opts);
 
     expect(html).not.toContain('NaN');
-    expect(html).toContain('0.0%'); // discovery gauge
+    expect(html).toContain('0.0%'); // resolution gauge
   });
 
   // --- Metadata edge cases ---
@@ -457,10 +510,10 @@ describe('generateHtmlReport', () => {
 
   // --- Flaky indicator ---
 
-  it('marks flaky tasks in embedded data', async () => {
+  it('marks flaky tasks in embedded data (trials disagree)', async () => {
     const opts = makeReportOptions({
       scores: [
-        makeScore({ taskId: 'task-1', stddev: { discovery: 0, adherence: 1.5, outputQuality: 0.5, weightedScore: 0.1 } }),
+        makeScore({ taskId: 'task-1', stddev: { reward: 0.5, discovery: 0 } }),
         makeScore({ taskId: 'task-2' }),
       ],
     });

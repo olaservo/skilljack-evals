@@ -4,26 +4,26 @@ on:
   workflow_dispatch:
     inputs:
       eval-file:
-        description: 'Path to tasks YAML file'
+        description: 'Path to a task-package or suite directory'
         required: false
-        default: 'evals/example-greeting/tasks.yaml'
-      no-judge:
-        description: 'Skip LLM judge (deterministic only)'
-        required: false
-        type: boolean
-        default: true
-      runs-number:
-        description: 'Number of times to run each task'
-        required: false
-        type: number
-        default: 3
-      compare:
-        description: 'Run with and without skill to measure skill impact'
+        default: 'evals/example-greeting'
+      judge:
+        description: 'Enable LLM judge diagnostics'
         required: false
         type: boolean
         default: false
+      runs-number:
+        description: 'Number of trials per task per condition'
+        required: false
+        type: number
+        default: 3
+      baseline:
+        description: 'Run the paired no-skill baseline (default: on when skills present)'
+        required: false
+        type: boolean
+        default: true
       blind-compare:
-        description: 'Run blind A/B comparison alongside --compare'
+        description: 'Run blind A/B comparison (requires compare-skill + judge)'
         required: false
         type: boolean
         default: false
@@ -43,44 +43,6 @@ jobs:
           - runner: claude-sdk
             model: sonnet
             name: claude-sdk-sonnet
-          - runner: vercel-ai
-            model: 'anthropic:claude-sonnet-4-6'
-            name: vercel-ai-sonnet
-          - runner: vercel-ai
-            model: 'google:gemini-3.1-pro'
-            name: vercel-ai-gemini
-          - runner: vercel-ai
-            model: 'openai:gpt-5.5'
-            name: vercel-ai-gpt
-          - runner: openai-agents
-            model: gpt-5.5
-            name: openai-agents-gpt
-          - runner: vercel-ai
-            model: 'openrouter:deepseek/deepseek-v4-pro'
-            name: vercel-ai-openrouter-deepseek
-          - runner: vercel-ai
-            model: 'openrouter:moonshotai/kimi-k2.6'
-            name: vercel-ai-openrouter-kimi
-          - runner: vercel-ai
-            model: 'openrouter:qwen/qwen3-coder'
-            name: vercel-ai-openrouter-qwen3-coder
-          - runner: vercel-ai
-            model: 'openrouter:minimax/minimax-m2.7'
-            name: vercel-ai-openrouter-minimax
-          - runner: vercel-ai
-            model: 'openrouter:z-ai/glm-5'
-            name: vercel-ai-openrouter-glm
-          - runner: vercel-ai
-            model: 'openrouter:openai/gpt-oss-120b'
-            name: vercel-ai-openrouter-gpt-oss
-          # copilot-sdk entries disabled until github/copilot-sdk#629 is fixed
-          # (skillDirectories not working — agent relies on inconsistent file browsing)
-          # - runner: copilot-sdk
-          #   model: gpt-5.5
-          #   name: copilot-sdk-gpt
-          # - runner: copilot-sdk
-          #   model: claude-sonnet-4-6
-          #   name: copilot-sdk-sonnet
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v7
@@ -92,31 +54,20 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install peer dependencies
-        if: matrix.runner != 'claude-sdk'
-        run: |
-          if [ "${{ matrix.runner }}" = "vercel-ai" ]; then
-            npm install ai zod @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @openrouter/ai-sdk-provider
-          elif [ "${{ matrix.runner }}" = "openai-agents" ]; then
-            npm install @openai/agents openai
-          elif [ "${{ matrix.runner }}" = "copilot-sdk" ]; then
-            npm install @github/copilot-sdk
-          fi
-
       - name: Build
         run: npm run build
 
       - name: Run evaluation
         run: |
-          ARGS="--verbose --runs $RUNS_NUMBER --runner $RUNNER --model $MODEL --github-summary"
-          # NO_JUDGE defaults to "no judge"; gh CLI dispatch leaves booleans
-          # empty rather than applying the YAML default, so treat anything
-          # other than explicit "false" as "skip judge".
-          if [ "$NO_JUDGE" != "false" ]; then
-            ARGS="$ARGS --no-judge"
+          ARGS="--verbose --trials $RUNS_NUMBER --runner $RUNNER --model $MODEL --github-summary"
+          # The judge is off by default; only pass --judge when explicitly enabled.
+          if [ "$JUDGE" = "true" ]; then
+            ARGS="$ARGS --judge"
           fi
-          if [ "$COMPARE" = "true" ]; then
-            ARGS="$ARGS --compare"
+          # Baseline defaults to on when skills are present; only pass
+          # --no-baseline when explicitly disabled.
+          if [ "$BASELINE" = "false" ]; then
+            ARGS="$ARGS --no-baseline"
           fi
           if [ "$BLIND_COMPARE" = "true" ]; then
             ARGS="$ARGS --blind-compare"
@@ -127,13 +78,10 @@ jobs:
           node dist/src/cli.js run "$EVAL_FILE" $ARGS
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           EVAL_FILE: ${{ inputs.eval-file }}
-          NO_JUDGE: ${{ inputs.no-judge }}
+          JUDGE: ${{ inputs.judge }}
           RUNS_NUMBER: ${{ inputs.runs-number }}
-          COMPARE: ${{ inputs.compare }}
+          BASELINE: ${{ inputs.baseline }}
           BLIND_COMPARE: ${{ inputs.blind-compare }}
           GENERATE_FEEDBACK: ${{ inputs.generate-feedback }}
           RUNNER: ${{ matrix.runner }}
@@ -162,13 +110,12 @@ jobs:
       - name: Test bundled action
         uses: ./action
         with:
-          tasks: evals/example-greeting/tasks.yaml
+          tasks: evals/example-greeting
           runner: claude-sdk
           model: sonnet
-          no-judge: 'true'
+          judge: 'false'
           runs: '1'
-          threshold-discovery: '0'
-          threshold-score: '0'
+          threshold-resolution: '0'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 

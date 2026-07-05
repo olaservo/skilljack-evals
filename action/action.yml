@@ -1,15 +1,15 @@
 name: 'Agent Skill Evaluation'
-description: 'Run agent skill evaluations to test discoverability, adherence, and output quality'
+description: 'Run agent skill evaluations with deterministic rewards: resolution rate, pass@k, skill lift, and invocation rate'
 branding:
   icon: 'check-circle'
   color: 'blue'
 
 inputs:
   tasks:
-    description: 'Path to tasks YAML file'
+    description: 'Path to a task-package directory or a suite directory of task packages'
     required: true
   runner:
-    description: 'Runner type: claude-sdk, vercel-ai, openai-agents, or copilot-sdk'
+    description: 'Runner type: claude-sdk, claude-code, codex, gemini (experimental), or opencode (experimental). CLI runners require the corresponding CLI installed and authenticated on the GitHub runner.'
     required: false
     default: 'claude-sdk'
   model:
@@ -17,20 +17,19 @@ inputs:
     required: false
     default: 'sonnet'
   judge-model:
-    description: 'Model for LLM-as-judge scoring'
+    description: 'Model for LLM-as-judge diagnostics'
     required: false
     default: 'haiku'
   config:
     description: 'Path to eval.config.yaml'
     required: false
-  threshold-discovery:
-    description: 'Minimum discovery rate (0-1)'
+  threshold-resolution:
+    description: 'Minimum with-skill resolution rate (0-1)'
     required: false
     default: '0.8'
-  threshold-score:
-    description: 'Minimum average score (1-5)'
+  threshold-lift:
+    description: 'Minimum macro skill lift (unset = not gated)'
     required: false
-    default: '4.0'
   timeout:
     description: 'Per-task timeout in milliseconds'
     required: false
@@ -46,46 +45,30 @@ inputs:
     description: 'Path to skills directory for local setup'
     required: false
   working-directory:
-    description: 'Working directory for agent execution'
+    description: 'Base directory for task resolution and outputs (relative tasks path, output dir, and cache dir resolve against it)'
     required: false
     default: '.'
-  no-judge:
-    description: 'Skip LLM judge scoring (deterministic only)'
+  baseline:
+    description: 'Run the paired no-skill baseline condition (true/false)'
     required: false
-    default: 'false'
-  no-deterministic:
-    description: 'Skip deterministic scoring (LLM judge only)'
+    default: 'true'
+  judge:
+    description: 'Enable LLM judge diagnostics (true/false; never affects pass/fail)'
     required: false
     default: 'false'
   runs:
-    description: 'Number of times to run each task (default: 3)'
+    description: 'Number of trials per task per condition (default: 3)'
     required: false
     default: '3'
   anthropic-api-key:
     description: 'Anthropic API key (or use ANTHROPIC_API_KEY env var)'
     required: false
-  openai-api-key:
-    description: 'OpenAI API key for vercel-ai (openai:) or openai-agents runner (or use OPENAI_API_KEY env var)'
-    required: false
-  google-api-key:
-    description: 'Google AI API key for vercel-ai (google:) runner (or use GOOGLE_GENERATIVE_AI_API_KEY env var)'
-    required: false
-  openrouter-api-key:
-    description: 'OpenRouter API key for vercel-ai (openrouter:) runner (or use OPENROUTER_API_KEY env var)'
-    required: false
-  github-token:
-    description: 'GitHub token for copilot-sdk runner auth (set as COPILOT_GITHUB_TOKEN; must have Copilot permissions)'
-    required: false
   generate-feedback:
     description: 'Path to write feedback template JSON after run'
     required: false
   feedback:
-    description: 'Path to human review feedback JSON for judge prompt enrichment'
+    description: 'Path to human review feedback JSON for judge prompt enrichment (requires judge)'
     required: false
-  compare:
-    description: 'Run with and without skill to compute impact deltas (true/false)'
-    required: false
-    default: 'false'
   compare-skill:
     description: 'Path to baseline skill directory (e.g., previous version) for A/B comparison'
     required: false
@@ -93,32 +76,32 @@ inputs:
     description: 'Custom label for the baseline in comparison reports'
     required: false
   compare-results:
-    description: 'Path to previous JSON results file for cross-iteration comparison'
+    description: 'Path to a previous run summary.json for cross-iteration comparison'
     required: false
   blind-compare:
-    description: 'Run blind A/B comparison alongside --compare (true/false)'
+    description: 'Run blind A/B comparison of two skill versions (requires compare-skill and judge)'
     required: false
     default: 'false'
 
 outputs:
   passed:
     description: 'Whether all thresholds were met (true/false)'
-  discovery-rate:
-    description: 'Discovery rate achieved (0-1)'
-  avg-score:
-    description: 'Average weighted score achieved'
+  resolution-rate:
+    description: 'With-skill resolution rate achieved (0-1)'
+  pass-at-k:
+    description: 'Share of tasks with at least one passing trial (0-1)'
+  skill-lift:
+    description: 'Macro skill lift (with-skill minus baseline resolution rate), only set when the baseline ran'
+  invocation-rate:
+    description: 'Skill invocation rate over invocation-expecting tasks (0-1), when available'
   report-path:
     description: 'Path to generated markdown report'
   json-path:
     description: 'Path to generated JSON report'
+  summary-json-path:
+    description: 'Path to the machine-readable summary.json'
   feedback-template-path:
-    description: 'Path to generated feedback template (if --generate-feedback used)'
-  adherence-delta:
-    description: 'Adherence delta (with minus without skill), only set in compare mode'
-  output-delta:
-    description: 'Output quality delta (with minus without skill), only set in compare mode'
-  score-delta:
-    description: 'Weighted score delta (with minus without skill), only set in compare mode'
+    description: 'Path to generated feedback template (if generate-feedback used)'
   has-regressions:
     description: 'Whether any tasks regressed significantly vs. previous results (true/false)'
   blind-with-skill-preferred:

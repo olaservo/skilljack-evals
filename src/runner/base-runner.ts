@@ -15,7 +15,7 @@ import type {
 import { loadConfigSync } from '../config.js';
 import type { EvalConfig } from '../config.js';
 import type { SessionLogger } from '../session/session-logger.js';
-import { runFixtureScript } from './fixture-runner.js';
+import { DEFAULT_SKILLS_MOUNT_PATH } from '../run/workspace.js';
 
 /**
  * Rough per-token cost for runners without per-model pricing data. Calibrated
@@ -23,6 +23,29 @@ import { runFixtureScript } from './fixture-runner.js';
  * family, not accurate enough for billing.
  */
 export const ROUGH_COST_PER_TOKEN = 0.000003;
+
+let warnedCliRunnerSecurity = false;
+
+/**
+ * One-time-per-process security warning shared by all CLI runners. The CLI
+ * harnesses (claude-code, codex, gemini, opencode) run the real agent fully
+ * auto-approved on the host — v1's allowedWriteDirs restriction only survives
+ * in the claude-sdk runner's PreToolUse hook, so users must be told the agent
+ * is unrestricted here.
+ */
+export function warnCliRunnerSecurity(providerName: string): void {
+  if (warnedCliRunnerSecurity) return;
+  warnedCliRunnerSecurity = true;
+  console.warn(
+    `⚠ ${providerName} runs the agent with all permissions granted on this host (no write restrictions). ` +
+    'Run only skills/tasks you trust; --sandbox docker isolates verifiers, not the agent.',
+  );
+}
+
+/** Test hook: re-arm the one-time CLI runner security warning. */
+export function resetCliRunnerSecurityWarningForTests(): void {
+  warnedCliRunnerSecurity = false;
+}
 
 /**
  * Normalize a runner-provided usage snapshot into TokenUsage, enforcing
@@ -46,8 +69,30 @@ export function buildTokenUsage(
   };
 }
 
+/**
+ * Extract a skill name from a Read tool file path when it points inside a
+ * skills directory (the SKILL.md read fallback used when countReadAsFallback
+ * is set). Handles both / and \ separators. Returns undefined when the path
+ * is not a skill read.
+ */
+export function skillNameFromReadPath(filePath: string): string | undefined {
+  if (!filePath) return undefined;
+  const normalized = filePath.replace(/\\/g, '/');
+  if (!normalized.includes('SKILL.md') && !normalized.includes('/skills/')) return undefined;
+  const match = normalized.match(/skills\/([^/]+)/);
+  return match ? match[1] : undefined;
+}
+
 export abstract class BaseRunner implements AgentRunner {
   abstract readonly providerName: string;
+
+  /**
+   * Workspace-relative skill discovery path for this harness. Claude runners
+   * use '.claude/skills'; CLI harnesses with a different convention (Codex:
+   * '.agents/skills', OpenCode: '.opencode/skill') override this.
+   */
+  readonly skillsMountPath: string = DEFAULT_SKILLS_MOUNT_PATH;
+
   protected options: AgentRunnerOptions;
 
   /** Read-only access to resolved runner options (for testing and introspection). */
@@ -157,76 +202,35 @@ export abstract class BaseRunner implements AgentRunner {
   abstract runTask(task: EvalTask, logger?: SessionLogger): Promise<TaskResult>;
 
   /**
-   * Execute a task with timeout protection and fixture setup/teardown.
+   * Execute a task with timeout protection.
    *
-   * If the task has a fixture with setup/teardown scripts, they are executed
-   * around the task: setup before, teardown after (in a finally block).
-   * Setup failure skips the task. Teardown failure warns but does not fail.
+   * Timeout precedence: explicit argument > task.timeoutMs > runner option > 5min.
    */
   async runTaskWithTimeout(
     task: EvalTask,
     timeoutMs?: number,
     logger?: SessionLogger,
   ): Promise<TaskResult> {
-    const timeout = timeoutMs ?? this.options.taskTimeoutMs ?? 300000;
-    const cwd = this.options.cwd ?? process.cwd();
-    const fixture = task.fixture;
+    const timeout = timeoutMs ?? task.timeoutMs ?? this.options.taskTimeoutMs ?? 300000;
 
-    let taskResult: TaskResult | undefined;
+    const controller = new AbortController();
+    const abortTimer = setTimeout(() => controller.abort(), timeout);
 
     try {
-      // Run fixture setup if defined
-      if (fixture?.setup) {
-        const setupResult = await runFixtureScript(fixture.setup, cwd);
-        if (!setupResult.success) {
-          taskResult = this.createErrorResult(
-            task,
-            `Fixture setup failed: ${setupResult.errorMessage}`,
-            0,
+      return await Promise.race([
+        this.runTask(task, logger),
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () =>
+            reject(new Error(`Task ${task.id} timed out after ${timeout}ms`)),
           );
-          return taskResult;
-        }
-      }
-
-      // Run the task with timeout
-      const controller = new AbortController();
-      const abortTimer = setTimeout(() => controller.abort(), timeout);
-
-      try {
-        const result = await Promise.race([
-          this.runTask(task, logger),
-          new Promise<never>((_, reject) => {
-            controller.signal.addEventListener('abort', () =>
-              reject(new Error(`Task ${task.id} timed out after ${timeout}ms`)),
-            );
-          }),
-        ]);
-        taskResult = result;
-        return result;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger?.markAsError(errorMessage);
-        taskResult = this.createErrorResult(task, errorMessage, timeout);
-        return taskResult;
-      } finally {
-        clearTimeout(abortTimer);
-      }
+        }),
+      ]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger?.markAsError(errorMessage);
+      return this.createErrorResult(task, errorMessage, timeout);
     } finally {
-      // Run fixture teardown if defined (always, even after setup failure)
-      if (fixture?.teardown) {
-        try {
-          const teardownResult = await runFixtureScript(fixture.teardown, cwd);
-          if (!teardownResult.success) {
-            console.warn(
-              `Fixture teardown failed for task ${task.id}: ${teardownResult.errorMessage}`,
-            );
-          }
-        } catch (teardownError) {
-          console.warn(
-            `Fixture teardown threw for task ${task.id}: ${teardownError instanceof Error ? teardownError.message : String(teardownError)}`,
-          );
-        }
-      }
+      clearTimeout(abortTimer);
     }
   }
 }

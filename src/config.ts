@@ -16,10 +16,17 @@ import * as yaml from 'js-yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DEFAULT_RUNNER_CONCURRENCY } from './utils/concurrency.js';
+import { NUDGE_LEVELS } from './run/nudge.js';
+import type { NudgeLevel } from './run/nudge.js';
 
-export type RunnerType = 'claude-sdk' | 'vercel-ai' | 'openai-agents' | 'copilot-sdk' | 'google-adk';
+export type RunnerType = 'claude-sdk' | 'claude-code' | 'codex' | 'gemini' | 'opencode';
 
-export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'vercel-ai', 'openai-agents', 'copilot-sdk', 'google-adk'];
+export const VALID_RUNNER_TYPES: RunnerType[] = ['claude-sdk', 'claude-code', 'codex', 'gemini', 'opencode'];
+
+/** Verifier/oracle sandbox: run on the host (default) or inside Docker. */
+export type SandboxMode = 'host' | 'docker';
+
+export const SANDBOX_MODES: SandboxMode[] = ['host', 'docker'];
 
 export interface EvalConfig {
   // Runner
@@ -29,12 +36,8 @@ export interface EvalConfig {
   defaultAgentModel: string;
   defaultJudgeModel: string;
 
-  // Scoring weights
-  defaultWeights: {
-    discovery: number;
-    adherence: number;
-    output: number;
-  };
+  // LLM judge diagnostics (opt-in; never affects pass/fail)
+  judgeEnabled: boolean;
 
   // Output limits
   judgeOutputTruncation: number;
@@ -46,6 +49,12 @@ export interface EvalConfig {
   // Concurrency
   concurrency: number;
 
+  // Skill nudge appended to with-skill prompts (baseline always gets 'off')
+  nudge: NudgeLevel;
+
+  // Verifier/oracle sandbox mode (host default; docker containerizes verifiers)
+  sandbox: SandboxMode;
+
   // CI/CD behavior
   exitOnFailure: boolean;
   outputDir: string;
@@ -53,8 +62,8 @@ export interface EvalConfig {
   htmlReport: boolean;
 
   // Pass/fail thresholds
-  discoveryThreshold: number; // 0-1, default 0.8 (80%)
-  scoreThreshold: number; // 1-5, default 4.0
+  resolutionThreshold: number; // 0-1 min with-skill resolution rate, default 0.8
+  liftThreshold?: number; // min macro skill lift; unset = not gated
 
   // Security
   allowedWriteDirs: string[];
@@ -74,21 +83,19 @@ export const DEFAULT_CONFIG: EvalConfig = {
   runnerType: 'claude-sdk',
   defaultAgentModel: 'sonnet',
   defaultJudgeModel: 'haiku',
-  defaultWeights: {
-    discovery: 0.3,
-    adherence: 0.4,
-    output: 0.3,
-  },
+  judgeEnabled: false,
   judgeOutputTruncation: 5000,
   reportOutputTruncation: 2000,
   taskTimeoutMs: 300000, // 5 minutes
   concurrency: DEFAULT_RUNNER_CONCURRENCY, // sequential by default
+  nudge: 'off',
+  sandbox: 'host',
   exitOnFailure: true,
   outputDir: './results',
   githubSummary: false,
   htmlReport: true,
-  discoveryThreshold: 0.8,
-  scoreThreshold: 4.0,
+  resolutionThreshold: 0.8,
+  liftThreshold: undefined,
   allowedWriteDirs: ['./results/', './fixtures/'],
   cache: {
     enabled: true,
@@ -106,15 +113,20 @@ interface RawConfigFile {
     judge?: string;
   };
   scoring?: {
-    weights?: {
-      discovery?: number;
-      adherence?: number;
-      output?: number;
-    };
+    /** Removed in v2 — detected only to warn (judge is diagnostics-only). */
+    weights?: unknown;
   };
   thresholds?: {
+    resolution_rate?: number;
+    min_lift?: number;
+    /** Removed in v2 — detected only to warn (was: min discovery rate). */
     discovery_rate?: number;
+    /** Removed in v2 — detected only to warn (was: min avg weighted score). */
     avg_score?: number;
+  };
+  judge?: {
+    enabled?: boolean;
+    model?: string;
   };
   runner?: {
     type?: string;
@@ -122,6 +134,8 @@ interface RawConfigFile {
     concurrency?: number;
     allowed_write_dirs?: string[];
   };
+  nudge?: string;
+  sandbox?: string;
   output?: {
     dir?: string;
     judge_truncation?: number;
@@ -162,15 +176,17 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
     if (raw.models?.judge) config.defaultJudgeModel = raw.models.judge;
 
     if (raw.scoring?.weights) {
-      config.defaultWeights = {
-        discovery: raw.scoring.weights.discovery ?? DEFAULT_CONFIG.defaultWeights.discovery,
-        adherence: raw.scoring.weights.adherence ?? DEFAULT_CONFIG.defaultWeights.adherence,
-        output: raw.scoring.weights.output ?? DEFAULT_CONFIG.defaultWeights.output,
-      };
+      console.warn('Warning: eval.config.yaml scoring.weights was removed in v2 — judge is diagnostics-only; weights no longer affect any metric');
     }
 
-    if (raw.thresholds?.discovery_rate !== undefined) config.discoveryThreshold = raw.thresholds.discovery_rate;
-    if (raw.thresholds?.avg_score !== undefined) config.scoreThreshold = raw.thresholds.avg_score;
+    if (raw.thresholds?.resolution_rate !== undefined) config.resolutionThreshold = raw.thresholds.resolution_rate;
+    if (raw.thresholds?.min_lift !== undefined) config.liftThreshold = raw.thresholds.min_lift;
+    if (raw.thresholds?.discovery_rate !== undefined || raw.thresholds?.avg_score !== undefined) {
+      console.warn('Warning: eval.config.yaml thresholds.discovery_rate/avg_score were removed in v2 and are IGNORED — use thresholds.resolution_rate / thresholds.min_lift');
+    }
+
+    if (raw.judge?.enabled !== undefined) config.judgeEnabled = raw.judge.enabled === true;
+    if (raw.judge?.model) config.defaultJudgeModel = raw.judge.model;
 
     if (raw.runner?.timeout_ms !== undefined) config.taskTimeoutMs = raw.runner.timeout_ms;
     if (raw.runner?.concurrency !== undefined) {
@@ -180,6 +196,20 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
       config.concurrency = raw.runner.concurrency;
     }
     if (raw.runner?.allowed_write_dirs) config.allowedWriteDirs = raw.runner.allowed_write_dirs;
+
+    if (raw.nudge !== undefined) {
+      if (!NUDGE_LEVELS.includes(raw.nudge as NudgeLevel)) {
+        throw new Error(`Invalid nudge "${raw.nudge}" in config file. Valid: ${NUDGE_LEVELS.join(', ')}`);
+      }
+      config.nudge = raw.nudge as NudgeLevel;
+    }
+
+    if (raw.sandbox !== undefined) {
+      if (!SANDBOX_MODES.includes(raw.sandbox as SandboxMode)) {
+        throw new Error(`Invalid sandbox "${raw.sandbox}" in config file. Valid: ${SANDBOX_MODES.join(', ')}`);
+      }
+      config.sandbox = raw.sandbox as SandboxMode;
+    }
 
     if (raw.output?.dir) config.outputDir = raw.output.dir;
     if (raw.output?.judge_truncation !== undefined) config.judgeOutputTruncation = raw.output.judge_truncation;
@@ -218,10 +248,13 @@ async function loadConfigFile(configPath?: string): Promise<Partial<EvalConfig>>
  * - EVAL_REPORT_TRUNCATION: Max chars in reports (default: 2000)
  * - EVAL_TASK_TIMEOUT_MS: Per-task timeout in ms (default: 300000)
  * - EVAL_RUNNER_CONCURRENCY: Max concurrent tasks (default: 1, 0=unlimited)
+ * - EVAL_NUDGE: Skill nudge level off|name|description|full (default: 'off')
+ * - EVAL_SANDBOX: Verifier/oracle sandbox host|docker (default: 'host')
  * - EVAL_EXIT_ON_FAILURE: Exit with code 1 on failures (default: true)
  * - EVAL_OUTPUT_DIR: Directory for results (default: './results')
- * - EVAL_DISCOVERY_THRESHOLD: Min discovery rate 0-1 (default: 0.8)
- * - EVAL_SCORE_THRESHOLD: Min avg score 1-5 (default: 4.0)
+ * - EVAL_JUDGE: Enable LLM judge diagnostics (default: false)
+ * - EVAL_RESOLUTION_THRESHOLD: Min with-skill resolution rate 0-1 (default: 0.8)
+ * - EVAL_LIFT_THRESHOLD: Min macro skill lift (default: unset = not gated)
  * - EVAL_GITHUB_SUMMARY: Write GitHub Actions summary (default: false)
  * - EVAL_HTML_REPORT: Generate HTML report (default: true)
  * - EVAL_CACHE_ENABLED: Enable/disable response cache (default: true)
@@ -258,17 +291,39 @@ function loadEnvConfig(): Partial<EvalConfig> {
     config.concurrency = concurrency;
   }
 
+  if (process.env.EVAL_NUDGE) {
+    if (!NUDGE_LEVELS.includes(process.env.EVAL_NUDGE as NudgeLevel)) {
+      throw new Error(`Invalid EVAL_NUDGE "${process.env.EVAL_NUDGE}". Valid: ${NUDGE_LEVELS.join(', ')}`);
+    }
+    config.nudge = process.env.EVAL_NUDGE as NudgeLevel;
+  }
+
+  if (process.env.EVAL_SANDBOX) {
+    if (!SANDBOX_MODES.includes(process.env.EVAL_SANDBOX as SandboxMode)) {
+      throw new Error(`Invalid EVAL_SANDBOX "${process.env.EVAL_SANDBOX}". Valid: ${SANDBOX_MODES.join(', ')}`);
+    }
+    config.sandbox = process.env.EVAL_SANDBOX as SandboxMode;
+  }
+
   if (process.env.EVAL_EXIT_ON_FAILURE !== undefined) {
     config.exitOnFailure = process.env.EVAL_EXIT_ON_FAILURE !== 'false';
   }
 
   if (process.env.EVAL_OUTPUT_DIR) config.outputDir = process.env.EVAL_OUTPUT_DIR;
 
-  const discoveryThreshold = parseFloat(process.env.EVAL_DISCOVERY_THRESHOLD || '');
-  if (!isNaN(discoveryThreshold)) config.discoveryThreshold = discoveryThreshold;
+  if (process.env.EVAL_JUDGE !== undefined) {
+    config.judgeEnabled = ['true', '1'].includes(process.env.EVAL_JUDGE.toLowerCase());
+  }
 
-  const scoreThreshold = parseFloat(process.env.EVAL_SCORE_THRESHOLD || '');
-  if (!isNaN(scoreThreshold)) config.scoreThreshold = scoreThreshold;
+  const resolutionThreshold = parseFloat(process.env.EVAL_RESOLUTION_THRESHOLD || '');
+  if (!isNaN(resolutionThreshold)) config.resolutionThreshold = resolutionThreshold;
+
+  const liftThreshold = parseFloat(process.env.EVAL_LIFT_THRESHOLD || '');
+  if (!isNaN(liftThreshold)) config.liftThreshold = liftThreshold;
+
+  if (process.env.EVAL_DISCOVERY_THRESHOLD !== undefined || process.env.EVAL_SCORE_THRESHOLD !== undefined) {
+    console.warn('Warning: EVAL_DISCOVERY_THRESHOLD/EVAL_SCORE_THRESHOLD were removed in v2 and are IGNORED — use EVAL_RESOLUTION_THRESHOLD / EVAL_LIFT_THRESHOLD');
+  }
 
   if (process.env.EVAL_GITHUB_SUMMARY !== undefined) {
     config.githubSummary = process.env.EVAL_GITHUB_SUMMARY === 'true';
@@ -301,7 +356,7 @@ function loadEnvConfig(): Partial<EvalConfig> {
 }
 
 /** Keys whose sub-fields should be merged, not replaced wholesale. */
-const NESTED_CONFIG_KEYS = new Set<keyof EvalConfig>(['defaultWeights', 'cache']);
+const NESTED_CONFIG_KEYS = new Set<keyof EvalConfig>(['cache']);
 
 /**
  * Deep merge multiple partial configs into a full config. Nested objects

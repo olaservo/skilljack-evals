@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
@@ -18,12 +18,25 @@ describe('loadConfig', () => {
     const config = await loadConfig('/nonexistent/path/eval.config.yaml');
     expect(config).toBeDefined();
     expect(config.runnerType).toBe('claude-sdk');
-    expect(config.defaultWeights).toEqual({
-      discovery: 0.3,
-      adherence: 0.4,
-      output: 0.3,
-    });
     expect(config.taskTimeoutMs).toBe(300000);
+  });
+
+  it('warns on removed scoring.weights instead of loading it', async () => {
+    const tmpDir = path.join(os.tmpdir(), `eval-test-weights-${Date.now()}`);
+    await fs.mkdir(tmpDir, { recursive: true });
+    tmpDirs.push(tmpDir);
+
+    const configPath = path.join(tmpDir, 'eval.config.yaml');
+    await fs.writeFile(configPath, 'scoring:\n  weights:\n    discovery: 0.5\n');
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const config = await loadConfig(configPath);
+      expect('defaultWeights' in config).toBe(false);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('scoring.weights was removed in v2'));
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('loads valid YAML config file', async () => {
@@ -116,6 +129,164 @@ describe('loadConfig htmlReport', () => {
 
     const config = await loadConfig(configPath, { htmlReport: true });
     expect(config.htmlReport).toBe(true);
+  });
+});
+
+describe('judge + threshold config', () => {
+  const tmpDirs: string[] = [];
+  const savedEnv: Record<string, string | undefined> = {};
+  const ENV_KEYS = ['EVAL_JUDGE', 'EVAL_RESOLUTION_THRESHOLD', 'EVAL_LIFT_THRESHOLD'];
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterEach(async () => {
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] !== undefined) process.env[key] = savedEnv[key];
+      else delete process.env[key];
+    }
+    for (const dir of tmpDirs) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    tmpDirs.length = 0;
+  });
+
+  async function writeConfig(content: string): Promise<string> {
+    const tmpDir = path.join(os.tmpdir(), `eval-test-judge-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    await fs.mkdir(tmpDir, { recursive: true });
+    tmpDirs.push(tmpDir);
+    const configPath = path.join(tmpDir, 'eval.config.yaml');
+    await fs.writeFile(configPath, content);
+    return configPath;
+  }
+
+  it('judge is disabled by default', async () => {
+    expect(DEFAULT_CONFIG.judgeEnabled).toBe(false);
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.judgeEnabled).toBe(false);
+  });
+
+  it('resolution threshold defaults to 0.8 and lift threshold is unset', async () => {
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.resolutionThreshold).toBe(0.8);
+    expect(config.liftThreshold).toBeUndefined();
+  });
+
+  it('EVAL_JUDGE=true enables the judge', async () => {
+    process.env.EVAL_JUDGE = 'true';
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.judgeEnabled).toBe(true);
+  });
+
+  it('EVAL_RESOLUTION_THRESHOLD and EVAL_LIFT_THRESHOLD are honored', async () => {
+    process.env.EVAL_RESOLUTION_THRESHOLD = '0.6';
+    process.env.EVAL_LIFT_THRESHOLD = '0.15';
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(config.resolutionThreshold).toBe(0.6);
+    expect(config.liftThreshold).toBe(0.15);
+  });
+
+  it('reads judge.enabled + judge.model from the config file', async () => {
+    const configPath = await writeConfig('judge:\n  enabled: true\n  model: opus\n');
+    const config = await loadConfig(configPath);
+    expect(config.judgeEnabled).toBe(true);
+    expect(config.defaultJudgeModel).toBe('opus');
+  });
+
+  it('reads thresholds.resolution_rate + thresholds.min_lift from the config file', async () => {
+    const configPath = await writeConfig('thresholds:\n  resolution_rate: 0.9\n  min_lift: 0.25\n');
+    const config = await loadConfig(configPath);
+    expect(config.resolutionThreshold).toBe(0.9);
+    expect(config.liftThreshold).toBe(0.25);
+  });
+
+  it('CLI overrides win over env vars', async () => {
+    process.env.EVAL_RESOLUTION_THRESHOLD = '0.6';
+    const config = await loadConfig('/nonexistent/path/eval.config.yaml', { resolutionThreshold: 0.95 });
+    expect(config.resolutionThreshold).toBe(0.95);
+  });
+});
+
+describe('removed pre-2.0 threshold surfaces warn instead of silently ignoring', () => {
+  const tmpDirs: string[] = [];
+  const savedEnv: Record<string, string | undefined> = {};
+  const ENV_KEYS = ['EVAL_DISCOVERY_THRESHOLD', 'EVAL_SCORE_THRESHOLD'];
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterEach(async () => {
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] !== undefined) process.env[key] = savedEnv[key];
+      else delete process.env[key];
+    }
+    for (const dir of tmpDirs) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    tmpDirs.length = 0;
+    vi.restoreAllMocks();
+  });
+
+  async function writeConfig(content: string): Promise<string> {
+    const tmpDir = path.join(os.tmpdir(), `eval-test-removed-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    await fs.mkdir(tmpDir, { recursive: true });
+    tmpDirs.push(tmpDir);
+    const configPath = path.join(tmpDir, 'eval.config.yaml');
+    await fs.writeFile(configPath, content);
+    return configPath;
+  }
+
+  it('warns when eval.config.yaml sets thresholds.discovery_rate', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const configPath = await writeConfig('thresholds:\n  discovery_rate: 0.9\n');
+    const config = await loadConfig(configPath);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('thresholds.discovery_rate/avg_score were removed in v2 and are IGNORED'));
+    // The removed keys never leak into the config.
+    expect(config.resolutionThreshold).toBe(0.8);
+  });
+
+  it('warns when eval.config.yaml sets thresholds.avg_score', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const configPath = await writeConfig('thresholds:\n  avg_score: 0.7\n  resolution_rate: 0.9\n');
+    const config = await loadConfig(configPath);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('removed in v2 and are IGNORED'));
+    // Supported sibling keys still apply.
+    expect(config.resolutionThreshold).toBe(0.9);
+  });
+
+  it('does not warn for supported thresholds keys', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const configPath = await writeConfig('thresholds:\n  resolution_rate: 0.9\n  min_lift: 0.1\n');
+    await loadConfig(configPath);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('warns when EVAL_DISCOVERY_THRESHOLD is set', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.EVAL_DISCOVERY_THRESHOLD = '0.9';
+    await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('EVAL_DISCOVERY_THRESHOLD/EVAL_SCORE_THRESHOLD were removed in v2 and are IGNORED'));
+  });
+
+  it('warns when EVAL_SCORE_THRESHOLD is set', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.EVAL_SCORE_THRESHOLD = '0.7';
+    await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('removed in v2 and are IGNORED'));
+  });
+
+  it('does not warn when neither removed env var is set', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await loadConfig('/nonexistent/path/eval.config.yaml');
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 

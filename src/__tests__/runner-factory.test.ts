@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createRunner } from '../runner/runner-factory.js';
+import { createRunner, RUNNER_SKILLS_MOUNT_PATHS } from '../runner/runner-factory.js';
+import { VALID_RUNNER_TYPES } from '../config.js';
 import type { RunnerType } from '../config.js';
 
 describe('createRunner', () => {
@@ -9,28 +10,34 @@ describe('createRunner', () => {
     expect(runner.providerName).toBe('claude-sdk');
   });
 
-  it('creates a vercel-ai runner', async () => {
-    const runner = await createRunner('vercel-ai', {});
-    expect(runner).toBeDefined();
-    expect(runner.providerName).toBe('vercel-ai');
-  });
+  it('creates the CLI runners with their harness-specific skills mount paths', async () => {
+    const codex = await createRunner('codex', {});
+    expect(codex.providerName).toBe('codex');
+    expect(codex.skillsMountPath).toContain('.agents');
 
-  it('creates an openai-agents runner', async () => {
-    const runner = await createRunner('openai-agents', {});
-    expect(runner).toBeDefined();
-    expect(runner.providerName).toBe('openai-agents');
-  });
+    const gemini = await createRunner('gemini', {});
+    expect(gemini.providerName).toBe('gemini');
+    expect(gemini.skillsMountPath).toContain('.gemini');
 
-  it('creates a copilot-sdk runner', async () => {
-    const runner = await createRunner('copilot-sdk', {});
-    expect(runner).toBeDefined();
-    expect(runner.providerName).toBe('copilot-sdk');
+    const opencode = await createRunner('opencode', {});
+    expect(opencode.providerName).toBe('opencode');
+    expect(opencode.skillsMountPath).toContain('.opencode');
+
+    const claudeCode = await createRunner('claude-code', {});
+    expect(claudeCode.skillsMountPath).toContain('.claude');
   });
 
   it('throws for unknown runner type', async () => {
     await expect(
       createRunner('invalid-runner' as RunnerType, {}),
     ).rejects.toThrow('Unknown runner type: invalid-runner');
+  });
+
+  it('RUNNER_SKILLS_MOUNT_PATHS matches every constructed runner (never diverges)', async () => {
+    for (const type of VALID_RUNNER_TYPES) {
+      const runner = await createRunner(type, {});
+      expect(RUNNER_SKILLS_MOUNT_PATHS[type], `mount path for ${type}`).toBe(runner.skillsMountPath);
+    }
   });
 
   it('passes options through to runner', async () => {

@@ -1,2 +1,0 @@
-google-adk
-google-genai>=2.10.0,<3.0.0

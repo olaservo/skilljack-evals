@@ -9,7 +9,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { formatDelta, formatCategory, formatTokens, pct } from '../utils/format.js';
-import { computeSummary, computeFailureBreakdown, evaluatePassFail } from './report.js';
+import { computeSummary, computeFailureBreakdown, evaluatePassFail, trialFlags } from './report.js';
 import type { ReportOptions } from './report.js';
 import type {
   CombinedScore,
@@ -58,7 +58,8 @@ export async function generateHtmlReport(options: ReportOptions): Promise<string
 
   const summary = computeSummary(results, scores, numRuns);
   const failureBreakdown = computeFailureBreakdown(scores);
-  const { passed } = evaluatePassFail(summary, config);
+  const skillLift = comparison?.summary.delta.resolutionRateDelta;
+  const { passed } = evaluatePassFail(summary, config, skillLift);
 
   const tasks: HtmlTaskData[] = evaluation.tasks.map((task, i) => ({
     index: i,
@@ -72,10 +73,8 @@ export async function generateHtmlReport(options: ReportOptions): Promise<string
   const clientData = tasks.map(t => ({
     taskId: t.task.id,
     prompt: t.task.prompt,
-    discovery: t.score.discovery,
-    adherence: t.score.adherence,
-    outputQuality: t.score.outputQuality,
-    weightedScore: t.score.weightedScore,
+    passed: t.score.passed,
+    reward: t.score.reward,
     failureCategory: t.score.failureCategory,
     isFlaky: isFlaky(t.score.stddev),
     tokens: t.result.tokens?.total ?? null,
@@ -104,7 +103,7 @@ ${renderStyles()}
 <body>
 <div class="container">
 ${renderHeader(evaluation.skillName, passed, metadata, numRuns, comparison)}
-${renderDashboard(summary, config)}
+${renderDashboard(summary, config, skillLift)}
 ${renderFailureAnalysis(failureBreakdown)}
 ${renderControls(!!crossIterationComparison)}
 ${renderTaskTable(tasks, config, humanFeedback)}
@@ -153,15 +152,20 @@ function renderHeader(skillName: string, passed: boolean, metadata: ReportMetada
 </header>`;
 }
 
-function renderGauge(label: string, value: number, max: number, threshold: number, format: (v: number) => string): string {
+function renderGauge(label: string, value: number, max: number, threshold: number | undefined, format: (v: number) => string): string {
   const pctValue = max > 0 ? Math.min(value / max, 1) : 0;
-  const pctThreshold = max > 0 ? Math.min(threshold / max, 1) : 0;
-  const passed = value >= threshold;
+  const pctThreshold = threshold !== undefined && max > 0 ? Math.min(threshold / max, 1) : 0;
+  const passed = threshold === undefined || value >= threshold;
   // SVG arc: 180-degree semicircle
   const radius = 60;
   const circumference = Math.PI * radius;
   const offset = circumference * (1 - pctValue);
   const thresholdAngle = 180 * pctThreshold;
+
+  const thresholdLine = threshold !== undefined
+    ? `<line x1="70" y1="75" x2="${70 + radius * Math.cos(Math.PI - (thresholdAngle * Math.PI / 180))}" y2="${75 - radius * Math.sin(Math.PI - (thresholdAngle * Math.PI / 180))}"
+      stroke="var(--color-text-muted)" stroke-width="1.5" stroke-dasharray="3,2"/>`
+    : '';
 
   return `
 <div class="gauge">
@@ -169,28 +173,43 @@ function renderGauge(label: string, value: number, max: number, threshold: numbe
     <path d="M 10 75 A 60 60 0 0 1 130 75" fill="none" stroke="var(--color-border)" stroke-width="10" stroke-linecap="round"/>
     <path d="M 10 75 A 60 60 0 0 1 130 75" fill="none" stroke="${passed ? 'var(--color-pass)' : 'var(--color-fail)'}" stroke-width="10" stroke-linecap="round"
       stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" class="gauge-fill"/>
-    <line x1="70" y1="75" x2="${70 + radius * Math.cos(Math.PI - (thresholdAngle * Math.PI / 180))}" y2="${75 - radius * Math.sin(Math.PI - (thresholdAngle * Math.PI / 180))}"
-      stroke="var(--color-text-muted)" stroke-width="1.5" stroke-dasharray="3,2"/>
+    ${thresholdLine}
   </svg>
   <div class="gauge-value">${format(value)}</div>
   <div class="gauge-label">${label}</div>
-  <div class="gauge-threshold">Threshold: ${format(threshold)}</div>
+  <div class="gauge-threshold">${threshold !== undefined ? `Threshold: ${format(threshold)}` : '&nbsp;'}</div>
 </div>`;
 }
 
-function renderDashboard(summary: EvaluationSummary, config: EvalConfig): string {
+function renderDashboard(summary: EvaluationSummary, config: EvalConfig, skillLift?: number): string {
+  const pctFmt = (v: number) => v.toFixed(1) + '%';
+  const gauges = [
+    renderGauge('Resolution Rate', summary.resolutionRate * 100, 100, config.resolutionThreshold * 100, pctFmt),
+    renderGauge(`Pass@${summary.numRuns}`, summary.passAtK * 100, 100, undefined, pctFmt),
+  ];
+  if (summary.invocationRate !== undefined) {
+    gauges.push(renderGauge('Invocation Rate', summary.invocationRate * 100, 100, undefined, pctFmt));
+  }
+
+  const ci = summary.resolutionCI;
+  const liftStat = skillLift !== undefined
+    ? `
+    <div class="stat">
+      <div class="stat-value">${formatDelta(skillLift * 100, 1)}%</div>
+      <div class="stat-label">Skill Lift</div>
+    </div>`
+    : '';
+
   return `
 <section id="dashboard">
   <div class="gauges">
-    ${renderGauge('Discovery', summary.discoveryAccuracy * 100, 100, config.discoveryThreshold * 100, v => v.toFixed(1) + '%')}
-    ${renderGauge('Adherence', summary.avgAdherence, 5, config.scoreThreshold, v => v.toFixed(2) + '/5')}
-    ${renderGauge('Output Quality', summary.avgOutputQuality, 5, config.scoreThreshold, v => v.toFixed(2) + '/5')}
+    ${gauges.join('\n    ')}
   </div>
   <div class="stats-row">
     <div class="stat">
-      <div class="stat-value">${summary.avgWeightedScore.toFixed(2)}${summary.stddev ? ` <span class="stddev">&plusmn; ${summary.stddev.weightedScore.toFixed(2)}</span>` : ''}</div>
-      <div class="stat-label">Weighted Score</div>
-    </div>
+      <div class="stat-value">${(ci.low * 100).toFixed(0)}&ndash;${(ci.high * 100).toFixed(0)}%</div>
+      <div class="stat-label">95% CI</div>
+    </div>${liftStat}
     <div class="stat">
       <div class="stat-value">${summary.totalTasks}</div>
       <div class="stat-label">Tasks</div>
@@ -253,26 +272,30 @@ function renderControls(hasRegression: boolean): string {
 function renderTaskTable(tasks: HtmlTaskData[], config: EvalConfig, humanFeedback: HumanFeedback | undefined): string {
   let rows = '';
   for (const t of tasks) {
-    const isFailed = t.score.failureCategory !== 'none';
+    const isFailed = !t.score.passed;
     const flaky = isFlaky(t.score.stddev);
     const statusClass = isFailed ? 'status-fail' : (flaky ? 'status-flaky' : 'status-pass');
     const statusLabel = isFailed ? 'FAIL' : (flaky ? 'FLAKY' : 'PASS');
+    const flags = trialFlags(t.score);
+    const passedCell = `${flags.filter(Boolean).length}/${flags.length}`;
+    const invokedCell = t.score.invocation !== undefined
+      ? `${(t.score.invocation * 100).toFixed(0)}%`
+      : 'n/a';
 
     const tokensCell = formatTokens(t.result.tokens?.total);
     rows += `
     <tr class="task-row" data-task-id="${escapeHtml(t.task.id)}" data-index="${t.index}">
       <td>${t.index + 1}</td>
       <td class="task-id-cell">${escapeHtml(t.task.id)}</td>
-      <td>${t.score.discovery >= 1 ? '1' : t.score.discovery.toFixed(2)}</td>
-      <td>${t.score.adherence.toFixed(1)}</td>
-      <td>${t.score.outputQuality.toFixed(1)}</td>
-      <td>${t.score.weightedScore.toFixed(2)}</td>
+      <td>${passedCell}</td>
+      <td>${t.score.reward.toFixed(2)}</td>
+      <td>${invokedCell}</td>
       <td>${tokensCell}</td>
       <td>${escapeHtml(formatCategory(t.score.failureCategory))}</td>
       <td><span class="status ${statusClass}">${statusLabel}</span></td>
     </tr>
     <tr class="detail-row" data-task-id="${escapeHtml(t.task.id)}">
-      <td colspan="9">
+      <td colspan="8">
         ${renderTaskDetail(t, config, humanFeedback)}
       </td>
     </tr>`;
@@ -287,10 +310,9 @@ function renderTaskTable(tasks: HtmlTaskData[], config: EvalConfig, humanFeedbac
         <tr>
           <th class="sortable" data-col="index">#</th>
           <th class="sortable" data-col="taskId">Task ID</th>
-          <th class="sortable" data-col="discovery">Discovery</th>
-          <th class="sortable" data-col="adherence">Adherence</th>
-          <th class="sortable" data-col="outputQuality">Output Quality</th>
-          <th class="sortable" data-col="weightedScore">Weighted</th>
+          <th>Passed</th>
+          <th class="sortable" data-col="reward">Reward</th>
+          <th>Invoked</th>
           <th class="sortable" data-col="tokens">Tokens</th>
           <th class="sortable" data-col="failureCategory">Failure</th>
           <th>Status</th>
@@ -324,28 +346,16 @@ function renderTaskDetail(t: HtmlTaskData, config: EvalConfig, humanFeedback: Hu
 
   // Scores with stddev
   if (t.score.stddev) {
+    const judgeVariance = t.score.stddev.adherence !== undefined && t.score.adherence !== undefined
+      && t.score.stddev.outputQuality !== undefined && t.score.outputQuality !== undefined
+      ? ` |
+       Adherence: ${t.score.adherence.toFixed(1)} &plusmn; ${t.score.stddev.adherence.toFixed(1)} |
+       Output: ${t.score.outputQuality.toFixed(1)} &plusmn; ${t.score.stddev.outputQuality.toFixed(1)}`
+      : '';
     detail += `
   <div class="detail-section">
     <h4>Score Variance</h4>
-    <p>Discovery: ${(t.score.discovery * 100).toFixed(0)}% &plusmn; ${(t.score.stddev.discovery * 100).toFixed(0)}% |
-       Adherence: ${t.score.adherence.toFixed(1)} &plusmn; ${t.score.stddev.adherence.toFixed(1)} |
-       Output: ${t.score.outputQuality.toFixed(1)} &plusmn; ${t.score.stddev.outputQuality.toFixed(1)} |
-       Weighted: ${t.score.weightedScore.toFixed(2)} &plusmn; ${t.score.stddev.weightedScore.toFixed(2)}</p>
-  </div>`;
-  }
-
-  // Checklist
-  if (t.score.checklistResults && t.score.checklistResults.length > 0) {
-    const passed = t.score.checklistResults.filter(c => c.passed).length;
-    const items = t.score.checklistResults.map(c => {
-      const icon = c.passed ? '<span class="check-pass">&#10003;</span>' : '<span class="check-fail">&#10007;</span>';
-      const evidence = c.evidence?.trim() ? `<div class="check-evidence">${escapeHtml(c.evidence.trim())}</div>` : '';
-      return `<li>${icon} ${escapeHtml(c.item)}${evidence}</li>`;
-    }).join('');
-    detail += `
-  <div class="detail-section">
-    <h4>Checklist (${passed}/${t.score.checklistResults.length})</h4>
-    <ul class="checklist">${items}</ul>
+    <p>Reward: ${t.score.reward.toFixed(2)} &plusmn; ${t.score.stddev.reward.toFixed(2)}${judgeVariance}</p>
   </div>`;
   }
 
@@ -355,6 +365,30 @@ function renderTaskDetail(t: HtmlTaskData, config: EvalConfig, humanFeedback: Hu
   <div class="detail-section">
     <h4>Deterministic Check: ${t.score.deterministic.passed ? '<span class="check-pass">PASS</span>' : '<span class="check-fail">FAIL</span>'}</h4>
     <ul>${t.score.deterministic.details.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
+  </div>`;
+  }
+
+  // Judge diagnostics — only rendered when the judge ran; never affects pass/fail.
+  if (t.score.judge) {
+    const ratings = t.score.adherence !== undefined && t.score.outputQuality !== undefined
+      ? `<p>Adherence: ${t.score.adherence.toFixed(1)}/5 | Output Quality: ${t.score.outputQuality.toFixed(1)}/5</p>`
+      : '';
+    let assertionsHtml = '';
+    if (t.score.checklistResults && t.score.checklistResults.length > 0) {
+      const passed = t.score.checklistResults.filter(c => c.passed).length;
+      const items = t.score.checklistResults.map(c => {
+        const icon = c.passed ? '<span class="check-pass">&#10003;</span>' : '<span class="check-fail">&#10007;</span>';
+        const evidence = c.evidence?.trim() ? `<div class="check-evidence">${escapeHtml(c.evidence.trim())}</div>` : '';
+        return `<li>${icon} ${escapeHtml(c.item)}${evidence}</li>`;
+      }).join('');
+      assertionsHtml = `
+    <p><strong>Assertions (${passed}/${t.score.checklistResults.length})</strong></p>
+    <ul class="checklist">${items}</ul>`;
+    }
+    detail += `
+  <div class="detail-section">
+    <h4>Diagnostics (LLM judge &mdash; does not affect pass/fail)</h4>
+    ${ratings}${assertionsHtml}
   </div>`;
   }
 
@@ -394,10 +428,8 @@ function renderTaskDetail(t: HtmlTaskData, config: EvalConfig, humanFeedback: Hu
       const skills = rd.result.skillLoads.length > 0 ? rd.result.skillLoads.join(', ') : 'none';
       runRows += `<tr>
         <td>${r + 1}</td>
-        <td>${rd.score.discovery}</td>
-        <td>${rd.score.adherence}/5</td>
-        <td>${rd.score.outputQuality}/5</td>
-        <td>${rd.score.weightedScore.toFixed(2)}</td>
+        <td>${rd.score.passed ? '<span class="check-pass">PASS</span>' : '<span class="check-fail">FAIL</span>'}</td>
+        <td>${rd.score.reward.toFixed(2)}</td>
         <td>${formatTokens(rd.result.tokens?.total)}</td>
         <td>${escapeHtml(skills)}</td>
       </tr>`;
@@ -406,7 +438,7 @@ function renderTaskDetail(t: HtmlTaskData, config: EvalConfig, humanFeedback: Hu
   <div class="detail-section">
     <h4>Per-Run Breakdown (${t.runDetails.length} runs)</h4>
     <table class="run-table">
-      <thead><tr><th>Run</th><th>Discovery</th><th>Adherence</th><th>Output</th><th>Weighted</th><th>Tokens</th><th>Skills</th></tr></thead>
+      <thead><tr><th>Trial</th><th>Passed</th><th>Reward</th><th>Tokens</th><th>Skills</th></tr></thead>
       <tbody>${runRows}</tbody>
     </table>
   </div>`;
@@ -422,10 +454,13 @@ function renderComparisonSection(comparison: ComparisonData): string {
   const bs = summary.withoutSkill;
   const d = summary.delta;
 
+  const passedCell = (score: CombinedScore): string => {
+    const flags = trialFlags(score);
+    return `${flags.filter(Boolean).length}/${flags.length}`;
+  };
+
   let taskRows = '';
   for (const t of tasks) {
-    const w = t.withSkill.score;
-    const b = t.withoutSkill.score;
     const wTokens = t.withSkill.result.tokens;
     const bTokens = t.withoutSkill.result.tokens;
     const tokenCell = wTokens && bTokens && t.delta.totalTokensDelta !== undefined
@@ -433,9 +468,9 @@ function renderComparisonSection(comparison: ComparisonData): string {
       : 'n/a';
     taskRows += `<tr>
       <td>${escapeHtml(t.taskId)}</td>
-      <td>${w.adherence.toFixed(1)} / ${b.adherence.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.adherenceDelta, 1))}</span></td>
-      <td>${w.outputQuality.toFixed(1)} / ${b.outputQuality.toFixed(1)} / <span class="delta">${escapeHtml(formatDelta(t.delta.outputQualityDelta, 1))}</span></td>
-      <td>${w.weightedScore.toFixed(2)} / ${b.weightedScore.toFixed(2)} / <span class="delta">${escapeHtml(formatDelta(t.delta.weightedScoreDelta))}</span></td>
+      <td>${passedCell(t.withSkill.score)}</td>
+      <td>${passedCell(t.withoutSkill.score)}</td>
+      <td class="delta">${escapeHtml(formatDelta(t.delta.lift * 100, 0))}%</td>
       <td>${tokenCell}</td>
     </tr>`;
   }
@@ -447,10 +482,8 @@ function renderComparisonSection(comparison: ComparisonData): string {
   <table>
     <thead><tr><th>Metric</th><th>With Skill</th><th>Baseline</th><th>Delta</th></tr></thead>
     <tbody>
-      <tr><td>Discovery</td><td>${(ws.discoveryAccuracy * 100).toFixed(0)}%</td><td>${(bs.discoveryAccuracy * 100).toFixed(0)}%</td><td class="delta">${escapeHtml(formatDelta(d.discoveryAccuracyDelta * 100, 0))}%</td></tr>
-      <tr><td>Adherence</td><td>${ws.avgAdherence.toFixed(2)}/5</td><td>${bs.avgAdherence.toFixed(2)}/5</td><td class="delta">${escapeHtml(formatDelta(d.avgAdherenceDelta))}</td></tr>
-      <tr><td>Output Quality</td><td>${ws.avgOutputQuality.toFixed(2)}/5</td><td>${bs.avgOutputQuality.toFixed(2)}/5</td><td class="delta">${escapeHtml(formatDelta(d.avgOutputQualityDelta))}</td></tr>
-      <tr><td>Weighted Score</td><td>${ws.avgWeightedScore.toFixed(2)}</td><td>${bs.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(d.avgWeightedScoreDelta))}</td></tr>
+      <tr><td>Resolution Rate</td><td>${(ws.resolutionRate * 100).toFixed(0)}%</td><td>${(bs.resolutionRate * 100).toFixed(0)}%</td><td class="delta">${escapeHtml(formatDelta(d.resolutionRateDelta * 100, 0))}%</td></tr>
+      <tr><td>Pass@k</td><td>${(ws.passAtK * 100).toFixed(0)}%</td><td>${(bs.passAtK * 100).toFixed(0)}%</td><td class="delta">${escapeHtml(formatDelta(d.passAtKDelta * 100, 0))}%</td></tr>
       <tr><td>Duration</td><td>${(ws.totalDurationMs / 1000).toFixed(1)}s</td><td>${(bs.totalDurationMs / 1000).toFixed(1)}s</td><td class="delta">${escapeHtml(formatDelta(d.totalDurationDeltaMs / 1000, 1))}s</td></tr>
       <tr><td>Cost</td><td>$${ws.totalCostUsd.toFixed(4)}</td><td>$${bs.totalCostUsd.toFixed(4)}</td><td class="delta">$${escapeHtml(formatDelta(d.totalCostDeltaUsd, 4))}</td></tr>
       <tr><td>Tokens</td><td>${formatTokens(ws.totalTokens)}</td><td>${formatTokens(bs.totalTokens)}</td><td class="delta">${d.totalTokensDelta !== undefined ? escapeHtml(formatDelta(d.totalTokensDelta, 0)) : 'n/a'}</td></tr>
@@ -459,7 +492,7 @@ function renderComparisonSection(comparison: ComparisonData): string {
   <h3>Per-Task Comparison</h3>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Task</th><th>Adherence (W / B / Delta)</th><th>Output (W / B / Delta)</th><th>Weighted (W / B / Delta)</th><th>Tokens (W / B / Delta)</th></tr></thead>
+      <thead><tr><th>Task</th><th>With Skill Passed</th><th>Baseline Passed</th><th>Lift</th><th>Tokens (W / B / Delta)</th></tr></thead>
       <tbody>${taskRows}</tbody>
     </table>
   </div>
@@ -529,9 +562,7 @@ function renderCrossIterationSection(comparison: ComparisonResult): string {
       : '';
     taskRows += `<tr class="${changeClass}">
       <td>${escapeHtml(td.taskId)}</td>
-      <td>${td.previous.adherence.toFixed(1)} &rarr; ${td.current.adherence.toFixed(1)} (${escapeHtml(formatDelta(td.delta.adherence, 1))})</td>
-      <td>${td.previous.outputQuality.toFixed(1)} &rarr; ${td.current.outputQuality.toFixed(1)} (${escapeHtml(formatDelta(td.delta.outputQuality, 1))})</td>
-      <td>${td.previous.weightedScore.toFixed(2)} &rarr; ${td.current.weightedScore.toFixed(2)} (${escapeHtml(formatDelta(td.delta.weightedScore))})</td>
+      <td>${(td.previous.resolutionRate * 100).toFixed(0)}% &rarr; ${(td.current.resolutionRate * 100).toFixed(0)}% (${escapeHtml(formatDelta(td.delta * 100, 0))}%)</td>
       <td><span class="status ${td.significantChange === 'improved' ? 'status-pass' : td.significantChange === 'regressed' ? 'status-fail' : 'status-neutral'}">${td.significantChange}</span></td>
     </tr>`;
   }
@@ -544,6 +575,11 @@ function renderCrossIterationSection(comparison: ComparisonResult): string {
     extras += `<p><strong>Removed tasks:</strong> ${comparison.tasksOnlyInPrevious.map(escapeHtml).join(', ')}</p>`;
   }
 
+  const liftRow = sd.delta.skillLift !== undefined && sd.previous.skillLift !== undefined && sd.current.skillLift !== undefined
+    ? `
+      <tr><td>Skill Lift</td><td>${escapeHtml(formatDelta(sd.previous.skillLift * 100, 1))}%</td><td>${escapeHtml(formatDelta(sd.current.skillLift * 100, 1))}%</td><td class="delta">${escapeHtml(formatDelta(sd.delta.skillLift * 100, 1))}%</td></tr>`
+    : '';
+
   return `
 <section id="cross-iteration">
   <h2>Cross-Iteration Comparison</h2>
@@ -551,16 +587,14 @@ function renderCrossIterationSection(comparison: ComparisonResult): string {
   <table>
     <thead><tr><th>Metric</th><th>Previous</th><th>Current</th><th>Delta</th></tr></thead>
     <tbody>
-      <tr><td>Discovery</td><td>${(sd.previous.discoveryAccuracy * 100).toFixed(1)}%</td><td>${(sd.current.discoveryAccuracy * 100).toFixed(1)}%</td><td class="delta">${escapeHtml(formatDelta(sd.delta.discoveryAccuracy * 100, 1))}%</td></tr>
-      <tr><td>Adherence</td><td>${sd.previous.avgAdherence.toFixed(2)}</td><td>${sd.current.avgAdherence.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd.delta.avgAdherence))}</td></tr>
-      <tr><td>Output Quality</td><td>${sd.previous.avgOutputQuality.toFixed(2)}</td><td>${sd.current.avgOutputQuality.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd.delta.avgOutputQuality))}</td></tr>
-      <tr><td>Weighted Score</td><td>${sd.previous.avgWeightedScore.toFixed(2)}</td><td>${sd.current.avgWeightedScore.toFixed(2)}</td><td class="delta">${escapeHtml(formatDelta(sd.delta.avgWeightedScore))}</td></tr>
+      <tr><td>Resolution Rate</td><td>${(sd.previous.resolutionRate * 100).toFixed(1)}%</td><td>${(sd.current.resolutionRate * 100).toFixed(1)}%</td><td class="delta">${escapeHtml(formatDelta(sd.delta.resolutionRate * 100, 1))}%</td></tr>
+      <tr><td>Pass@k</td><td>${(sd.previous.passAtK * 100).toFixed(1)}%</td><td>${(sd.current.passAtK * 100).toFixed(1)}%</td><td class="delta">${escapeHtml(formatDelta(sd.delta.passAtK * 100, 1))}%</td></tr>${liftRow}
     </tbody>
   </table>
   <h3>Per-Task Changes</h3>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Task</th><th>Adherence</th><th>Output Quality</th><th>Weighted Score</th><th>Change</th></tr></thead>
+      <thead><tr><th>Task</th><th>Resolution Rate</th><th>Change</th></tr></thead>
       <tbody>${taskRows}</tbody>
     </table>
   </div>
@@ -869,7 +903,7 @@ function renderScript(): string {
       }
 
       // Category filter
-      if (show && currentFilter === 'failed' && d.failureCategory === 'none') show = false;
+      if (show && currentFilter === 'failed' && d.passed) show = false;
       if (show && currentFilter === 'flaky' && !d.isFlaky) show = false;
       if (show && currentFilter === 'regressed' && !d.isRegressed) show = false;
 

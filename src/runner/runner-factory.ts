@@ -1,18 +1,38 @@
 /**
  * Runner factory — creates the appropriate AgentRunner based on config.
- *
- * Non-Claude runners are dynamically imported so their SDKs
- * are only required when actually used.
  */
 
+import * as path from 'path';
 import type { AgentRunner, AgentRunnerOptions } from './agent-runner.js';
 import { ClaudeSdkRunner } from './claude-sdk-runner.js';
+import { ClaudeCodeRunner } from './claude-code-runner.js';
+import { CodexRunner } from './codex-runner.js';
+import { GeminiRunner } from './gemini-runner.js';
+import { OpenCodeRunner } from './opencode-runner.js';
+import { DEFAULT_SKILLS_MOUNT_PATH } from '../run/workspace.js';
 import type { RunnerType, EvalConfig } from '../config.js';
+
+/**
+ * Workspace-relative skills mount path per runner type, WITHOUT constructing
+ * a runner (validate needs the mount path for its oracle-gate workspace but
+ * not a live runner — and CLI-runner constructors print a security warning).
+ * Must mirror each runner class's skillsMountPath; runner-factory tests
+ * assert the two never diverge.
+ */
+export const RUNNER_SKILLS_MOUNT_PATHS: Record<RunnerType, string> = {
+  'claude-sdk': DEFAULT_SKILLS_MOUNT_PATH,
+  'claude-code': DEFAULT_SKILLS_MOUNT_PATH,
+  codex: path.join('.agents', 'skills'),
+  gemini: path.join('.gemini', 'skills'),
+  opencode: path.join('.opencode', 'skills'),
+};
 
 /**
  * Create the appropriate AgentRunner based on runner type.
  *
- * @param type - Runner type ('claude-sdk', 'vercel-ai', 'openai-agents', or 'copilot-sdk')
+ * @param type - Runner type ('claude-sdk' | 'claude-code' | 'codex' |
+ *   'gemini' | 'opencode'). gemini and opencode are EXPERIMENTAL (built from
+ *   documented output formats, not yet verified against a live CLI).
  * @param options - Runner options (cwd, model, timeout, etc.)
  * @param config - Optional pre-loaded EvalConfig. Passed through to BaseRunner
  *   so YAML file config values are respected. When omitted, BaseRunner falls
@@ -27,40 +47,17 @@ export async function createRunner(
     case 'claude-sdk':
       return new ClaudeSdkRunner(options, config);
 
-    case 'vercel-ai': {
-      const { VercelAiRunner } = await import('./vercel-ai-runner.js').catch(() => {
-        throw new Error(
-          'Vercel AI SDK runner requires the "ai" and a provider package (e.g. "@ai-sdk/openai"). ' +
-          'Install them with: npm install ai @ai-sdk/openai zod',
-        );
-      });
-      return new VercelAiRunner(options, config);
-    }
+    case 'claude-code':
+      return new ClaudeCodeRunner(options, config);
 
-    case 'openai-agents': {
-      const { OpenAiAgentsRunner } = await import('./openai-agents-runner.js').catch(() => {
-        throw new Error(
-          'OpenAI Agents SDK runner requires "@openai/agents". ' +
-          'Install it with: npm install @openai/agents',
-        );
-      });
-      return new OpenAiAgentsRunner(options, config);
-    }
+    case 'codex':
+      return new CodexRunner(options, config);
 
-    case 'copilot-sdk': {
-      const { CopilotSdkRunner } = await import('./copilot-sdk-runner.js').catch(() => {
-        throw new Error(
-          'Copilot SDK runner requires "@github/copilot-sdk". ' +
-          'Install it with: npm install @github/copilot-sdk',
-        );
-      });
-      return new CopilotSdkRunner(options, config);
-    }
+    case 'gemini':
+      return new GeminiRunner(options, config);
 
-    case 'google-adk': {
-      const { GoogleAdkRunner } = await import('./google-adk-runner.js');
-      return new GoogleAdkRunner(options, config);
-    }
+    case 'opencode':
+      return new OpenCodeRunner(options, config);
 
     default:
       throw new Error(`Unknown runner type: ${type}`);

@@ -23,7 +23,7 @@ import {
   isToolUseBlock,
 } from '../types.js';
 import { createPreToolUseHook } from './security.js';
-import { BaseRunner, buildTokenUsage } from './base-runner.js';
+import { BaseRunner, buildTokenUsage, skillNameFromReadPath } from './base-runner.js';
 import type { SessionLogger } from '../session/session-logger.js';
 
 export class ClaudeSdkRunner extends BaseRunner {
@@ -44,15 +44,19 @@ export class ClaudeSdkRunner extends BaseRunner {
       let resultCostUsd = 0;
       let resultTokens: TokenUsage | undefined;
 
-      const preToolUseHook = createPreToolUseHook(
-        this.options.allowedWriteDirs ?? [],
-        this.options.cwd ?? process.cwd(),
-      );
+      // Per-trial workspace (when set) becomes the agent cwd, and writes inside
+      // it are unrestricted — the workspace is throwaway isolation.
+      const cwd = task.workspaceDir ?? this.options.cwd ?? process.cwd();
+      const allowedWriteDirs = task.workspaceDir
+        ? [task.workspaceDir]
+        : this.options.allowedWriteDirs ?? [];
+
+      const preToolUseHook = createPreToolUseHook(allowedWriteDirs, cwd);
 
       const q = query({
         prompt: task.prompt,
         options: {
-          cwd: this.options.cwd,
+          cwd,
           model: this.options.model,
           systemPrompt: { type: 'preset', preset: 'claude_code' },
           settingSources: ['project'],
@@ -107,12 +111,9 @@ export class ClaudeSdkRunner extends BaseRunner {
 
               // Optionally detect via Read calls to SKILL.md
               if (this.options.countReadAsFallback && toolName === 'Read') {
-                const filePath = (toolInput.file_path as string) || '';
-                if (filePath.includes('SKILL.md') || filePath.includes('/skills/')) {
-                  const match = filePath.match(/skills\/([^/]+)/);
-                  if (match) {
-                    skillLoads.push(match[1]);
-                  }
+                const skillName = skillNameFromReadPath((toolInput.file_path as string) || '');
+                if (skillName) {
+                  skillLoads.push(skillName);
                 }
               }
             }

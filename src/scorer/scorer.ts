@@ -1,8 +1,11 @@
 /**
- * Scoring orchestrator that combines deterministic and LLM-as-judge scoring.
+ * Scoring orchestrator: deterministic reward is authoritative, the LLM judge
+ * is an opt-in diagnostics layer.
  *
- * Deterministic scoring runs first (free, fast), then LLM judge if configured.
- * Results are merged with deterministic taking precedence for discovery.
+ * Deterministic scoring produces the trial's passed/reward outcome. When the
+ * judge is enabled (--judge) it adds adherence/output-quality ratings,
+ * assertion grading with evidence, and failure-category attribution — none of
+ * which affect passed, rewards, or thresholds.
  */
 
 import type {
@@ -17,56 +20,51 @@ import type {
 import { scoreDeterministic } from './deterministic.js';
 import { SkillJudge } from './judge.js';
 import type { JudgeOptions } from '../types.js';
-import { loadConfigSync } from '../config.js';
 import { getFeedbackForTask } from '../feedback.js';
 
 export interface ScorerOptions {
-  /** Skip deterministic scoring */
+  /** Skip deterministic scoring (used by `score` re-runs on retained results). */
   noDeterministic?: boolean;
-  /** Skip LLM judge scoring */
-  noJudge?: boolean;
+  /** Enable LLM judge diagnostics (off by default). */
+  judgeEnabled?: boolean;
   /** Judge options */
   judgeOptions?: JudgeOptions;
-  /** Human review feedback keyed by task ID */
+  /** Human review feedback keyed by task ID (judge-scoped) */
   humanFeedback?: HumanFeedback;
-  /** True for no-skill baseline evaluation — adjusts judge prompt */
+  /** True for no-skill baseline evaluation — skips activation checks, adjusts judge prompt */
   isBaseline?: boolean;
-  /** Working directory for file-based assertions (expect_file_exists) */
+  /** Working directory for file-based assertions (files_exist) */
   cwd?: string;
 }
 
 /**
- * Score a single task result using both deterministic and LLM judge methods.
+ * Score a single task result: deterministic reward plus optional judge diagnostics.
  */
 export async function scoreTask(
   task: EvalTask,
   result: TaskResult,
   options: ScorerOptions = {}
 ): Promise<CombinedScore> {
-  const config = loadConfigSync();
-  const weights = new Map<string, number>([
-    ['discovery', config.defaultWeights.discovery],
-    ['adherence', config.defaultWeights.adherence],
-    ['output', config.defaultWeights.output],
-  ]);
-
-  // Run deterministic scoring
+  // Run deterministic scoring (reward-authoritative)
   let deterministicResult: DeterministicResult | null = null;
   if (!options.noDeterministic && task.deterministic) {
-    deterministicResult = scoreDeterministic(task, result, { cwd: options.cwd });
+    // File-based assertions resolve against the trial workspace when present.
+    deterministicResult = scoreDeterministic(task, result, {
+      cwd: task.workspaceDir ?? options.cwd,
+      ignoreActivation: options.isBaseline,
+    });
   }
 
-  // Run LLM judge scoring
+  // Run LLM judge diagnostics (opt-in)
   let judgeResult: JudgeScore | null = null;
-  if (!options.noJudge && task.criteria.length > 0) {
+  if (options.judgeEnabled && task.criteria.length > 0) {
     const judgeOpts = { ...options.judgeOptions, isBaseline: options.isBaseline };
     const judge = new SkillJudge(judgeOpts);
     const taskFeedback = getFeedbackForTask(options.humanFeedback, task.id);
     judgeResult = await judge.judgeResult(task, result, taskFeedback);
   }
 
-  const isNegativeTest = task.expectedSkillLoad === 'none';
-  return mergeScores(task.id, deterministicResult, judgeResult, weights, isNegativeTest);
+  return mergeScores(task, result, deterministicResult, judgeResult, options.isBaseline ?? false);
 }
 
 /**
@@ -90,135 +88,100 @@ export async function scoreAll(
   return scores;
 }
 
-/**
- * Apply dimension weights to produce a 0-1 weighted score.
- * Normalizes 1-5 dimensions to 0-1 before weighting.
- */
-function computeWeightedScore(
-  discovery: number,
-  adherence: number,
-  outputQuality: number,
-  weights: Map<string, number>,
-): number {
-  const adherenceNorm = (adherence - 1) / 4;
-  const outputNorm = (outputQuality - 1) / 4;
-  return (weights.get('discovery') ?? 0.3) * discovery
-    + (weights.get('adherence') ?? 0.4) * adherenceNorm
-    + (weights.get('output') ?? 0.3) * outputNorm;
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
 }
 
 /**
- * Merge deterministic and judge scores into a combined score.
+ * Merge deterministic reward and judge diagnostics into a combined score.
  *
- * Merge rules:
- * - Discovery: deterministic is authoritative (checks actual tool calls)
- * - Adherence/output: from judge; if no judge, map deterministic pass→5, fail→1
- * - Failure category: determined from available evidence
+ * Rules:
+ * - passed/reward come exclusively from the deterministic result (+ agent error)
+ * - discovery is deterministic (tool-call evidence) — never from the judge
+ * - adherence/outputQuality/assertion grading come from the judge when it ran
+ * - failure category: judge-sourced when available, else derived minimally
  */
 function mergeScores(
-  taskId: string,
+  task: EvalTask,
+  result: TaskResult,
   det: DeterministicResult | null,
   judge: JudgeScore | null,
-  weights: Map<string, number>,
-  isNegativeTest = false
+  isBaseline: boolean,
 ): CombinedScore {
+  const taskId = task.id;
+  const isNegativeTest = task.expectedSkillLoad === 'none';
+
   // For negative tests (expectedSkillLoad === 'none'):
   // discovery = 1 means correctly did NOT activate (good)
   // discovery = 0 means incorrectly activated (false positive)
   const computeDiscovery = (activated: boolean) =>
     isNegativeTest ? (activated ? 0 : 1) : (activated ? 1 : 0);
 
-  // Case 1: Both available — merge
-  if (det && judge) {
-    const discovery = computeDiscovery(det.skillActivated);
-    const adherence = judge.adherence;
-    const outputQuality = judge.outputQuality;
-    const weightedScore = computeWeightedScore(discovery, adherence, outputQuality, weights);
+  // Trial reward decomposition:
+  // - Agent error/timeout always yields reward 0.
+  // - Non-verifier deterministic checks gate the reward: if any of them
+  //   failed, reward is 0 — a passing verifier cannot rescue a trial that
+  //   failed an activation/output check.
+  // - When the other checks pass, the verifier (when present) contributes
+  //   its (possibly partial) reward; without a verifier the deterministic
+  //   outcome is binary.
+  // - With no deterministic checks (score re-runs with --no-deterministic),
+  //   there is nothing to fail: the agent error status decides.
+  // Invariant: on non-error trials, passed === (reward >= 1).
+  const hasVerifier = !!result.verifier;
+  const checksPassedExVerifier = det ? det.checksPassed : true;
+  const reward = result.isError
+    ? 0
+    : !checksPassedExVerifier
+      ? 0
+      : hasVerifier
+        ? clamp01(result.verifier!.reward)
+        : det
+          ? (det.passed ? 1 : 0)
+          : 1;
+  const passed = !result.isError && reward >= 1 && (det ? det.passed : true);
 
-    // Determine failure category
-    let failureCategory = judge.failureCategory;
-    if (!det.passed && det.skillActivated === false) {
+  const discovery = det ? computeDiscovery(det.skillActivated) : 0;
+  // Invocation signal feeds skillInvocationRate: only meaningful for
+  // with-skill trials of tasks that expect an invocation.
+  const invocation = !isBaseline && !isNegativeTest && det
+    ? (det.skillActivated ? 1 : 0)
+    : undefined;
+
+  // Failure category: judge-sourced when available, else derived minimally.
+  let failureCategory: FailureCategory = judge?.failureCategory ?? 'none';
+  if (result.isError) {
+    failureCategory = 'agent_error';
+  } else if (det) {
+    if (!det.passed && !det.skillActivated && det.details.some((d) => d.includes('Expected skill activation'))) {
       failureCategory = 'discovery_failure';
-    }
-    // Check for false positive via deterministic
-    if (det.skillActivated && det.details.some((d) => d.includes('false positive'))) {
+    } else if (det.details.some((d) => d.includes('false positive'))) {
       failureCategory = 'false_positive';
+    } else if (!det.passed && !judge) {
+      failureCategory = 'agent_error';
     }
-
-    const reasons: string[] = [];
-    if (det.details.length > 0) reasons.push(`Deterministic: ${det.details.join('; ')}`);
-    if (judge.reasoning) reasons.push(`Judge: ${judge.reasoning}`);
-
-    return {
-      taskId,
-      deterministic: det,
-      judge,
-      discovery,
-      adherence,
-      outputQuality,
-      weightedScore,
-      failureCategory,
-      reasoning: reasons.join(' | '),
-      checklistResults: judge.checklistResults,
-    };
+  }
+  if (passed && !judge) {
+    failureCategory = 'none';
   }
 
-  // Case 2: Deterministic only
-  if (det) {
-    const discovery = computeDiscovery(det.skillActivated);
-    const adherence = det.passed ? 5 : 1;
-    const outputQuality = det.passed ? 5 : 1;
-    const weightedScore = computeWeightedScore(discovery, adherence, outputQuality, weights);
+  const reasons: string[] = [];
+  if (result.isError && result.errorMessage) reasons.push(`Agent error: ${result.errorMessage}`);
+  if (det && det.details.length > 0) reasons.push(`Deterministic: ${det.details.join('; ')}`);
+  if (judge?.reasoning) reasons.push(`Judge: ${judge.reasoning}`);
 
-    let failureCategory: FailureCategory = 'none';
-    if (!det.skillActivated && det.details.some((d) => d.includes('Expected skill activation'))) {
-      failureCategory = 'discovery_failure';
-    }
-    if (det.details.some((d) => d.includes('false positive'))) {
-      failureCategory = 'false_positive';
-    }
-
-    return {
-      taskId,
-      deterministic: det,
-      judge: null,
-      discovery,
-      adherence,
-      outputQuality,
-      weightedScore,
-      failureCategory,
-      reasoning: `Deterministic only: ${det.details.join('; ')}`,
-      checklistResults: [],
-    };
-  }
-
-  // Case 3: Judge only
-  if (judge) {
-    return {
-      taskId,
-      deterministic: null,
-      judge,
-      discovery: judge.discovery,
-      adherence: judge.adherence,
-      outputQuality: judge.outputQuality,
-      weightedScore: judge.weightedScore,
-      failureCategory: judge.failureCategory,
-      reasoning: judge.reasoning,
-      checklistResults: judge.checklistResults,
-    };
-  }
-
-  // Case 4: No scoring available
   return {
     taskId,
-    deterministic: null,
-    judge: null,
-    discovery: 0,
-    adherence: 1,
-    outputQuality: 1,
-    weightedScore: 0,
-    failureCategory: 'agent_error',
-    reasoning: 'No scoring method available (no deterministic check or LLM judge criteria defined)',
-    checklistResults: [],
+    deterministic: det,
+    judge,
+    passed,
+    reward,
+    discovery,
+    invocation,
+    adherence: judge?.adherence,
+    outputQuality: judge?.outputQuality,
+    failureCategory,
+    reasoning: reasons.join(' | ') || 'No scoring detail available',
+    checklistResults: judge?.checklistResults ?? [],
   };
 }
