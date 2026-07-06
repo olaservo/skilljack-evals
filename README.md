@@ -94,7 +94,7 @@ A task must define at least one of `checks:`, a `verifier/` script, or `assertio
 | `claude-sdk` (default) | stable | Claude Agent SDK in-process | `.claude/skills` | `ANTHROPIC_API_KEY` |
 | `claude-code` | stable | `claude -p --output-format stream-json --setting-sources project` | `.claude/skills` | `npm i -g @anthropic-ai/claude-code` |
 | `codex` | stable (e2e-verified) | `codex exec --json --skip-git-repo-check --ignore-user-config --ephemeral` | `.agents/skills` | `npm i -g @openai/codex` + `codex login` |
-| `gemini` | **experimental** | `gemini -p --output-format stream-json --approval-mode yolo` | `.gemini/skills` | `npm i -g @google/gemini-cli` |
+| `gemini` | **experimental, to be replaced** | `gemini -p --output-format stream-json --approval-mode yolo` | `.gemini/skills` | `npm i -g @google/gemini-cli` |
 | `opencode` | stable (e2e-verified) | `opencode run --format json --auto` + isolation env | `.opencode/skills` | `npm i -g opencode-ai` |
 
 Notes:
@@ -103,7 +103,7 @@ Notes:
 - `--model` semantics differ per runner: `claude-sdk`/`claude-code` take Claude aliases (`sonnet`, `haiku`, `opus`); `codex`/`gemini`/`opencode` only forward `--model` when you set one explicitly (otherwise each CLI uses its own default — Claude aliases are never forwarded to non-Claude CLIs). OpenCode expects `provider/model` form.
 - Skill invocation detection: Claude runners see the native `Skill` tool; `codex` detects shell reads of `SKILL.md` (its native discovery mechanism, verified in captured transcripts); `gemini`/`opencode` look for their native `activate_skill`/`skill` tools plus SKILL.md reads as fallback.
 - Isolation: `claude-code` passes `--setting-sources project`, `codex` passes `--ignore-user-config --ephemeral`, and `opencode` sets per-trial isolation env vars (opencode has no ignore-user-config flag; see the JSDoc in `src/runner/opencode-runner.ts` for the exact set) so your global config and skills don't leak into trials. Auth still works via provider env keys (`ANTHROPIC_API_KEY` etc.) and, for `opencode auth login` OAuth users, by forwarding the real `auth.json` content into the trial. All CLI runners spawn with `PWD` pinned to the trial workspace (some CLI runtimes trust `env.PWD` over the real cwd). The `gemini` runner has **no verified isolation story yet** — global gemini config and skills may leak into trials; see the JSDoc in `src/runner/gemini-runner.ts`.
-- `gemini` was built from official docs but has not been verified against a live CLI — it warns on first use, and a captured transcript is wanted (see `src/__tests__/fixtures/transcripts/README.md`). `opencode` was verified live against opencode 1.17.13 (real captured transcript, isolation probe, error-shape capture).
+- `gemini` was built from official docs and will NOT be live-verified: Google deprecated Gemini CLI for consumer tiers (June 2026) in favor of Antigravity CLI, so the plan is an `antigravity` runner replacing it (tracked in [#126](https://github.com/olaservo/skilljack-evals/issues/126)); the gemini runner warns on first use and remains only for enterprise-licensed legacy users until then. `opencode` was verified live against opencode 1.17.13 (real captured transcript, isolation probe, error-shape capture).
 
 ### Security model
 
