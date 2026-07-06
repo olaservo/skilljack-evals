@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vm from 'vm';
+import { BUILTIN_AGENT_SKILLS } from '../types.js';
 import type {
   EvalTask,
   TaskResult,
@@ -65,11 +66,13 @@ export function scoreDeterministic(
   if (result.isError) {
     details.push('Task errored — treating as no activation');
   } else {
-    // Check tool calls for skill invocations
+    // Check tool calls for skill invocations (built-in agent skills are
+    // housekeeping, not activations — skip, don't break, so a real skill
+    // call after a built-in one is still found)
     for (const call of result.toolCalls) {
       if (isSkillTool(call.tool)) {
         const name = extractSkillName(call.input);
-        if (name) {
+        if (name && !BUILTIN_AGENT_SKILLS.has(name)) {
           skillActivated = true;
           activatedSkillName = name;
           break;
@@ -78,9 +81,12 @@ export function scoreDeterministic(
     }
 
     // Also check skillLoads array (may be populated by runner)
-    if (!skillActivated && result.skillLoads.length > 0) {
-      skillActivated = true;
-      activatedSkillName = result.skillLoads[0];
+    if (!skillActivated) {
+      const loaded = result.skillLoads.find((name) => !BUILTIN_AGENT_SKILLS.has(name));
+      if (loaded) {
+        skillActivated = true;
+        activatedSkillName = loaded;
+      }
     }
   }
 

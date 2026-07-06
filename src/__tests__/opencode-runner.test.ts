@@ -1,10 +1,14 @@
 /**
- * OpenCodeRunner tests — EXPERIMENTAL runner, replayed against a SYNTHETIC
- * fixture (hand-written from documented output shapes, NOT captured from a
- * live CLI). Replace with a captured transcript when opencode is available.
+ * OpenCodeRunner tests — replayed against a REAL transcript captured from
+ * opencode 1.17.13 (2026-07-05, Windows, anthropic/claude-haiku-4-5, greeting
+ * skill mounted at .opencode/skills/, full isolation env). See
+ * fixtures/transcripts/README.md for the capture procedure and the verified
+ * contract.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { OpenCodeRunner, OPENCODE_CLI_INSTALL_HINT } from '../runner/opencode-runner.js';
@@ -13,7 +17,7 @@ import type { EvalTask } from '../types.js';
 
 const FIXTURE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  'fixtures', 'transcripts', 'opencode', 'synthetic-greeting-with-skill.jsonl',
+  'fixtures', 'transcripts', 'opencode', 'greeting-with-skill.jsonl',
 );
 
 class TestableOpenCodeRunner extends OpenCodeRunner {
@@ -57,7 +61,7 @@ beforeAll(async () => {
     .map((line) => JSON.parse(line));
 });
 
-describe('OpenCodeRunner with the synthetic transcript', () => {
+describe('OpenCodeRunner with the captured transcript', () => {
   function makeRunner(model?: string): TestableOpenCodeRunner {
     const runner = new TestableOpenCodeRunner({ model, taskTimeoutMs: 60000 });
     runner.cliResult = { ...emptyCliResult(), events: fixtureEvents };
@@ -78,18 +82,37 @@ describe('OpenCodeRunner with the synthetic transcript', () => {
     expect(result.output.trimEnd().endsWith('Warm regards!')).toBe(true);
   });
 
-  it('extracts cost and tokens from step_finish', async () => {
+  it('sums cost and tokens across step_finish events', async () => {
     const result = await makeRunner().runTask(makeTask());
 
-    expect(result.costUsd).toBeCloseTo(0.0021);
+    // Captured run has two steps (skill call, then final text):
+    // cost 0.0104655 + 0.00141995, tokens input 3+5, output 52+38,
+    // cache read 0+8162, cache write 8162+327.
+    expect(result.costUsd).toBeCloseTo(0.01188545, 6);
     expect(result.tokens).toEqual({
-      input: 900,
-      output: 80,
-      cacheRead: 300,
-      cacheCreation: 50,
-      total: 900 + 80 + 300 + 50,
+      input: 8,
+      output: 90,
+      cacheRead: 8162,
+      cacheCreation: 8489,
+      total: 8 + 90 + 8162 + 8489,
     });
+    // Two step_finish events, but only the reason:'stop' one ends the
+    // assistant turn (tool-calls steps don't) — comparable to codex/claude.
     expect(result.numTurns).toBe(1);
+  });
+
+  it('folds reasoning tokens into output (TokenUsage has no reasoning field)', async () => {
+    const runner = new TestableOpenCodeRunner({});
+    runner.cliResult = {
+      ...emptyCliResult(),
+      events: [
+        { type: 'text', part: { type: 'text', text: 'thought hard', time: { start: 1, end: 2 } } },
+        { type: 'step_finish', part: { type: 'step-finish', reason: 'stop', cost: 0.01, tokens: { input: 10, output: 20, reasoning: 5, cache: { read: 0, write: 0 } } } },
+      ],
+    };
+
+    const result = await runner.runTask(makeTask());
+    expect(result.tokens).toEqual({ input: 10, output: 25, cacheRead: 0, cacheCreation: 0, total: 35 });
   });
 
   it('spawns opencode run with json format, --auto, prompt, and workspace cwd', async () => {
@@ -127,8 +150,8 @@ describe('OpenCodeRunner with the synthetic transcript', () => {
     runner.cliResult = {
       ...emptyCliResult(),
       events: [
-        { type: 'tool_use', tool: 'read', callID: 'c1', state: { status: 'completed', input: { filePath: '/ws/.opencode/skills/greeting/SKILL.md' } } },
-        { type: 'text', text: 'done' },
+        { type: 'tool_use', part: { type: 'tool', tool: 'read', callID: 'c1', state: { status: 'completed', input: { filePath: '/ws/.opencode/skills/greeting/SKILL.md' } } } },
+        { type: 'text', part: { type: 'text', text: 'done', time: { start: 1, end: 2 } } },
       ],
     };
 
@@ -136,8 +159,91 @@ describe('OpenCodeRunner with the synthetic transcript', () => {
     expect(result.skillLoads).toEqual(['greeting']);
   });
 
+  it('ignores the built-in customize-opencode skill (always registered by the CLI)', async () => {
+    const runner = new TestableOpenCodeRunner({});
+    runner.cliResult = {
+      ...emptyCliResult(),
+      events: [
+        { type: 'tool_use', part: { type: 'tool', tool: 'skill', callID: 'c1', state: { status: 'completed', input: { name: 'customize-opencode' } } } },
+        { type: 'text', part: { type: 'text', text: 'done', time: { start: 1, end: 2 } } },
+      ],
+    };
+
+    const result = await runner.runTask(makeTask());
+    expect(result.skillLoads).toEqual([]);
+    // Still recorded as a tool call, just not a skill invocation.
+    expect(result.toolCalls.map((c) => c.tool)).toEqual(['skill']);
+  });
+
+  it('layers per-trial isolation env vars over the process env', async () => {
+    const runner = makeRunner();
+    await runner.runTask(makeTask({ workspaceDir: '/tmp/trial-ws' }));
+
+    const env = runner.lastCliOptions!.env!;
+    // The XDG root is a per-trial OS temp dir OUTSIDE the workspace (so
+    // verifiers, docker mounts, and retention never see opencode's state).
+    const xdgRoot = path.dirname(env.XDG_CONFIG_HOME!);
+    expect(path.basename(xdgRoot)).toMatch(/^skilljack-opencode-/);
+    expect(xdgRoot.startsWith(os.tmpdir())).toBe(true);
+    expect(env.XDG_CONFIG_HOME).toBe(path.join(xdgRoot, 'config'));
+    expect(env.XDG_DATA_HOME).toBe(path.join(xdgRoot, 'data'));
+    expect(env.XDG_CACHE_HOME).toBe(path.join(xdgRoot, 'cache'));
+    expect(env.XDG_STATE_HOME).toBe(path.join(xdgRoot, 'state'));
+    expect(env.OPENCODE_TEST_HOME).toBe(path.join(xdgRoot, 'home'));
+    expect(env.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBe('1');
+    expect(env.OPENCODE_PURE).toBe('1');
+    // opencode (Bun) trusts env.PWD over the spawn cwd — CliRunner pins it
+    // to the resolved workspace for every CLI runner.
+    expect(env.PWD).toBe(path.resolve('/tmp/trial-ws'));
+    // The workspace .opencode mount must stay discoverable.
+    expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBeUndefined();
+    // Provider auth (and PATH etc.) still inherited from the process env.
+    expect(env.PATH ?? env.Path).toBeDefined();
+    // The per-trial temp dir is removed after the trial.
+    expect(fsSync.existsSync(xdgRoot)).toBe(false);
+  });
+
   it('mounts skills at .opencode/skills (plural, per current docs)', () => {
     expect(new TestableOpenCodeRunner({}).skillsMountPath).toBe(path.join('.opencode', 'skills'));
+  });
+
+  it('prunes opencode config-bootstrap droppings from the workspace after the trial', async () => {
+    // opencode's bootstrap writes a .gitignore and npm-installs
+    // @opencode-ai/plugin into the workspace .opencode/ during every run —
+    // the runner must remove them so verifiers/retention see only task state.
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), 'skilljack-test-ws-'));
+    try {
+      const dotOpencode = path.join(ws, '.opencode');
+      await fs.mkdir(path.join(dotOpencode, 'node_modules', 'pkg'), { recursive: true });
+      await fs.mkdir(path.join(dotOpencode, 'skills', 'greeting'), { recursive: true });
+      await fs.writeFile(path.join(dotOpencode, 'package.json'), '{}');
+      await fs.writeFile(path.join(dotOpencode, '.gitignore'), 'node_modules');
+      await fs.writeFile(path.join(dotOpencode, 'skills', 'greeting', 'SKILL.md'), '---\nname: greeting\n---\n');
+
+      const runner = makeRunner();
+      await runner.runTask(makeTask({ workspaceDir: ws }));
+
+      expect(fsSync.existsSync(path.join(dotOpencode, 'node_modules'))).toBe(false);
+      expect(fsSync.existsSync(path.join(dotOpencode, 'package.json'))).toBe(false);
+      expect(fsSync.existsSync(path.join(dotOpencode, '.gitignore'))).toBe(false);
+      // The skills mount itself must survive the prune.
+      expect(fsSync.existsSync(path.join(dotOpencode, 'skills', 'greeting', 'SKILL.md'))).toBe(true);
+    } finally {
+      await fs.rm(ws, { recursive: true, force: true });
+    }
+  });
+
+  it('respects an explicitly-empty OPENCODE_AUTH_CONTENT opt-out', async () => {
+    vi.stubEnv('OPENCODE_AUTH_CONTENT', '');
+    try {
+      const runner = makeRunner();
+      await runner.runTask(makeTask({ workspaceDir: '/tmp/trial-ws' }));
+      // '' means the user opted out of auth forwarding — must NOT be
+      // replaced with the real auth.json content.
+      expect(runner.lastCliOptions!.env!.OPENCODE_AUTH_CONTENT).toBe('');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 
@@ -153,17 +259,34 @@ describe('OpenCodeRunner error handling', () => {
     expect(result.errorMessage).toContain('no provider configured');
   });
 
-  it('returns an error result on an error event', async () => {
+  it('returns an error result on an error event (real nested NamedError shape)', async () => {
     const runner = new TestableOpenCodeRunner({});
     runner.cliResult = {
       ...emptyCliResult(),
-      events: [{ type: 'error', part: { message: 'model refused' } }],
+      exitCode: 1,
+      // Shape captured live from opencode 1.17.13 with a bad -m value.
+      events: [{ type: 'error', error: { name: 'UnknownError', data: { message: 'Unexpected server error. Check server logs for details.', ref: 'err_b62b8d5e' } } }],
     };
 
     const result = await runner.runTask(makeTask());
 
     expect(result.isError).toBe(true);
-    expect(result.errorMessage).toContain('model refused');
+    expect(result.errorMessage).toContain('Unexpected server error');
+    expect(result.errorMessage).not.toContain('[object Object]');
+  });
+
+  it('extracts a message from a string error payload', async () => {
+    const runner = new TestableOpenCodeRunner({});
+    runner.cliResult = {
+      ...emptyCliResult(),
+      events: [{ type: 'error', error: 'flat string error' }],
+    };
+
+    const result = await runner.runTask(makeTask());
+
+    expect(result.isError).toBe(true);
+    expect(result.errorMessage).toContain('flat string error');
+    expect(result.errorMessage).not.toContain('[object Object]');
   });
 
   it('returns the standard timeout error result', async () => {

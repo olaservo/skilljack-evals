@@ -31,8 +31,8 @@ export const RUNNER_SKILLS_MOUNT_PATHS: Record<RunnerType, string> = {
  * Create the appropriate AgentRunner based on runner type.
  *
  * @param type - Runner type ('claude-sdk' | 'claude-code' | 'codex' |
- *   'gemini' | 'opencode'). gemini and opencode are EXPERIMENTAL (built from
- *   documented output formats, not yet verified against a live CLI).
+ *   'gemini' | 'opencode'). gemini is EXPERIMENTAL (built from documented
+ *   output formats, not yet verified against a live CLI).
  * @param options - Runner options (cwd, model, timeout, etc.)
  * @param config - Optional pre-loaded EvalConfig. Passed through to BaseRunner
  *   so YAML file config values are respected. When omitted, BaseRunner falls

@@ -168,6 +168,33 @@ describe('trial reward derivation', () => {
     expect(score.discovery).toBe(1); // correctly did not activate
   });
 
+  it('ignores built-in agent skills (customize-opencode) on anti-trigger tasks', async () => {
+    const antiTask = makeTask({
+      expectedSkillLoad: 'none',
+      deterministic: { expectSkillActivation: false },
+    });
+    // opencode's built-in skill is always registered; invoking it is agent
+    // housekeeping, not a skill activation — must NOT count as false positive.
+    const score = await scoreTask(antiTask, makeResult({
+      skillLoads: [],
+      toolCalls: [{ tool: 'skill', toolUseId: '1', timestamp: 0, input: { name: 'customize-opencode' } }],
+    }));
+    expect(score.passed).toBe(true);
+    expect(score.discovery).toBe(1);
+  });
+
+  it('finds the real skill when a built-in agent skill fires first', async () => {
+    const score = await scoreTask(makeTask(), makeResult({
+      skillLoads: ['test-skill'],
+      toolCalls: [
+        { tool: 'skill', toolUseId: '1', timestamp: 0, input: { name: 'customize-opencode' } },
+        { tool: 'skill', toolUseId: '2', timestamp: 1, input: { name: 'test-skill' } },
+      ],
+    }));
+    expect(score.passed).toBe(true);
+    expect(score.discovery).toBe(1);
+  });
+
   it('baseline mode scores output checks without an activation gate', async () => {
     const task = makeTask({
       deterministic: { expectSkillActivation: true, expectContains: ['hello'] },

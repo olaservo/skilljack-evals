@@ -1,4 +1,0 @@
-{"type":"step_start","timestamp":1751600000000,"sessionID":"synthetic-session"}
-{"type":"tool_use","timestamp":1751600001000,"sessionID":"synthetic-session","tool":"skill","callID":"call-1","state":{"status":"completed","input":{"name":"greeting"},"output":"Loaded skill greeting","title":"skill: greeting"}}
-{"type":"text","timestamp":1751600002000,"sessionID":"synthetic-session","text":"Hello! GREETING_SUCCESS\n\nWelcome aboard — glad to have you with us.\n\nWarm regards!"}
-{"type":"step_finish","timestamp":1751600003000,"sessionID":"synthetic-session","reason":"stop","cost":0.0021,"tokens":{"input":900,"output":80,"reasoning":0,"cache":{"read":300,"write":50}}}

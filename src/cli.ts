@@ -45,7 +45,7 @@ program
   .command('run')
   .description('Run the full evaluation pipeline: execute tasks → score → report')
   .argument('<path>', 'Path to a task-package dir or suite dir of task packages')
-  .option('--runner <type>', 'Runner type: claude-sdk | claude-code | codex | gemini (experimental) | opencode (experimental) (default: claude-sdk)')
+  .option('--runner <type>', 'Runner type: claude-sdk | claude-code | codex | gemini (experimental) | opencode (default: claude-sdk)')
   .option('--model <model>', 'Agent model (default: sonnet)')
   .option('--judge-model <model>', 'Judge model (default: haiku)')
   .option('--config <path>', 'Path to eval.config.yaml')
