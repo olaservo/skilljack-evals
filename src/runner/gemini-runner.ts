@@ -1,10 +1,14 @@
 /**
- * Gemini CLI Runner — EXPERIMENTAL.
+ * Gemini CLI Runner — EXPERIMENTAL, slated for replacement.
  *
  * Built from the official Gemini CLI docs (headless mode, Agent Skills,
- * stream-json output), NOT yet verified against a live CLI on this machine —
- * captured transcripts wanted. Unit tests replay a hand-written SYNTHETIC
- * fixture (src/__tests__/fixtures/transcripts/gemini/synthetic-*.jsonl).
+ * stream-json output), NOT verified against a live CLI — and it never will
+ * be: Google deprecated Gemini CLI for consumer tiers (June 2026) in favor
+ * of Antigravity CLI, which keeps Agent Skills. The plan (issue #126) is an
+ * `antigravity` runner spiked per fixtures/transcripts/README.md; this
+ * runner remains only for enterprise-licensed legacy users until then. Unit
+ * tests replay a hand-written SYNTHETIC fixture
+ * (src/__tests__/fixtures/transcripts/gemini/synthetic-*.jsonl).
  *
  * Documented facts this implementation relies on (geminicli.com/docs, July 2026):
  * - Headless: `gemini -p "<prompt>" --output-format stream-json` emits JSONL

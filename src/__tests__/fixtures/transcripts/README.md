@@ -42,6 +42,6 @@ Verified contract:
 
 ## gemini — SYNTHETIC fixture only
 
-The gemini CLI is not installed on the dev machine, so `gemini/synthetic-*.jsonl` is HAND-WRITTEN from the officially documented output shapes (July 2026 docs), NOT a captured transcript. The runner built on it is marked experimental; replace with a real capture when the CLI is available.
+The gemini CLI is not installed on the dev machine, so `gemini/synthetic-*.jsonl` is HAND-WRITTEN from the officially documented output shapes (July 2026 docs), NOT a captured transcript. The runner built on it is marked experimental and will NOT be live-verified: Google deprecated Gemini CLI for consumer tiers (June 2026) in favor of Antigravity CLI, so the planned path is a new `antigravity` runner spiked with this same capture procedure (issue #126) — the opencode spike above is the template (reuse the `CliRunner` scratch-dir/`buildEnv` contract for env-based isolation, check for bundled builtin skills, and remember `PWD` is already pinned at the base for all CLI runners).
 
 - gemini: `gemini -p "<prompt>" --output-format stream-json --approval-mode yolo` (docs-verified; the plan's `--output-format json --yolo` guess was revised — single-object json mode omits tool arguments, which SKILL.md-read detection needs). Skills discovered from `.gemini/skills/` (alias `.agents/skills/`); native `activate_skill` tool is the primary invocation surface.
